@@ -67,7 +67,8 @@ register({
     const st=$('ocr_st'),pg=$('ocr_pg'),out=$('ocr_out');
     const showOff=async()=>{
       const ok=await offline(lang),need=CORE+lang.split('+').reduce((a,l)=>a+SIZE[l],0);
-      $('ocr_off').textContent=ok?'✓ Disponible hors-ligne (déjà téléchargé).':'Premier usage : ~'+mo(need)+' à télécharger une seule fois, ensuite hors-ligne.';
+      const el=$('ocr_off');if(!el)return;                  // v5 : outil fermé entre-temps (téléphone lent) → rien à afficher
+      el.textContent=ok?'✓ Disponible hors-ligne (déjà téléchargé).':'Premier usage : ~'+mo(need)+' à télécharger une seule fois, ensuite hors-ligne.';
     };
     const log=m=>{if(!m||!m.status)return;st.textContent=(STEP[m.status]||m.status)+(m.progress?' — '+Math.round(m.progress*100)+' %':'');pg.value=m.progress||0;};
     let token=0;

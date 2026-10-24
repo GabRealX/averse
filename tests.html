@@ -1,7 +1,17 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8"><title>AVERSE — tests</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="css/base.css"><link rel="stylesheet" href="css/tools.css">
-<style>body{padding:30px;font-family:var(--mono);font-size:.82rem}.t{padding:5px 0;border-bottom:1px solid var(--line)}h1{font-size:1.2rem;margin-bottom:6px}#sum{margin:10px 0 18px}</style>
+<style>body{padding:30px;font-family:var(--mono);font-size:.82rem}.t{padding:5px 0;border-bottom:1px solid var(--line)}h1{font-size:1.2rem;margin-bottom:6px}#sum{margin:10px 0 18px}.skip{color:var(--fg-faint)}</style>
+<script>
+/* v5 : les tests tournent sur le même site que tes vraies notes (ex. GitHub Pages). On range d'abord une copie de tout
+   le localStorage ; elle est remise à la fin — et, si la page est fermée en plein milieu, par la prochaine page ouverte
+   (voir core.js). Une copie laissée par un test interrompu est d'abord remise en place. */
+try{const old=localStorage.getItem('averse-tests-backup');
+  if(old){const o=JSON.parse(old);localStorage.clear();for(const k in o)localStorage.setItem(k,o[k]);}
+  const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}
+  localStorage.setItem('averse-tests-backup',JSON.stringify(o));sessionStorage.setItem('averse-tests','1');
+}catch(e){}
+</script>
 <script src="js/core.js"></script></head>
 <body>
 <h1>Tests des calculs</h1>
@@ -12,7 +22,7 @@
 <script src="js/tools/reseau.js"></script><script src="js/tools/electronique.js"></script>
 <script src="js/tools/dev.js"></script><script src="js/tools/texte.js"></script><script src="js/tools/memo.js"></script>
 <script src="js/tools/encodage.js"></script><script src="js/tools/pdf.js"></script><script src="js/tools/carnet.js"></script><script src="js/tools/image.js"></script><script src="js/tools/editeur.js"></script><script src="js/tools/ocr.js"></script>
-<script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
+<script src="js/vault.js"></script><script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
 <script src="js/math.js"></script><script src="js/ctxmenu.js"></script>
 <link rel="stylesheet" href="css/ui.css">
 <script>
@@ -23,6 +33,8 @@ const text=()=>$('modal').textContent.replace(/\s+/g,' ');
 function fill(id,v){const e=$(id);e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));}
 function tab(k){$('modal').querySelector('.tabs [data-v="'+k+'"]').click();}
 const tests=[];const T=(name,fn)=>tests.push([name,fn]);
+/* v5 : fonction absente de CE navigateur → « ignoré » (gris), pas « ✕ ». Seulement pour une API manquante, jamais pour un résultat faux. */
+const SKIP=why=>{const e=new Error(why);e.skip=true;throw e;};
 const has=(s,...parts)=>{for(const p of parts)if(!(p instanceof RegExp?p.test(s):s.includes(p)))throw new Error('manque « '+p+' » dans : '+s.slice(0,160));};
 
 T('IPv4 : 192.168.1.130/26',async()=>{NOXE.open('reseau');has(text(),'192.168.1.128/26','192.168.1.191','62');});
@@ -67,8 +79,11 @@ T('Regex : correspondances calculées dans le Worker',async()=>{NOXE.open('regex
 T('Regex : (a+)+$ arrêtée sans bloquer la page',async()=>{fill('r_p','(a+)+$');fill('r_t','a'.repeat(40)+'!');
   let ticks=0;const iv=setInterval(()=>ticks++,50);const t0=performance.now();
   while(!$('r_slow')&&performance.now()-t0<4000)await sleep(50);clearInterval(iv);
-  if(!$('r_slow'))throw new Error('pas de timeout');if(ticks<15)throw new Error('page bloquée ('+ticks+' ticks)');
-  fill('r_p','a+');for(let i=0;i<40&&!/correspondance/.test($('r_out').textContent);i++)await sleep(50);has($('r_out').textContent,'1 correspondance');});
+  /* Safari (JavaScriptCore) a sa propre limite : il abandonne seul ce motif au bout de ~0,8 s et répond « 0 correspondance »
+     (ce qui est juste ici). Ce qui compte : la page n'est jamais bloquée, et on a une réponse. */
+  const selfStop=!$('r_slow')&&/0 correspondance/.test($('r_out').textContent);
+  if(!$('r_slow')&&!selfStop)throw new Error('pas de timeout');if(ticks<15)throw new Error('page bloquée ('+ticks+' ticks)');
+  fill('r_p','a+');for(let i=0;i<60&&!/1 correspondance/.test($('r_out').textContent);i++)await sleep(50);has($('r_out').textContent,'1 correspondance');});
 T('PDF : intervalles de pages',async()=>{const j=x=>JSON.stringify(x);
   if(j(NOXE.pageRanges('1-3, 5',10))!=='[0,1,2,4]')throw new Error('1-3,5');if(j(NOXE.pageRanges('8-',10))!=='[7,8,9]')throw new Error('8-');
   if(j(NOXE.pageRanges('',3))!=='[0,1,2]')throw new Error('vide');if(NOXE.pageRanges('0',5)!==null||NOXE.pageRanges('11',10)!==null||NOXE.pageRanges('a',5)!==null)throw new Error('invalide accepté');});
@@ -240,7 +255,8 @@ T('Clic droit : miniature d\'Images en PDF → retirer',async()=>{NOXE.open('pdf
 let S3;
 const wkey=(el,k,o={})=>{const e=new W.KeyboardEvent('keydown',Object.assign({key:k,bubbles:true,cancelable:true},o));el.dispatchEvent(e);return e;};
 const frame=async(src,test)=>{F=document.createElement('iframe');F.style.cssText='width:1000px;height:700px;border:1px solid #333;margin-top:20px';document.body.appendChild(F);
-  await new Promise(r=>{F.onload=r;F.src=src;});W=F.contentWindow;await until(test,5000);};
+  F.scrollIntoView({block:'start'});      // v5 : une iframe hors de l'écran a ses animations ralenties (voire arrêtées) par le navigateur
+  await new Promise(r=>{F.onload=r;F.src=src;});W=F.contentWindow;await until(test,8000);};
 T('Accueil v3 : grand titre AVERSE + liens du pied de page (data.js)',async()=>{S3=snap();
   await frame('index.html#/',()=>{try{N=W.eval('NOXE');return !!N.search&&W.document.querySelectorAll('#footerLinks a').length;}catch(e){return false;}});
   const d=W.document;if(!d.querySelector('#homeView .home-head h1')||d.querySelector('.home-head h1').textContent!=='AVERSE')throw new Error('titre');
@@ -307,7 +323,7 @@ const wctx=(el,x,y)=>{const r=el.getBoundingClientRect();const e=new W.MouseEven
 const wL=()=>[...W.document.querySelectorAll('#ctxMenu button')].map(b=>b.textContent);
 const wClick=lab=>{const b=[...W.document.querySelectorAll('#ctxMenu button')].find(b=>b.textContent.includes(lab));if(!b)throw new Error('pas de « '+lab+' » : '+wL().join('|'));b.click();};
 const wAsk=async v=>{await until(()=>W.document.getElementById('ctxIn'));const i=W.document.getElementById('ctxIn');i.value=v;i.form.requestSubmit();};
-const nd=()=>W.eval('data');
+const nd=()=>W.notesDebug.data;
 T('Carnet : clic droit sur une note → les 8 actions',async()=>{const item=()=>W.document.querySelector('#list [data-id="n_b"]');
   wctx(item());has(wL().join('|'),'Ouvrir','Renommer…','Dupliquer','Épingler en haut','Ajouter un tag…','Exporter .md','Exporter PDF','Supprimer…');
   wClick('Renommer');await wAsk('Autre renommée');await until(()=>nd().notes.n_b.title==='Autre renommée');
@@ -323,7 +339,7 @@ T('Carnet : clic droit sur une note → les 8 actions',async()=>{const item=()=>
   wctx(item());wClick('Supprimer');await until(()=>W.document.querySelector('.ctx-dlg'));W.document.querySelector('.ctx-dlg button[type=submit]').click();
   await until(()=>!nd().notes.n_b&&nd().deleted.n_b);});
 T('Carnet : clic droit sur un nœud du graphe',async()=>{W.document.querySelector('.seg [data-v="graph"]').click();await sleep(300);
-  const G=W.eval('G'),c=W.document.getElementById('graph'),n=G.nodes.find(x=>x.id==='n_m');if(!n)throw new Error('pas de nœud');
+  const G=W.notesDebug.G,c=W.document.getElementById('graph'),n=G.nodes.find(x=>x.id==='n_m');if(!n)throw new Error('pas de nœud');
   const r=c.getBoundingClientRect(),Wd=c.width/G.dpr,Hd=c.height/G.dpr;G.alpha=0;
   const x=r.left+Wd/2+G.off.x+n.x*G.scale,y=r.top+Hd/2+G.off.y+n.y*G.scale;
   if(!wctx(c,x,y).defaultPrevented)throw new Error('pas de menu sur le nœud');has(W.document.querySelector('#ctxMenu').textContent,'Maths','Épingler');
@@ -350,7 +366,9 @@ T('Regex en Worker (rxRunner) : résultat, erreur, arrêt au bout du délai',asy
   const r2=await R.run({pat:'a',flags:'g',text:'aaa',count:true});if(r2.count!==3)throw new Error('pas relancé après timeout');R.stop();});
 T('Rechercher / remplacer : regex catastrophique arrêtée, page fluide ; « $ » littéral',async()=>{NOXE.open('texte');tab('repl');
   fill('r_in','a'.repeat(40)+'!');$('r_re').checked=true;fill('r_a','(a+)+$');
-  let ticks=0;const iv=setInterval(()=>ticks++,50);await until(()=>/arrêtée/.test($('r_info').textContent),4000);clearInterval(iv);
+  let ticks=0;const iv=setInterval(()=>ticks++,50);
+  await until(()=>/arrêtée|^0 occurrence/.test($('r_info').textContent),4000);clearInterval(iv);   // Safari : abandon par le moteur lui-même (voir plus haut)
+  if(!/arrêtée/.test($('r_info').textContent)&&$('r_in').value!=='a'.repeat(40)+'!')throw new Error('texte modifié : '+$('r_info').textContent);
   if(ticks<8)throw new Error('page figée ('+ticks+' ticks)');
   $('r_re').checked=false;fill('r_in','prix : 5 €, 7 €');fill('r_a','€');fill('r_b','$&$1');$('r_go').click();await until(()=>$('r_in').value.includes('$'));
   if($('r_in').value!=='prix : 5 $&$1, 7 $&$1')throw new Error($('r_in').value);
@@ -364,6 +382,20 @@ T('Images : pas de fuite d\'URL d\'aperçu (relances, fermeture)',async()=>{cons
 
 /* ---- v4 : synchro par fichier (fichier OPFS = « dossier OneDrive » simulé ; un autre appareil écrit dedans) ---- */
 let S4,FH;
+/* v5 : fichier OPFS si possible ; sinon (Safari, navigation privée…) un faux fichier en mémoire avec la même interface
+   (getFile → File avec lastModified, createWritable → write/close). La logique testée est exactement la même. */
+function memHandle(name){let f=new File([''],name,{lastModified:Date.now()}),gone=false;
+  const nf=()=>{const e=new Error('introuvable');e.name='NotFoundError';return e;};
+  return{kind:'file',name,mem:true,getFile:async()=>{if(gone)throw nf();return f;},
+    createWritable:async()=>{let buf='';return{write:async t=>{buf+=typeof t==='string'?t:await new Blob([t]).text();},
+      close:async()=>{await sleep(2);f=new File([buf],name,{lastModified:Math.max(Date.now(),f.lastModified+1)});}};},
+    remove:()=>{gone=true;}};}
+async function testHandle(){
+  try{const root=await navigator.storage.getDirectory();try{await root.removeEntry('carnet-test.json');}catch(e){}
+    const h=await root.getFileHandle('carnet-test.json',{create:true});const w=await h.createWritable();await w.close();return h;}
+  catch(e){return memHandle('carnet-test.json');}
+}
+async function dropTestFile(){if(FH.mem){FH.remove();return;}const root=await navigator.storage.getDirectory();await root.removeEntry('carnet-test.json');}
 const fread=async()=>(await FH.getFile()).text();
 const fwrite=async t=>{await sleep(15);const w=await FH.createWritable();await w.write(typeof t==='string'?t:JSON.stringify(t));await w.close();};   // « l'autre appareil »
 const fjson=async()=>JSON.parse(await fread());
@@ -372,8 +404,7 @@ T('Synchro : lier un fichier → écrit, état « synchro OK »',async()=>{S4=sn
   const t=Date.now()-60000;
   setLS('noxe-notes',{notes:{s_a:{id:'s_a',title:'Alpha',body:'a1',tags:[],created:t,updated:t},s_b:{id:'s_b',title:'Bravo',body:'b1',tags:[],created:t,updated:t}},openId:'s_a',deleted:{}});
   await frame('notes.html',()=>W.notesSync&&W.document.getElementById('list').children.length);
-  const root=await navigator.storage.getDirectory();try{await root.removeEntry('carnet-test.json');}catch(e){}
-  FH=await root.getFileHandle('carnet-test.json',{create:true});
+  FH=await testHandle();
   await W.notesSync.attach(FH,false);
   if(W.notesSync.state()!=='ok')throw new Error(W.notesSync.state());has(sst().textContent,'synchro OK');
   const d=await fjson();if(d.app!=='averse'||!d.notes.s_a||!d.notes.s_b||d.openId)throw new Error('contenu');
@@ -418,32 +449,219 @@ T('Synchro : fichier illisible (synchro OneDrive en cours) → erreur, fichier P
   if(await fread()!==bad)throw new Error('fichier écrasé');if(!nd().notes.s_a)throw new Error('notes perdues');
   const d=JSON.parse(ok);d.notes.s_a.title='Alpha bis';d.notes.s_a.updated=Date.now();await fwrite(d);
   await W.notesSync.sync('poll');if(!/^(ok|ext)$/.test(W.notesSync.state())||nd().notes.s_a.title!=='Alpha bis')throw new Error('pas repris : '+W.notesSync.state());});
-T('Synchro : fichier supprimé → erreur claire',async()=>{const root=await navigator.storage.getDirectory();await root.removeEntry('carnet-test.json');
+T('Synchro : fichier supprimé → erreur claire',async()=>{await dropTestFile();
   await W.notesSync.sync('poll');if(W.notesSync.state()!=='err')throw new Error(W.notesSync.state());has(sst().textContent,'introuvable');});
-T('Synchro : navigateur sans l\'API (Firefox / Safari) → message Sauvegarde / Restaurer',async()=>{W.notesSync.unlink();W.eval('FS').ok=false;
+T('Synchro : navigateur sans l\'API (Firefox / Safari) → message Sauvegarde / Restaurer',async()=>{W.notesSync.unlink();W.notesDebug.FS.ok=false;
   W.document.getElementById('fileBtn').click();await until(()=>W.document.querySelector('.ctx-dlg'));
   has(W.document.querySelector('.ctx-dlg').textContent,'Firefox','Sauvegarde','Restaurer','OneDrive');W.document.querySelector('.ctx-dlg [data-x]').click();
   F.remove();restoreLS(S4);localStorage.removeItem('noxe-sync');});
 
-/* ---- v4 : graphe à 500 notes (s'arrête quand c'est stable) ---- */
-T('Graphe : 500 notes, se stabilise puis s\'arrête (plus de calcul)',async()=>{S4=snap();const notes={},t=Date.now();
-  for(let i=0;i<500;i++)notes['g'+i]={id:'g'+i,title:'N'+i,body:'voir [[N'+((i*7+3)%500)+']] et [[N'+Math.floor(i/2)+']]',tags:[],created:t,updated:t-i};
+/* ---- graphe à 500 notes ----
+   v5 : tests DÉTERMINISTES. Avant, on attendait que l'animation (requestAnimationFrame) se calme toute seule : sur un
+   téléphone lent, ou un cadre hors écran / onglet en arrière-plan, le navigateur ralentit rAF à quelques images par
+   seconde → « délai dépassé » alors que tout marchait. Maintenant on fait les pas de calcul nous-mêmes (même code),
+   et on vérifie seulement ensuite que la boucle rAF s'arrête bien d'elle-même. */
+const GT=['cours','réseau','linux','tp','stage'];
+const gD=()=>W.notesDebug,gS=()=>W.graphStats(),gC=()=>W.document.getElementById('graph');
+function gSettle(max){const D=gD();let k=0;const t0=performance.now();while(D.tick(false)&&k<(max||4000))k++;return{k,ms:(performance.now()-t0)/Math.max(1,k)};}
+function gXY(id){const G=gD().G,c=gC(),r=c.getBoundingClientRect(),n=G.nodes.find(x=>x.id===id);if(!n)throw new Error('nœud '+id+' absent');
+  return{x:r.left+c.width/G.dpr/2+G.off.x+n.x*G.scale,y:r.top+c.height/G.dpr/2+G.off.y+n.y*G.scale,n};}
+function gZoomOn(id,S){const D=gD(),r=gC().getBoundingClientRect(),p=gXY(id);D.zoomAt(p.x-r.left,p.y-r.top,(S||2)/D.G.scale);D.draw();return gXY(id);}   // nœuds bien séparés
+const gpe=(type,X,Y,id,extra)=>gC().dispatchEvent(new W.PointerEvent(type,Object.assign({bubbles:true,cancelable:true,clientX:X,clientY:Y,button:0,
+  buttons:type==='pointerup'?0:1,pointerId:id||1,isPrimary:(id||1)===1,pointerType:'mouse'},extra||{})));
+T('Graphe : 500 notes, calcul rapide, se stabilise puis la boucle s\'arrête seule',async()=>{S4=snap();localStorage.removeItem('averse-graph');const notes={},t=Date.now();
+  for(let i=0;i<500;i++)notes['g'+i]={id:'g'+i,title:'N'+i,body:'voir [[N'+((i*7+3)%500)+']] et [[N'+Math.floor(i/2)+']]',tags:i%10===9?[]:[GT[i%5]],created:t,updated:t-i};
   setLS('noxe-notes',{notes,openId:'g0',deleted:{}});
   await frame('notes.html',()=>W.graphStats&&W.document.getElementById('list').children.length>=500);
   let t0=performance.now();W.document.querySelector('.seg [data-v="graph"]').click();const open=performance.now()-t0;
-  await until(()=>!W.graphStats().running,20000);const settle=performance.now()-t0,s=W.graphStats();
-  await sleep(500);if(W.graphStats().steps!==s.steps)throw new Error('continue de calculer après stabilisation');
-  if(s.nodes!==500||s.edges<900)throw new Error(JSON.stringify(s));
-  const step=W.eval('step');t0=performance.now();for(let i=0;i<30;i++)step();const per=(performance.now()-t0)/30;
-  if(per>16)throw new Error('pas trop lent : '+per.toFixed(1)+' ms');
-  window.__graph={open:Math.round(open),settle:Math.round(settle),step:+per.toFixed(2),steps:s.steps,edges:s.edges};
-  return 'ouverture '+Math.round(open)+' ms, stable en '+Math.round(settle)+' ms ('+s.steps+' pas), 1 pas = '+per.toFixed(2)+' ms';});
-T('Graphe : glisser un nœud relance, puis ça se rearrête',async()=>{const G=W.eval('G'),c=W.document.getElementById('graph');
-  const n=G.nodes[0],r=c.getBoundingClientRect(),Wd=c.width/G.dpr,Hd=c.height/G.dpr,x=r.left+Wd/2+G.off.x+n.x*G.scale,y=r.top+Hd/2+G.off.y+n.y*G.scale;
-  const pe=(type,X,Y)=>c.dispatchEvent(new W.PointerEvent(type,{bubbles:true,clientX:X,clientY:Y,button:0,buttons:type==='pointerup'?0:1,pointerId:1,isPrimary:true}));
-  pe('pointerdown',x,y);pe('pointermove',x+30,y+20);pe('pointermove',x+60,y+40);
-  if(!W.graphStats().running)throw new Error('pas relancé');pe('pointerup',x+60,y+40);
-  await until(()=>!W.graphStats().running,15000);F.remove();restoreLS(S4);});
+  const s0=gS();if(s0.nodes!==500||s0.edges<900)throw new Error(JSON.stringify(s0));
+  const st=gSettle();if(st.k>=4000)throw new Error('ne se stabilise pas');
+  if(st.ms>16)throw new Error('trop lent : '+st.ms.toFixed(1)+' ms par pas');
+  await until(()=>!gS().running,8000);                                 // il ne reste qu'une image ou deux à faire
+  const s=gS();await sleep(400);if(gS().steps!==s.steps)throw new Error('continue de calculer après stabilisation');
+  window.__graph={open:Math.round(open),step:+st.ms.toFixed(2),steps:s.steps,edges:s.edges};
+  return 'ouverture '+Math.round(open)+' ms, stable en '+st.k+' pas, 1 pas = '+st.ms.toFixed(2)+' ms';});
+T('Graphe : glisser un nœud relance, puis ça se rearrête',async()=>{const {x,y}=gXY('g0');
+  gpe('pointerdown',x,y);gpe('pointermove',x+30,y+20);gpe('pointermove',x+60,y+40);
+  if(!gS().running)throw new Error('pas relancé');gpe('pointerup',x+60,y+40);
+  gSettle();await until(()=>!gS().running,8000);});
+T('Graphe : groupes « par tag » → une forme et une couleur par groupe, légende',async()=>{
+  W.document.querySelector('[data-gl="tags"]').click();const S=gD().settings;
+  if(S.groups.length!==5)throw new Error(S.groups.length+' groupes');
+  const shapes=new Set(S.groups.map(g=>g.shape)),cols=new Set(S.groups.map(g=>g.color));
+  if(shapes.size!==5||cols.size!==5)throw new Error('formes/couleurs pas distinctes');
+  const sc=gD().styleOf('g0');if(sc!==S.groups.find(g=>g.tag===GT[0]))throw new Error('g0 pas dans #'+GT[0]);
+  if(gD().styleOf('g9')!==S.other)throw new Error('note sans tag → « Sans groupe »');
+  const rows=W.document.querySelectorAll('#graphLegend [data-gtog]');if(rows.length!==6)throw new Error(rows.length+' lignes de légende');
+  has(W.document.getElementById('graphLegend').textContent,'#cours','Sans groupe','100');
+  if(JSON.parse(localStorage.getItem('averse-graph')).groups.length!==5)throw new Error('pas enregistré');});
+T('Graphe : changer la forme et la couleur d\'un groupe (fenêtre d\'édition)',async()=>{
+  const i=gD().settings.groups.findIndex(g=>g.tag==='linux');W.document.querySelector('#graphLegend [data-gedit="'+i+'"]').click();
+  const box=W.document.getElementById('graphEdit');if(box.hidden)throw new Error('pas ouverte');
+  box.querySelector('[data-shape="star"]').click();box.querySelector('[data-col]:not(.on)').click();
+  const g=gD().settings.groups[i];if(g.shape!=='star')throw new Error(g.shape);
+  if(gD().styleOf('g2').shape!=='star')throw new Error('note pas mise à jour');
+  if(JSON.parse(localStorage.getItem('averse-graph')).groups[i].shape!=='star')throw new Error('pas enregistré');
+  box.querySelector('[data-ge="x"]').click();if(!box.hidden)throw new Error('pas fermée');});
+T('Graphe : légende → masquer / réafficher un groupe ; filtre par tag',async()=>{
+  const i=gD().settings.groups.findIndex(g=>g.tag==='cours'),cb=()=>W.document.querySelector('#graphLegend [data-gtog="'+i+'"]');
+  cb().click();if(gS().nodes!==400)throw new Error(gS().nodes+' nœuds (attendu 400)');if(gD().G.nodes.some(n=>n.id==='g0'))throw new Error('g0 visible');
+  cb().click();if(gS().nodes!==500)throw new Error('pas réaffiché');
+  const sel=W.document.getElementById('graphTag');sel.value='tp';sel.dispatchEvent(new W.Event('change',{bubbles:true}));
+  if(gS().nodes!==100)throw new Error(gS().nodes+' nœuds avec #tp');
+  sel.value='';sel.dispatchEvent(new W.Event('change',{bubbles:true}));if(gS().nodes!==500)throw new Error('filtre pas retiré');gSettle();});
+T('Graphe : étiquettes — peu au zoom arrière, au survol, toutes si on zoome',async()=>{const D=gD();D.fit();D.draw();
+  const far=gS().labels;if(D.G.scale<1.1&&far>120)throw new Error(far+' étiquettes au zoom arrière');
+  const {x,y}=gZoomOn('g7',1.5);if(D.G.scale<1.1)throw new Error('zoom');const near=gS().labels;if(near<1)throw new Error('aucune étiquette de près');
+  gpe('pointermove',x,y,1,{buttons:0});D.draw();if(D.G.hover==null||D.G.hover.id!=='g7')throw new Error('survol');
+  const sel=W.document.getElementById('graphLabels');sel.value='hover';sel.dispatchEvent(new W.Event('change',{bubbles:true}));D.draw();
+  if(gS().labels>Object.keys(D.G.near||{}).length)throw new Error('mode survol : '+gS().labels+' (survolé + voisins : '+Object.keys(D.G.near||{}).length+')');sel.value='auto';sel.dispatchEvent(new W.Event('change',{bubbles:true}));
+  D.fit();return far+' étiquettes de loin, '+near+' de près';});
+T('Graphe : molette et pincement à deux doigts zooment',async()=>{const D=gD(),c=gC(),r=c.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+  let s0=D.G.scale;c.dispatchEvent(new W.WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:cx,clientY:cy,deltaY:-200}));
+  if(!(D.G.scale>s0))throw new Error('molette');
+  s0=D.G.scale;const t={pointerType:'touch'};
+  gpe('pointerdown',cx-40,cy,11,t);gpe('pointerdown',cx+40,cy,12,t);gpe('pointermove',cx-120,cy,11,t);gpe('pointermove',cx+120,cy,12,t);
+  gpe('pointerup',cx-120,cy,11,t);gpe('pointerup',cx+120,cy,12,t);
+  if(!(D.G.scale>s0*2))throw new Error('pincement : '+s0.toFixed(2)+' → '+D.G.scale.toFixed(2));
+  W.document.querySelector('[data-zoom="fit"]').click();if(!(D.G.scale<s0))throw new Error('« tout voir »');});
+T('Graphe : clic = focus (voisins en avant), 2e clic = ouvrir la note',async()=>{const D=gD();gSettle();D.fit();
+  const {x,y}=gZoomOn('g5');gpe('pointerdown',x,y);gpe('pointerup',x,y);
+  if(gS().focus!=='g5')throw new Error('focus : '+gS().focus);
+  const card=W.document.getElementById('graphFocus');if(card.hidden)throw new Error('carte');has(card.textContent,'N5','Ouvrir');
+  const nb=new Set();D.G.edges.forEach(([a,b])=>{if(a.id==='g5')nb.add(b.id);if(b.id==='g5')nb.add(a.id);});
+  D.draw();if(!nb.size||!D.G.near||![...nb].every(id=>D.G.near[id]))throw new Error('voisins');
+  const p=gXY('g5');gpe('pointerdown',p.x,p.y);gpe('pointerup',p.x,p.y);
+  await until(()=>nd().openId==='g5'&&W.document.getElementById('titleIn').value==='N5');
+  W.document.querySelector('.seg [data-v="graph"]').click();await sleep(50);if(gS().focus)throw new Error('focus pas remis à zéro');});
+T('Graphe : groupe manuel par clic droit sur un nœud (« Groupe… »)',async()=>{gSettle();gD().fit();const {x,y}=gZoomOn('g3');
+  wctx(gC(),x,y);has(W.document.querySelector('#ctxMenu').textContent,'Groupe');wClick('Groupe…');await sleep(30);wClick('Nouveau groupe');await wAsk('Projet X');
+  const S=gD().settings,g=S.groups[0];if(!g||g.name!=='Projet X'||g.kind!=='manual'||!g.ids.includes('g3'))throw new Error(JSON.stringify(S.groups.map(g=>g.name)));
+  if(gD().styleOf('g3')!==g)throw new Error('priorité : le groupe manuel doit passer devant');});
+T('Graphe : réglages gardés après rechargement',async()=>{const n0=gD().settings.groups.length;
+  await frame('notes.html',()=>W.graphStats&&W.document.getElementById('list').children.length>=500);W.document.querySelector('.seg [data-v="graph"]').click();
+  const S=gD().settings;if(S.groups.length!==n0||S.groups[0].name!=='Projet X'||S.groups.find(g=>g.tag==='linux').shape!=='star')throw new Error('réglages perdus');
+  if(W.document.querySelectorAll('#graphLegend [data-gtog]').length!==n0+1)throw new Error('légende');
+  F.remove();restoreLS(S4);});
+
+/* ---- v5 : synchro chiffrée par Gist ----
+   AUCUN appel au vrai GitHub : un faux GitHub en mémoire (ci-dessous) et de fausses passkeys PRF (HMAC) sont branchés
+   dans la page. En mode test, cloud.js refuse d'ailleurs tout réseau tant qu'on ne lui a pas donné ce faux GitHub. */
+const GTOK='ghp_TESTONLY0000000000000000000000000000',GPW='phrase de test 2026';
+function fakeGitHub(){
+  const G={},log=[];let before=null;const sha=()=>[...crypto.getRandomValues(new Uint8Array(20))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  const view=(g,rev)=>{const r=rev?g.hist.find(h=>h.version===rev):g.hist[0];if(!r)return null;const files={};
+    for(const n in r.files)files[n]={filename:n,raw_url:'mock://raw/'+g.id+'/'+r.version+'/'+n,truncated:false,content:r.files[n]};
+    return{id:g.id,public:g.public,description:g.desc,files,updated_at:r.at,history:g.hist.map(h=>({version:h.version,committed_at:h.at}))};};
+  const R=(st,o,h)=>new Response(st===304?null:JSON.stringify(o),{status:st,headers:Object.assign({'Content-Type':'application/json'},h||{})});
+  const commit=(g,files)=>{g.hist.unshift({version:sha(),at:new Date().toISOString(),files:Object.assign({},g.hist[0]?g.hist[0].files:{},files)});};
+  async function f(url,o){
+    const u=new URL(url),p=u.pathname.split('/').filter(Boolean),a=(o.headers||{}).Authorization||'',ok=a==='Bearer '+GTOK;
+    log.push({m:o.method,p:u.pathname,inm:(o.headers||{})['If-None-Match']||null,auth:!!a});
+    if(u.host!=='api.github.com')return R(404,{});
+    if(a&&!ok)return R(401,{message:'Bad credentials'});
+    if(p[0]!=='gists')return R(404,{});
+    if(p.length===1&&o.method==='GET')return ok?R(200,Object.values(G).map(g=>view(g))):R(401,{});
+    if(p.length===1&&o.method==='POST'){if(!ok)return R(401,{});const b=JSON.parse(o.body),id=sha().slice(0,32),g={id,public:b.public,desc:b.description,hist:[]};
+      commit(g,{[Object.keys(b.files)[0]]:Object.values(b.files)[0].content});G[id]=g;return R(201,view(g));}
+    const g=G[p[1]];if(!g)return R(404,{message:'Not Found'});
+    if(o.method==='GET'){if(p[2]){const v=view(g,p[2]);return v?R(200,v):R(404,{});}
+      const et='W/"'+g.hist[0].version+'"';return(o.headers||{})['If-None-Match']===et?R(304,null,{ETag:et}):R(200,view(g),{ETag:et});}
+    if(o.method==='PATCH'){if(!ok)return R(401,{});if(before){const fn=before;before=null;await fn();}
+      const b=JSON.parse(o.body);commit(g,{[Object.keys(b.files)[0]]:Object.values(b.files)[0].content});return R(200,view(g));}
+    return R(405,{});
+  }
+  return{fetch:f,G,log,one:()=>Object.values(G)[0],vault:()=>JSON.parse(Object.values(Object.values(G)[0].hist[0].files)[0]),
+    write:v=>{const g=Object.values(G)[0];commit(g,{'averse-carnet.json':JSON.stringify(v)});},beforePatch:fn=>{before=fn;}};
+}
+function fakePasskeys(opt){const keys={};opt=opt||{};const b=u=>VAULT.b64(new Uint8Array(u));
+  return{keys,create:async({publicKey:o})=>{const id=crypto.getRandomValues(new Uint8Array(16));if(opt.noprf)return{rawId:id.buffer,getClientExtensionResults:()=>({})};
+      keys[b(id)]=crypto.getRandomValues(new Uint8Array(32));return{rawId:id.buffer,getClientExtensionResults:()=>({prf:{enabled:true}})};},
+    get:async({publicKey:o})=>{const id=b(o.allowCredentials[0].id),k=keys[id];if(!k)throw new DOMException('aucune passkey','NotAllowedError');
+      const hk=await crypto.subtle.importKey('raw',k,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      const out=await crypto.subtle.sign('HMAC',hk,new Uint8Array(o.extensions.prf.eval.first));return{getClientExtensionResults:()=>({prf:{results:{first:out}}})};}};}
+T('Coffre (vault.js) : mot de passe ET passkey nécessaires ; mauvais l\'un ou l\'autre → refus',async()=>{
+  const {vault:v,dk}=await VAULT.create({iter:100000}),prf=VAULT.rnd(32);
+  const s=await VAULT.addDevice(v,dk,'bon mot de passe',prf,{name:'x',credId:'c',prfSalt:'s'});
+  const back=await VAULT.openDevice(v,s,'bon mot de passe',prf);if(VAULT.b64(back)!==VAULT.b64(dk))throw new Error('aller-retour');
+  for(const [pw,pr,why] of [['mauvais',prf,'mot de passe'],['bon mot de passe',VAULT.rnd(32),'passkey']]){let e=null;try{await VAULT.openDevice(v,s,pw,pr);}catch(x){e=x;}
+    if(!e||e.code!=='pw')throw new Error('mauvais(e) '+why+' accepté(e)');}
+  let e=null;try{await VAULT.openDevice(v,s,'bon mot de passe',null);}catch(x){e=x;}if(!e||e.code!=='prf')throw new Error('sans passkey');
+  const v2=JSON.parse(JSON.stringify(v));v2.id='autre';e=null;try{await VAULT.openDevice(v2,s,'bon mot de passe',prf);}catch(x){e=x;}if(!e)throw new Error('case recopiée dans un autre coffre acceptée (AAD)');
+  const w=JSON.parse(JSON.stringify(v));w.kdf.iter=1000;e=null;try{VAULT.check(Object.assign(w,{data:{}}));}catch(x){e=x;}if(!e)throw new Error('itérations trop faibles acceptées');
+  const key=await VAULT.dkKey(dk);await VAULT.sealData(v,key,{notes:{a:{id:'a',title:'secret'}},deleted:{}});
+  if(JSON.stringify(v).includes('secret'))throw new Error('texte en clair');if((await VAULT.openData(v,key)).notes.a.title!=='secret')throw new Error('données');});
+T('Coffre : code de secours (seul) et appairage (mot de passe + code, expire)',async()=>{
+  const {vault:v,dk}=await VAULT.create({iter:100000});const code=await VAULT.addRecovery(v,dk);
+  if(!/^([0-9A-Z]{4}-){7}[0-9A-Z]{4}$/.test(code))throw new Error(code);
+  if(VAULT.b64(await VAULT.openRecovery(v,code.toLowerCase().replace(/-/g,' ')))!==VAULT.b64(dk))throw new Error('secours');
+  let e=null;try{await VAULT.openRecovery(v,code.slice(0,-1)+(code.endsWith('0')?'1':'0'));}catch(x){e=x;}if(!e||e.code!=='rec')throw new Error('faux code accepté');
+  const p=await VAULT.addPair(v,dk,'mdp appairage','ghp_jeton');const o=await VAULT.openPair(v,p.code,'mdp appairage');
+  if(o.token!=='ghp_jeton'||VAULT.b64(o.dk)!==VAULT.b64(dk))throw new Error('appairage');
+  e=null;try{await VAULT.openPair(v,p.code,'faux');}catch(x){e=x;}if(!e||e.code!=='pw')throw new Error('appairage : mauvais mot de passe');
+  e=null;try{await VAULT.openPair(v,p.code,'mdp appairage',Date.now()+16*60000);}catch(x){e=x;}if(!e||e.code!=='expired')throw new Error('pas d\'expiration');});
+let GH,PK,S5,DKT;
+const cd=()=>W.cloudDebug,cst=()=>W.cloudSync.state();
+async function otherDevice(fn){                              // « l'autre appareil » : ouvre le coffre avec la clé, modifie, réécrit
+  const v=GH.vault(),k=await VAULT.dkKey(DKT),d=await VAULT.openData(v,k);await fn(d);await VAULT.sealData(v,k,d);GH.write(v);}
+T('Synchro Gist : mode test → réseau coupé tant qu\'aucun faux GitHub n\'est branché',async()=>{S5=snap();const t=Date.now()-60000;
+  setLS('noxe-notes',{notes:{k_a:{id:'k_a',title:'Kilo',body:'k1',tags:[],created:t,updated:t},k_b:{id:'k_b',title:'Lima',body:'l1',tags:[],created:t,updated:t}},openId:'k_a',deleted:{}});
+  await frame('notes.html',()=>W.cloudDebug&&W.document.getElementById('list').children.length);
+  if(cst()!=='off')throw new Error(cst());let e=null;cd().setCreds(fakePasskeys());cd().setIter(100000);
+  try{await cd().setup(GTOK,GPW,'PC test');}catch(x){e=x;}if(!e||!/réseau coupé/.test(e.message))throw new Error('réseau pas coupé');});
+T('Synchro Gist : 1er appareil → Gist SECRET, notes chiffrées ; rien de neuf → 304',async()=>{GH=fakeGitHub();PK=fakePasskeys();
+  cd().setFetch(GH.fetch);cd().setCreds(PK);cd().setTimes(600000,150);
+  const r=await cd().setup(GTOK,GPW,'PC test');DKT=r.dk.slice();await W.cloudSync.sync('t');
+  const g=GH.one();if(!g||g.public!==false)throw new Error('pas secret');const txt=g.hist[0].files['averse-carnet.json'];
+  if(/Kilo|Lima|k1/.test(txt))throw new Error('notes en clair dans le Gist');if(cst()!=='ok')throw new Error(cst());has(W.document.getElementById('cloudState').textContent,'synchronisé');
+  const n=GH.log.length;await W.cloudSync.sync('t');const l=GH.log.slice(n);if(l.length!==1||!l[0].inm)throw new Error(JSON.stringify(l));
+  if(JSON.stringify(localStorage).includes(GPW))throw new Error('mot de passe enregistré !');});
+T('Synchro Gist : modif sur l\'autre appareil → fusionnée ; modif ici → envoyée seule',async()=>{
+  await otherDevice(d=>{const t=Date.now();d.notes.k_a.body='k2 (téléphone)';d.notes.k_a.updated=t;d.notes.k_c={id:'k_c',title:'Mike',body:'m',tags:[],created:t,updated:t};});
+  await W.cloudSync.sync('t');if(nd().notes.k_a.body!=='k2 (téléphone)'||!nd().notes.k_c)throw new Error('pas fusionné');if(cst()!=='ext')throw new Error(cst());
+  W.document.querySelector('#list [data-id="k_b"]').click();await until(()=>W.document.getElementById('titleIn').value==='Lima');
+  const b=W.document.getElementById('bodyIn');b.value='l2 tapé ici';b.dispatchEvent(new W.Event('input',{bubbles:true}));
+  await until(async()=>{const k=await VAULT.dkKey(DKT);return(await VAULT.openData(GH.vault(),k)).notes.k_b.body==='l2 tapé ici';},5000);});
+T('Synchro Gist : CONFLIT → les deux versions gardées',async()=>{await W.cloudSync.sync('t');
+  const t=Date.now(),l=nd().notes.k_c;l.body='Mike ICI';l.updated=t;
+  await otherDevice(d=>{d.notes.k_c.body='Mike LÀ-BAS';d.notes.k_c.updated=t+5;});
+  await W.cloudSync.sync('t');const cp=Object.values(nd().notes).find(n=>n.id!=='k_c'&&(n.tags||[]).includes('conflit'));
+  if(nd().notes.k_c.body!=='Mike LÀ-BAS'||!cp||cp.body!=='Mike ICI')throw new Error('conflit mal géré');
+  const k=await VAULT.dkKey(DKT),d=await VAULT.openData(GH.vault(),k);if(!d.notes[cp.id])throw new Error('copie pas envoyée');});
+T('Synchro Gist : écriture de l\'autre appareil PENDANT la nôtre → récupérée (historique), rien perdu',async()=>{await W.cloudSync.sync('t');
+  nd().notes.k_a.body='k3 ici';nd().notes.k_a.updated=Date.now();
+  GH.beforePatch(()=>otherDevice(d=>{d.notes.k_b.body='l3 là-bas';d.notes.k_b.updated=Date.now();}));
+  await W.cloudSync.sync('t');await sleep(200);await until(()=>!W.cloudDebug.M.busy,4000);
+  const k=await VAULT.dkKey(DKT),d=await VAULT.openData(GH.vault(),k);
+  if(d.notes.k_a.body!=='k3 ici'||d.notes.k_b.body!=='l3 là-bas'||nd().notes.k_b.body!=='l3 là-bas')throw new Error('écriture perdue : '+d.notes.k_a.body+' / '+d.notes.k_b.body);});
+T('Synchro Gist : mauvais mot de passe / passkey absente → refus clair',async()=>{let e=null;
+  try{await cd().fullUnlock('pas le bon');}catch(x){e=x;}if(!e||e.code!=='pw'||!/incorrect/.test(e.message))throw new Error('mauvais mot de passe : '+(e&&e.message));
+  cd().setCreds(fakePasskeys());e=null;try{await cd().fullUnlock(GPW);}catch(x){e=x;}
+  if(!e||e.code!=='passkey')throw new Error('passkey absente : '+(e&&e.message));cd().setCreds(PK);
+  const u=await cd().fullUnlock(GPW);if(VAULT.b64(u.dk)!==VAULT.b64(DKT))throw new Error('déverrouillage');});
+T('Synchro Gist : appairage → le nouvel appareil reçoit clé + jeton (mot de passe exigé)',async()=>{
+  const p=await cd().startPair(GPW);has(p.link,'#pair='+GH.one().id+'.');
+  const o=await VAULT.openPair(GH.vault(),p.code,GPW);if(o.token!==GTOK||VAULT.b64(o.dk)!==VAULT.b64(DKT))throw new Error('contenu');
+  let e=null;try{await VAULT.openPair(GH.vault(),p.code,'faux');}catch(x){e=x;}if(!e)throw new Error('sans mot de passe');
+  if(!W.cloudSync.parsePair(p.link)||W.cloudSync.parsePair('n\'importe quoi'))throw new Error('lecture du code');});
+T('Synchro Gist : code de secours sur un appareil « neuf » → tout récupéré',async()=>{
+  const code=await cd().addRecoveryNow(DKT.slice());await cd().reset();if(W.cloudSync.configured())throw new Error('pas désactivé');
+  delete nd().notes.k_c;
+  const PK2=fakePasskeys();cd().setCreds(PK2);let e=null;
+  try{await cd().recover(GTOK,GH.one().id,'0000-0000-0000-0000-0000-0000-0000-0000','nouvelle phrase','Neuf');}catch(x){e=x;}if(!e||e.code!=='rec')throw new Error('faux code accepté');
+  const gone=await cd().recover(GTOK,GH.one().id,code,'nouvelle phrase de test','Neuf');await W.cloudSync.sync('t');
+  if(!nd().notes.k_c||cst()==='err')throw new Error('pas récupéré : '+W.cloudSync.status());
+  if(GH.vault().slots.filter(s=>s.type==='device').length!==1)throw new Error('anciennes cases');return gone+' ancienne(s) case(s) retirée(s)';});
+T('Synchro Gist : appareil retiré ailleurs → s\'arrête ici, notes gardées',async()=>{const v=GH.vault();v.slots=v.slots.filter(s=>s.type!=='device');GH.write(v);
+  await W.cloudSync.sync('t');if(cst()!=='removed'||W.cloudSync.configured())throw new Error(cst());if(!nd().notes.k_a)throw new Error('notes perdues');});
+T('Synchro Gist : navigateur sans PRF → refus clair, aucun Gist créé',async()=>{const n=Object.keys(GH.G).length;cd().setCreds(fakePasskeys({noprf:true}));let e=null;
+  try{await cd().setup(GTOK,GPW,'Vieux');}catch(x){e=x;}if(!e||e.code!=='noprf')throw new Error(e&&e.message);has(e.message,'PRF');
+  if(Object.keys(GH.G).length!==n)throw new Error('Gist créé');});
+T('Synchro Gist : assistant (lien jeton « gist », champ masqué)',async()=>{W.cloudSync.open();await until(()=>W.document.querySelector('.cw[data-view="intro"]'));
+  W.document.querySelector('.cw [data-cw="first"]').click();await until(()=>W.document.getElementById('cwToken'));
+  if(W.document.getElementById('cwToken').type!=='password')throw new Error('jeton visible');
+  if(W.document.querySelector('.cw a[href*="tokens/new"]').getAttribute('href')!=='https://github.com/settings/tokens/new?scopes=gist&description=AVERSE')throw new Error('lien');
+  cd().close();await cd().reset();F.remove();restoreLS(S5);});
 
 /* ---- v4 : OCR (Tesseract.js local, chargé à l'ouverture de l'outil) ---- */
 const lev=(a,b)=>{const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;
@@ -473,14 +691,22 @@ T('OCR : changer de langue relance la lecture (anglais)',async()=>{$('ocr_lang')
 T('ZIP : signature PK',async()=>{const b=await NOXE.zip([{name:'a.txt',blob:new Blob(['salut'])}]);const u=new Uint8Array(await b.slice(0,2).arrayBuffer());if(u[0]!==0x50||u[1]!==0x4b)throw new Error('pas un zip');});
 
 (async()=>{
-  let ok=0;const box=$('res');
-  for(const [name,fn] of tests){
-    let msg='',info='';try{const r=await fn();if(typeof r==='string')info=r;ok++;}catch(e){msg=e.message||String(e);}   // un test peut renvoyer une mesure
-    box.insertAdjacentHTML('beforeend','<div class="t '+(msg?'bad':'ok')+'">'+(msg?'✕ ':'✓ ')+esc(name)+(msg?' — '+esc(msg):info?' — '+esc(info):'')+'</div>');
+  let ok=0,skip=0,run=0;const box=$('res');
+  const only=new URLSearchParams(location.search).get('only');      // tests.html?only=Graphe : ne lance que les tests dont le nom contient ce mot
+  for(const [name,fn] of tests){if(only&&!name.includes(only))continue;
+    run++;let msg='',info='',sk=false;
+    try{const r=await fn();if(typeof r==='string')info=r;ok++;}catch(e){if(e&&e.skip){sk=true;skip++;info=e.message;}else msg=e&&e.message||String(e);}   // un test peut renvoyer une mesure
+    box.insertAdjacentHTML('beforeend',sk?'<div class="t skip">– '+esc(name)+' — ignoré : '+esc(info)+'</div>':
+      '<div class="t '+(msg?'bad':'ok')+'">'+(msg?'✕ ':'✓ ')+esc(name)+(msg?' — '+esc(msg):info?' — '+esc(info):'')+'</div>');
     await sleep(30);
   }
   NOXE.close();
-  $('sum').innerHTML='<b class="'+(ok===tests.length?'ok':'bad')+'">'+ok+' / '+tests.length+' réussis</b>';
-  document.title=(ok===tests.length?'OK':'ECHEC')+' — tests';
+  const fail=run-ok-skip;
+  $('sum').innerHTML='<b class="'+(fail?'bad':'ok')+'">'+ok+' / '+(run-skip)+' réussis</b>'+(skip?' · <span class="skip">'+skip+' ignoré(s) : non disponible(s) sur ce navigateur</span>':'')+
+    (fail?' · <b class="bad">'+fail+' en échec</b>':'');
+  /* fin : tes vraies données reviennent (localStorage complet) */
+  try{const o=JSON.parse(localStorage.getItem('averse-tests-backup'));localStorage.clear();for(const k in o)if(k!=='averse-tests-backup')localStorage.setItem(k,o[k]);}catch(e){}
+  try{sessionStorage.removeItem('averse-tests');indexedDB.deleteDatabase('averse-tests');}catch(e){}
+  document.title=(fail?'ECHEC':'OK')+' — tests';
 })();
 </script></body></html>

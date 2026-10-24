@@ -31,6 +31,17 @@ function copy(text,label){
   else fallback();
 }
 
+/* v5 — tests.html tourne sur le même site que tes vraies notes : avant de commencer il range une copie de tout le
+   localStorage dans « averse-tests-backup ». Si la page de tests est fermée en plein milieu (téléphone, onglet fermé…),
+   la page suivante remet cette copie en place : tes notes ne restent jamais remplacées par les notes de test. */
+(function(){try{
+  if(sessionStorage.getItem('averse-tests')||!localStorage.getItem('averse-tests-backup'))return;
+  const o=JSON.parse(localStorage.getItem('averse-tests-backup'));localStorage.clear();
+  for(const k in o)if(k!=='averse-tests-backup')localStorage.setItem(k,o[k]);
+}catch(e){}})();
+/* IndexedDB : base séparée pendant les tests (le fichier lié / la clé de synchro de l'appareil ne sont jamais touchés) */
+const IDB_NAME=(()=>{try{return sessionStorage.getItem('averse-tests')?'averse-tests':'averse';}catch(e){return 'averse';}})();
+
 /* petite mémoire locale : lire / écrire du JSON sans planter (navigation privée, quota plein…) */
 function getLS(k,def){try{const v=localStorage.getItem(k);return v==null?def:JSON.parse(v);}catch(e){return def;}}
 function setLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}}

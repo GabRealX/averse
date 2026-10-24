@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- v5 : politique de sécurité (CSP). Cette page garde le jeton GitHub de la synchro : aucun script en ligne, aucun eval,
+     et elle ne peut parler qu'à elle-même et à l'API GitHub. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://gist.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>AVERSE — carnet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,9 +34,11 @@
       <button class="active" data-v="editor">Éditeur</button>
       <button data-v="graph">Graphe</button>
     </div>
-    <button class="ico-btn" id="styleBtn" data-style-label onclick="toggleStyle()">style : normal</button>
+    <button class="ico-btn" id="styleBtn" data-style-label >style : normal</button>
     <button class="ico-btn" id="fileBtn" title="Synchro : lie le carnet à un fichier (ex. dans ton dossier OneDrive / Google Drive)">Fichier</button>
     <span class="sync-state" id="syncState" role="status" aria-live="polite" hidden></span>
+    <button class="ico-btn" id="cloudBtn" title="Synchro chiffrée entre tes appareils (PC + téléphone) via un Gist GitHub secret">Synchro</button>
+    <span class="sync-state" id="cloudState" role="status" aria-live="polite" hidden></span>
     <button class="ico-btn" id="exportBtn">Export</button>
     <button class="ico-btn" id="importBtn">Import</button>
     <input type="file" id="importFile" accept="application/json" style="display:none">
@@ -42,6 +47,10 @@
     <input type="file" id="bakFile" accept=".json,application/json" style="display:none">
     <button class="ico-btn install-btn" data-install hidden>Installer</button>
   </div>
+  <!-- v5 : sur mobile, la barre de boutons défile au doigt : flèches + fondus aux bords + petite barre de position -->
+  <button class="bar-arrow l" id="barL" aria-label="Boutons précédents" hidden>‹</button>
+  <button class="bar-arrow r" id="barR" aria-label="Boutons suivants" hidden>›</button>
+  <div class="bar-nav" id="barNav" hidden><span id="barThumb"></span></div>
 </div>
 
 <div class="app">
@@ -61,7 +70,7 @@
     <div class="blank" id="blank" style="display:none">
       <b>Carnet vide</b>
       <div>Crée une note pour commencer à garder des traces.</div>
-      <button class="btn primary" onclick="document.getElementById('newBtn').click()">+ Nouvelle note</button>
+      <button class="btn primary" id="blankNew">+ Nouvelle note</button>
     </div>
 
     <div class="editor">
@@ -90,7 +99,15 @@
 
     <div class="graph-wrap" id="graphWrap">
       <canvas id="graph"></canvas>
-      <div class="graph-hint">clic : ouvrir · glisser un nœud : déplacer · glisser le fond : déplacer la vue · clic droit : actions</div>
+      <div class="graph-legend" id="graphLegend"></div>
+      <div class="graph-tools">
+        <select id="graphTag" aria-label="Filtrer par tag"><option value="">tous les tags</option></select>
+        <select id="graphLabels" aria-label="Étiquettes" title="Étiquettes des nœuds"><option value="auto">étiquettes : auto</option><option value="all">étiquettes : toutes</option><option value="hover">étiquettes : survol</option></select>
+        <span class="graph-zoom"><button class="ico-btn" data-zoom="out" aria-label="Dézoomer">−</button><button class="ico-btn" data-zoom="fit" title="Tout voir" aria-label="Tout voir">⤢</button><button class="ico-btn" data-zoom="in" aria-label="Zoomer">+</button></span>
+      </div>
+      <div class="graph-edit" id="graphEdit" hidden></div>
+      <div class="graph-focus" id="graphFocus" hidden></div>
+      <div class="graph-hint">clic : voisins (focus) · 2e clic : ouvrir · molette / 2 doigts : zoom · glisser : déplacer · clic droit : groupe, actions</div>
       <div class="graph-empty" id="graphEmpty" style="display:none">Aucune note à afficher.</div>
     </div>
   </main>
@@ -101,7 +118,11 @@
 <script src="js/keys.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/ctxmenu.js"></script>
+<script src="js/notes-graph.js"></script>
 <script src="js/notes.js"></script>
-<script>if("serviceWorker" in navigator&&location.protocol!=="file:")addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
+<script src="js/vendor/qrcode.js"></script>
+<script src="js/vault.js"></script>
+<script src="js/cloud.js"></script>
+<script src="js/notes-page.js"></script>
 </body>
 </html>

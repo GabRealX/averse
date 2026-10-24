@@ -40,7 +40,7 @@ let data={notes:{},openId:null};
 let tagFilter=null, query='', view='editor';
 
 addEventListener('beforeunload',()=>{try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}});
-function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}if(typeof fsLater==='function')fsLater();}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}if(typeof fsLater==='function')fsLater();if(window.cloudLater)cloudLater();}   // v5 : + synchro Gist
 function load(){try{const s=localStorage.getItem(KEY);if(s){const d=JSON.parse(s);if(d&&d.notes)return d;}}catch(e){}return null;}
 
 function seed(){
@@ -268,7 +268,7 @@ function exportMd(){
 const FS={ok:'showSaveFilePicker' in window,h:null,t:0,mod:-1,size:-1,base:null,busy:null,again:false,dirty:false,state:'off',
   name:'',at:0,conflicts:0,poll:0};
 const SYNC_MS=5000,SYNC_KEY='noxe-sync';
-const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('averse',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open(IDB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
 const idbGet=async k=>{const d=await idb();return new Promise(r=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null);});};
 const idbSet=async(k,v)=>{const d=await idb();return new Promise(r=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>r();t.onerror=()=>r();});};
 const hhmm=t=>new Date(t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
@@ -303,7 +303,8 @@ function fileText(){
   Object.keys(del).sort().forEach(k=>{deleted[k]=del[k];});
   return JSON.stringify({app:'averse',kind:'carnet',version:2,notes,deleted},null,1);
 }
-function setBase(){FS.base={};Object.values(data.notes).forEach(n=>{FS.base[n.id]=n.updated||0;});
+const baseNow=()=>{const b={};Object.values(data.notes).forEach(n=>{b[n.id]=n.updated||0;});return b;};
+function setBase(){FS.base=baseNow();
   try{localStorage.setItem(SYNC_KEY,JSON.stringify({name:FS.name,base:FS.base}));}catch(e){}}
 function conflictCopy(n,why){                               // copie gardée en cas de conflit (id stable : pas de doublon)
   const id=('c'+n.id).slice(0,48)+'-'+(n.updated||0).toString(36);
@@ -312,9 +313,11 @@ function conflictCopy(n,why){                               // copie gardée en 
     tags:[...new Set((n.tags||[]).concat('conflit'))].slice(0,40),created:n.created||now(),updated:now(),pinned:false};
   return 1;
 }
-/* fusionne le contenu d d'un fichier modifié ailleurs ; renvoie {n: changements, c: conflits} */
-function syncMerge(d){
-  const base=FS.base,del=data.deleted||(data.deleted={}),rdel=d.deleted&&typeof d.deleted==='object'?d.deleted:{};
+/* fusionne le contenu d d'un fichier modifié ailleurs ; renvoie {n: changements, c: conflits}
+   v5 : base = état de la dernière synchro de CE canal (fichier lié ou Gist : chacun garde la sienne) */
+function syncMerge(d,base){
+  if(arguments.length<2)base=FS.base;
+  const del=data.deleted||(data.deleted={}),rdel=d.deleted&&typeof d.deleted==='object'?d.deleted:{};
   const notes=d.notes&&typeof d.notes==='object'?d.notes:{},keep={notes:Object.create(null),deleted:rdel};
   const since=(id,t)=>!base||base[id]==null||(t||0)>base[id];      // modifiée depuis la dernière synchro ?
   let c=0;
@@ -337,7 +340,6 @@ function syncMerge(d){
       c+=conflictCopy(l,'modifiée ici, supprimée sur l\'autre appareil');
   }
   const n=mergeNotes(keep)+c;
-  FS.conflicts+=c;
   return {n,c};
 }
 /* LA synchro : relit le fichier, fusionne si besoin, puis écrit si le fichier n'est pas à jour */
@@ -359,7 +361,7 @@ function fsSync(why){
           if(!d||typeof d!=='object'||!d.notes||typeof d.notes!=='object'){
             fsUi('err','fichier illisible (synchro en cours ?), nouvel essai dans '+SYNC_MS/1000+' s');return;   // surtout ne pas l'écraser
           }
-          res=syncMerge(d);
+          res=syncMerge(d,FS.base);FS.conflicts+=res.c;
           if(res.n){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}renderAll();if(res.c)toast(res.c+' conflit(s) : les deux versions sont gardées (tag « conflit »)');}
         }
       }
@@ -424,6 +426,15 @@ async function fsRestore(){
 }
 addEventListener('focus',()=>{if(FS.h)fsSync('focus');});
 document.addEventListener('visibilitychange',()=>{if(FS.h&&!document.hidden)fsSync('focus');});
+/* v5 : ce dont la synchro Gist (cloud.js) a besoin, sans toucher aux variables du carnet */
+window.notesApi={
+  payload:()=>{const o=JSON.parse(fileText());return{notes:o.notes,deleted:o.deleted};},   // trié, sans l'état de l'appareil
+  text:()=>{const o=JSON.parse(fileText());return JSON.stringify({notes:o.notes,deleted:o.deleted});},
+  merge:(d,base)=>{const r=syncMerge(d,base);
+    if(r.n){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}renderAll();
+      if(r.c)toast(r.c+' conflit(s) : les deux versions sont gardées (tag « conflit »)');}
+    return r;},
+  base:baseNow,count:()=>Object.keys(data.notes).length};
 window.notesSync={attach:fsAttach,sync:fsSync,state:()=>FS.state,unlink:()=>{FS.h=null;clearInterval(FS.poll);fsUi('off');},
   status:()=>{const s=$('syncState');return s?s.textContent:'';},setPoll:ms=>{clearInterval(FS.poll);FS.poll=setInterval(()=>{if(FS.h&&!document.hidden)fsSync('poll');},ms);}};
 
@@ -436,116 +447,7 @@ function setView(v){
   else{g.classList.remove('on');stopGraph();}
 }
 
-/* ===== GRAPHE FORCE-DIRECTED =====
-   v4 : - la simulation S'ARRÊTE quand le graphe est stable (plus aucun calcul ni dessin en boucle) ;
-          elle repart seulement si on glisse un nœud ou si les notes changent ; survol / déplacement = un seul dessin ;
-        - la répulsion n'est calculée qu'entre nœuds proches (grille de cases de REP px) : ~O(n) au lieu de O(n²),
-          donc fluide même avec 500 notes ou plus. */
-const G={canvas:null,ctx:null,nodes:[],edges:[],raf:0,alpha:0,dpr:1,scale:1,running:false,steps:0,drawPending:false,
-  drag:null,down:null,hover:null,panStart:null,off:{x:0,y:0}};
-const REP=300;                                              // au-delà, la répulsion (2600/d²) est négligeable
-const nodeSize=n=>10+Math.min(16,n.deg*3);
-function buildGraph(){
-  withTitles(()=>{
-    const ns=allNotes(),idx={},R=40*Math.sqrt(ns.length+1);      // nouveaux nœuds : répartis selon le nombre de notes
-    const keep=G.nodes.reduce((o,n)=>{o[n.id]=n;return o;},{});
-    let fresh=0;
-    G.nodes=ns.map(n=>{const old=keep[n.id];if(old)return Object.assign(old,{title:n.title,deg:0});fresh++;
-      return{id:n.id,title:n.title,x:(Math.random()-.5)*R,y:(Math.random()-.5)*R,vx:0,vy:0,deg:0};});
-    G.nodes.forEach(n=>idx[n.id]=n);
-    G.edges=[];G.nodes.forEach(n=>{const note=data.notes[n.id];outLinks(note).forEach(t=>{
-      if(idx[t.id]){G.edges.push([n,idx[t.id]]);n.deg++;idx[t.id].deg++;}});});
-    G.alpha=fresh>G.nodes.length/3?1:Math.max(G.alpha,.35);     // simple mise à jour : on ne rebat pas tout le graphe
-  });
-}
-function sizeCanvas(){
-  const c=G.canvas,r=c.parentElement.getBoundingClientRect();
-  G.dpr=Math.min(2,window.devicePixelRatio||1);
-  c.width=Math.max(1,r.width*G.dpr);c.height=Math.max(1,r.height*G.dpr);
-  c.style.width=r.width+'px';c.style.height=r.height+'px';
-}
-/* un pas de simulation ; renvoie le plus grand déplacement (pour savoir si c'est stable) */
-function step(){
-  const N=G.nodes,grid=new Map(),R2=REP*REP;
-  for(let i=0;i<N.length;i++){const n=N[i];n.i=i;n.cx=Math.floor(n.x/REP);n.cy=Math.floor(n.y/REP);
-    const k=n.cx*100003+n.cy;let c=grid.get(k);if(!c)grid.set(k,c=[]);c.push(n);}
-  for(const a of N){
-    for(let gx=a.cx-1;gx<=a.cx+1;gx++)for(let gy=a.cy-1;gy<=a.cy+1;gy++){
-      const c=grid.get(gx*100003+gy);if(!c)continue;
-      for(const b of c){if(b.i<=a.i)continue;                // chaque paire une seule fois
-        let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy;if(d2>R2)continue;if(d2<25)d2=25;
-        const d=Math.sqrt(d2),f=2600/d2;dx/=d;dy/=d;a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f;}
-    }
-  }
-  G.edges.forEach(([a,b])=>{let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||.01;
-    const f=(d-110)*.02;dx/=d;dy/=d;a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f;});
-  let moved=0;
-  N.forEach(n=>{n.vx-=n.x*.01;n.vy-=n.y*.01;if(G.drag===n)return;n.vx*=.85;n.vy*=.85;
-    const mx=n.vx*G.alpha,my=n.vy*G.alpha;n.x+=mx;n.y+=my;moved=Math.max(moved,Math.abs(mx)+Math.abs(my));});
-  G.alpha*=.985;G.steps++;
-  return moved;
-}
-function fitGraph(){
-  const W=G.canvas.width/G.dpr,H=G.canvas.height/G.dpr,N=G.nodes;if(!N.length)return;
-  let a=1e9,b=1e9,c=-1e9,d=-1e9;N.forEach(n=>{a=Math.min(a,n.x);c=Math.max(c,n.x);b=Math.min(b,n.y);d=Math.max(d,n.y);});
-  const bw=Math.max(1,c-a),bh=Math.max(1,d-b),padX=90,padT=46,padB=74;
-  G.scale=Math.max(.08,Math.min(1.4,(W-padX*2)/bw,(H-padT-padB)/bh));
-  G.off.x=-(a+c)/2*G.scale;G.off.y=-(b+d)/2*G.scale+(padT-padB)/2;
-}
-function draw(){
-  G.drawPending=false;
-  const W=G.canvas.width/G.dpr,H=G.canvas.height/G.dpr,x=G.ctx,S=G.scale,cx=W/2+G.off.x,cy=H/2+G.off.y;
-  x.save();x.scale(G.dpr,G.dpr);x.clearRect(0,0,W,H);
-  const hov=G.hover,near={};
-  if(hov){near[hov.id]=1;G.edges.forEach(([a,b])=>{if(a===hov)near[b.id]=1;if(b===hov)near[a.id]=1;});}
-  x.strokeStyle=hov?acc(.05):acc(.15);x.lineWidth=1;x.beginPath();   // toutes les arêtes « normales » en un seul tracé
-  G.edges.forEach(([a,b])=>{if(hov&&(a===hov||b===hov))return;x.moveTo(cx+a.x*S,cy+a.y*S);x.lineTo(cx+b.x*S,cy+b.y*S);});
-  x.stroke();
-  if(hov){x.strokeStyle=acc(.55);x.lineWidth=1.5;x.beginPath();
-    G.edges.forEach(([a,b])=>{if(a===hov||b===hov){x.moveTo(cx+a.x*S,cy+a.y*S);x.lineTo(cx+b.x*S,cy+b.y*S);}});x.stroke();}
-  const sc=Math.max(.5,Math.min(1,S));                        // nœuds un peu plus petits quand on dézoome beaucoup
-  G.nodes.forEach(n=>{const s=nodeSize(n)*sc,sx=cx+n.x*S,sy=cy+n.y*S;if(sx<-30||sy<-30||sx>W+30||sy>H+30)return;
-    x.fillStyle=hov&&!near[n.id]?acc(.16):ACC.hex;x.fillRect(sx-s/2,sy-s/2,s,s);});
-  const showAll=G.nodes.length<=16;x.textAlign='center';x.font='500 11px "JetBrains Mono", monospace';
-  G.nodes.forEach(n=>{const dim=hov&&!near[n.id];
-    if(!(showAll||n===hov||(hov&&near[n.id])))return;
-    const s=nodeSize(n)*sc,sx=cx+n.x*S,sy=cy+n.y*S;
-    const lab=(n.title||'').length>22?n.title.slice(0,21)+'\u2026':(n.title||'\u00b7');
-    const tw=x.measureText(lab).width,below=sy<H-44,ly=below?sy+s/2+5:sy-s/2-5,bl=below?'top':'bottom',ry=below?ly-1:ly-13;
-    x.fillStyle='rgba(6,6,10,.82)';x.fillRect(sx-tw/2-4,ry,tw+8,14);
-    x.fillStyle=dim?acc(.4):(n===hov?ACC.hex:acc(.8));
-    x.textBaseline=bl;x.fillText(lab,sx,ly);});
-  x.restore();
-}
-function loop(){
-  G.raf=0;if(!G.running)return;
-  const moved=step();draw();
-  if(!G.drag&&(G.alpha<.01||moved<.03)){G.running=false;return;}   // stable : on arrête tout
-  G.raf=requestAnimationFrame(loop);
-}
-function kick(a){                                          // relance la simulation (glisser un nœud, notes modifiées)
-  G.alpha=Math.max(G.alpha,a||0);
-  if(view!=='graph')return;
-  if(!G.running){G.running=true;cancelAnimationFrame(G.raf);G.raf=requestAnimationFrame(loop);}
-}
-function redraw(){if(G.running||G.drawPending||view!=='graph')return;G.drawPending=true;requestAnimationFrame(draw);}   // un seul dessin
-function nodeAt(px,py){
-  const W=G.canvas.width/G.dpr,H=G.canvas.height/G.dpr,S=G.scale,cx=W/2+G.off.x,cy=H/2+G.off.y,sc=Math.max(.5,Math.min(1,S));
-  for(let i=G.nodes.length-1;i>=0;i--){const n=G.nodes[i],s=nodeSize(n)*sc;
-    if(Math.abs(px-(cx+n.x*S))<=s/2+5&&Math.abs(py-(cy+n.y*S))<=s/2+5)return n;}return null;
-}
-function startGraph(){
-  if(!allNotes().length){$('graphEmpty').style.display='flex';stopGraph();return;}
-  $('graphEmpty').style.display='none';
-  const first=!G.nodes.length;
-  sizeCanvas();buildGraph();
-  const t0=performance.now();                              // pré-calcul (au plus ~150 ms) avant le premier dessin
-  for(let i=0;i<300&&performance.now()-t0<150;i++)if(step()<.03&&i>20)break;
-  if(first||G.alpha>.5)fitGraph();
-  draw();G.running=false;kick(0);
-}
-function stopGraph(){cancelAnimationFrame(G.raf);G.raf=0;G.running=false;}
-window.graphStats=()=>({nodes:G.nodes.length,edges:G.edges.length,running:G.running,steps:G.steps,alpha:G.alpha});   // pour les tests
+/* ===== GRAPHE : voir notes-graph.js (v5) ===== */
 
 /* ===== RENDU GLOBAL ===== */
 function renderAll(){renderList();renderTags();renderEditor();if(view==='graph')startGraph();}
@@ -592,22 +494,7 @@ function wire(){
     $('paneWrite').classList.toggle('shown',b.dataset.p==='write');
     $('panePrev').classList.toggle('shown',b.dataset.p==='prev');});
 
-  // graphe : interactions pointeur
-  const c=$('graph');
-  c.addEventListener('pointerdown',e=>{if(e.button!==0)return; // clic droit : laissé au menu contextuel
-    const r=c.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
-    const n=nodeAt(px,py);G.down={px:e.clientX,py:e.clientY,moved:false};
-    if(n){G.drag=n;}else{G.panStart={x:e.clientX-G.off.x,y:e.clientY-G.off.y};}
-    c.setPointerCapture(e.pointerId);});
-  c.addEventListener('pointermove',e=>{const r=c.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
-    if(G.down){if(Math.abs(e.clientX-G.down.px)>3||Math.abs(e.clientY-G.down.py)>3)G.down.moved=true;}
-    if(G.drag){if(!G.down||!G.down.moved)return;const W=c.width/G.dpr,H=c.height/G.dpr;G.drag.x=(px-(W/2+G.off.x))/G.scale;G.drag.y=(py-(H/2+G.off.y))/G.scale;G.drag.vx=0;G.drag.vy=0;kick(.4);}
-    else if(G.panStart){G.off.x=e.clientX-G.panStart.x;G.off.y=e.clientY-G.panStart.y;redraw();}
-    else{const h=nodeAt(px,py);if(h!==G.hover){G.hover=h;c.style.cursor=h?'pointer':'grab';redraw();}}});
-  const end=e=>{if(G.down&&!G.down.moved&&G.drag)openNoteFromGraph(G.drag);
-    G.drag=null;G.panStart=null;G.down=null;};
-  c.addEventListener('pointerup',end);c.addEventListener('pointercancel',end);
-  window.addEventListener('resize',()=>{if(view==='graph'){sizeCanvas();fitGraph();redraw();}});
+  graphWire();                                              // graphe : souris, doigts, légende (notes-graph.js)
 }
 /* ===== CLIC DROIT SUR UNE NOTE (ctxmenu.js) : liste, rétroliens, nœud du graphe ===== */
 const NOTE_OPS={
@@ -627,12 +514,17 @@ if(typeof CTX!=='undefined')CTX.add((t,e)=>{
   if(it)id=it.dataset.id;
   else if(t.id==='graph'&&view==='graph'){const r=t.getBoundingClientRect(),n=nodeAt(e.clientX-r.left,e.clientY-r.top);if(n)id=n.id;}
   if(!id||!data.notes[id])return null;
-  return{items:CTX.noteItems(id,NOTE_OPS),title:data.notes[id].title||'Sans titre'};
+  const items=CTX.noteItems(id,NOTE_OPS);
+  if(t.id==='graph')items.splice(1,0,graphGroupItems(id));    // v5 : sur un nœud, « Groupe… » (groupes manuels)
+  return{items,title:data.notes[id].title||'Sans titre'};
 },5);
 /* une note ajoutée ailleurs (clic droit → « Ajouter au carnet ») : on relit le stockage avant d'écraser */
+/* v5 : accès pour tests.html (les const/let ne sont pas sur window, et la page interdit eval : CSP) */
+window.notesDebug={get data(){return data;},FS,G,step,tick,get settings(){return GS;},groupOf:id=>groupOf(data.notes[id]),
+  styleOf:id=>styleOfGroup(groupOf(data.notes[id])),zoomAt,fit:()=>{fitGraph();redraw();},draw,setFocus:id=>setFocus(G.nodes.find(n=>n.id===id))};
 window.notesReloadFromStorage=()=>{const d=load();if(d&&mergeNotes(d))renderAll();};
 
-function openNoteFromGraph(n){setView('editor');$$('.seg button').forEach(b=>b.classList.toggle('active',b.dataset.v==='editor'));openNote(n.id);}
+function openNoteFromGraph(n){if(G.focus)setFocus(null);setView('editor');$$('.seg button').forEach(b=>b.classList.toggle('active',b.dataset.v==='editor'));openNote(n.id);}
 
 /* ===== INIT ===== */
 (function init(){
@@ -645,5 +537,6 @@ function openNoteFromGraph(n){setView('editor');$$('.seg button').forEach(b=>b.c
   const hh=location.hash.slice(1);if(hh&&data.notes[hh])data.openId=hh;
   wire();renderAll();fsRestore();
   if(/[?&]print=1/.test(location.search)){history.replaceState(null,'',location.pathname+location.hash);setTimeout(printNote,300);}   // « Exporter PDF » depuis le panneau
-  addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const d=JSON.parse(e.newValue);if(mergeNotes(d))renderAll();}catch(x){}});
+  addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;if(!sessionStorage.getItem('averse-tests')&&localStorage.getItem('averse-tests-backup'))return;   // v5 : tests.html tourne dans un autre onglet → on n'avale pas ses notes de test
+  try{const d=JSON.parse(e.newValue);if(mergeNotes(d))renderAll();}catch(x){}});
 })();

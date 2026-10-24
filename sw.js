@@ -1,9 +1,9 @@
 /* sw.js — fait fonctionner le site hors-ligne, et reçoit les partages (share_target).
    ⚠ À chaque modification d'un fichier, change le numéro de version ci-dessous
-   (averse-v12 → averse-v13…) pour que les visiteurs reçoivent la nouvelle version.
+   (averse-v13 → averse-v14…) pour que les visiteurs reçoivent la nouvelle version.
    Tous les chemins sont RELATIFS à ce fichier : le site marche aussi dans un sous-dossier
    (ex. https://toi.github.io/averse/ sur GitHub Pages). */
-const CACHE = 'averse-v12';
+const CACHE = 'averse-v13';
 const SHARE = 'averse-share';          // contenu partagé en attente (lu puis vidé par app.js)
 /* OCR (v4) : Tesseract.js pèse ~11 Mo (moteur wasm + langues). Il n'est PAS dans ASSETS : sinon chaque visiteur
    téléchargerait 11 Mo à l'installation, même sans jamais utiliser l'OCR, et à chaque nouvelle version du site.
@@ -39,6 +39,7 @@ const ASSETS = [
   './css/base.css', './css/home.css', './css/tools.css', './css/app.css', './css/ui.css', './css/notes.css', './css/ascii.css',
   './js/core.js', './js/data.js', './js/rain.js', './js/app.js', './js/about.js', './js/detect.js', './js/panel.js', './js/notes.js',
   './js/keys.js', './js/pwa.js', './js/ctxmenu.js', './js/backup.js', './js/math.js',
+  './js/notes-graph.js', './js/notes-page.js', './js/vault.js', './js/cloud.js',   // v5 : graphe, barre mobile, synchro chiffrée
   './js/tools/base.js', './js/tools/image.js', './js/tools/editeur.js', './js/tools/pdf.js', './js/tools/reseau.js',
   './js/tools/electronique.js', './js/tools/dev.js', './js/tools/encodage.js', './js/tools/carnet.js', './js/tools/texte.js', './js/tools/memo.js',
   './js/tools/sauvegarde.js', './js/tools/ocr.js',
@@ -95,6 +96,8 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const isFont = /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
   if (url.origin !== self.location.origin && !isFont) return;
+  // v5 : jamais de cache pour une requête authentifiée ou « no-store » (API de synchro : toujours le réseau)
+  if (req.headers.has('authorization') || req.cache === 'no-store') return;
 
   if (req.url.startsWith(OCR_DIR)) {               // OCR : cache d'abord, rempli à la première utilisation
     e.respondWith(caches.open(OCR_CACHE).then(c => c.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req).then(res => {
