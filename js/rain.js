@@ -8,10 +8,23 @@
    v2 : désactivée par défaut (bouton « pluie » en bas de l'accueil, mémorisé dans averse-rain).
    Perf : plus aucun dégradé créé par goutte ni de flou plein écran à chaque image —
    chaque traînée est un petit « sprite » pré-rendu (déjà flouté pour le lointain et le premier plan).
+   v7 : thèmes (densité / opacité / éclairs « Nuit d'orage »), rainBurst(ms) = grosse averse temporaire
+   (easter egg), et canvas créé à la demande sur les pages qui n'en ont pas (carnet).
    ===================================================================== */
 (function(){
-  const canvas=document.getElementById('rain');
-  if(!canvas)return;
+let canvas=document.getElementById('rain');
+/* pas de canvas (carnet) : rien ne tourne ; rainBurst le crée seulement s'il est demandé */
+if(!canvas){
+  window.rainBurst=function(ms){
+    canvas=document.createElement('canvas');canvas.id='rain';
+    Object.assign(canvas.style,{position:'fixed',inset:'0',zIndex:'0',pointerEvents:'none'});
+    document.body.prepend(canvas);init(true);return window.rainBurst(ms);
+  };
+  window.rainOn=()=>false;window.rainSetColor=window.rainTheme=()=>{};
+  return;
+}
+init(false);
+function init(lazy){
   const ctx=canvas.getContext('2d');
   if(!ctx)return;
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -23,8 +36,8 @@
     if(m){const n=parseInt(m[1],16);return[(n>>16)&255,(n>>8)&255,n&255];}
     return[199,188,228];
   }
-  let COL=readColor();
-  const rgba=a=>'rgba('+COL[0]+','+COL[1]+','+COL[2]+','+a+')';
+  let COL=readColor(),AM=1;                         // AM : opacité globale (thème Papier = pluie discrète)
+  const rgba=a=>'rgba('+COL[0]+','+COL[1]+','+COL[2]+','+Math.min(1,a*AM)+')';
   window.rainSetColor=function(){COL=readColor();makeSprites();};
 
   /* Sprite = une traînée verticale en dégradé (transparent en haut → couleur en bas), dessinée une seule fois.
@@ -44,8 +57,11 @@
 
   let W=0,H=0,dpr=1;
   let near=[],fars=[],bokeh=[],ripples=[],bits=[];
-  let enabled=false;
-  try{enabled=localStorage.getItem('averse-rain')==='on';}catch(e){}
+  let enabled=false,burst=0,burstT=0,wasOn=false;
+  /* jamais réglé : pluie coupée… sauf en « Nuit d'orage » où elle fait partie du thème */
+  const pref=()=>{try{const v=localStorage.getItem('averse-rain');if(v)return v==='on';}catch(e){}
+    return!!(window.THEME&&THEME.def().storm);};
+  enabled=!lazy&&pref();
   let t=0,last=performance.now(),running=enabled&&!document.hidden,raf=0;
   const rnd=(a,b)=>a+Math.random()*(b-a);
 
@@ -69,7 +85,8 @@
     ctx.setTransform(dpr,0,0,dpr,0,0);
 
     acols=[];
-    const density=reduce?0.12:0.32;
+    const th=window.THEME?THEME.def():{rain:1};
+    const density=(reduce?0.12:0.32)*(th.rain||1)*(burst?(reduce?1.6:3):1);
     const total=Math.round(W*density);
     near=[];fars=[];bokeh=[];
     for(let i=0;i<total*0.45;i++)near.push(makeDrop('near'));
@@ -135,11 +152,26 @@
     }
   }
 
+  /* éclairs (Nuit d'orage) : voile bref et rare (12-40 s), aucun sous prefers-reduced-motion */
+  let nextFlash=0,flashEl=null;
+  function storm(now){
+    if(reduce||!window.THEME||!THEME.def().storm)return;
+    if(!nextFlash){nextFlash=now+rnd(12000,40000);return;}
+    if(now<nextFlash)return;
+    nextFlash=now+rnd(12000,40000);
+    if(!flashEl){flashEl=document.createElement('div');flashEl.className='storm-flash';flashEl.setAttribute('aria-hidden','true');document.body.prepend(flashEl);
+      flashEl.addEventListener('animationend',()=>flashEl.classList.remove('on'));}
+    flashEl.classList.remove('on');void flashEl.offsetWidth;flashEl.classList.add('on');
+    window.rainFlashes=(window.rainFlashes||0)+1;
+  }
   function step(now){
     if(!running)return;
     let dt=(now-last)/1000; last=now; t+=dt;
     if(dt>0.05)dt=0.05;                         // garde-fou si l'onglet a lagué
-    if(document.documentElement.dataset.theme==='ascii'){
+    if(burst&&now>burstT)endBurst();
+    if(!running)return;
+    storm(now);
+    if(document.documentElement.dataset.style==='ascii'){
       if(!acols.length)asciiInit();
       asciiStep(dt,0);raf=requestAnimationFrame(step);return;
     }
@@ -184,13 +216,30 @@
 
   resize();
   addEventListener('resize',resize);
+  const on=()=>enabled||!!burst;
   function start(){
-    running=enabled&&!document.hidden;
-    cancelAnimationFrame(raf);                    // sinon l'ancienne boucle repart en plus de la nouvelle
-    canvas.style.display=enabled?'block':'none';
+    running=on()&&!document.hidden;
+    cancelAnimationFrame(raf);raf=0;              // sinon l'ancienne boucle repart en plus de la nouvelle
+    canvas.style.display=on()?'block':'none';
     if(running){last=performance.now();raf=requestAnimationFrame(step);}
     else ctx.clearRect(0,0,W,H);
   }
+  /* grosse averse temporaire (easter egg) : densité ×3 pendant ms, puis retour à l'état d'avant
+     (la boucle s'arrête si la pluie était coupée). Version réduite : moins dense, plus courte. */
+  function endBurst(){burst=0;resize();start();document.dispatchEvent(new CustomEvent('averse-burst',{detail:{on:false}}));}
+  window.rainBurst=function(ms){
+    ms=Math.min(ms||6000,reduce?2500:12000);
+    if(!burst){burst=1;resize();}
+    burstT=performance.now()+ms;start();
+    document.dispatchEvent(new CustomEvent('averse-burst',{detail:{on:true}}));
+    return ms;
+  };
+  window.rainBursting=()=>!!burst;
+  window.rainFlashSoon=()=>{nextFlash=1;};        // tests : prochain éclair à la prochaine image (si orage et mouvement autorisé)
+  window.rainRunning=()=>running&&!!raf;
+  /* appelé par theme.js : densité, opacité, pluie par défaut du thème orage */
+  window.rainTheme=function(){AM=window.THEME?THEME.def().rainAlpha||1:1;COL=readColor();makeSprites();
+    enabled=!lazy&&pref();resize();start();};
   document.addEventListener('visibilitychange',start);
   /* interrupteur : rainToggle() bascule, rainToggle(true/false) force ; renvoie l'état */
   window.rainToggle=function(on){
@@ -199,5 +248,7 @@
     start();return enabled;
   };
   window.rainOn=()=>enabled;
+  AM=window.THEME?THEME.def().rainAlpha||1:1;makeSprites();
   start();
+}
 })();

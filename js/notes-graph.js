@@ -48,7 +48,9 @@ function groupOf(note){
   return -1;
 }
 /* v6 : la 1re couleur de la palette (#c7bce4) veut dire « couleur d'accent du site » : elle suit le réglage couleur */
-const colOf=c=>c===PALETTE[0]?ACC.hex:c;
+/* v7 : sur un thème clair (Papier) les pastels sont foncés juste ce qu'il faut pour rester lisibles */
+const colOf=c=>c===PALETTE[0]?ACC.hex:(window.THEME&&THEME.def().light&&window.ACCENT?ACCENT.readable(c):c);
+const bgA=a=>'rgba('+(getComputedStyle(document.documentElement).getPropertyValue('--bg-rgb').trim()||'6,6,10')+','+a+')';
 const styleOfGroup=i=>i<0?GS.other:GS.groups[i];   // l'objet lui-même (modifiable) ; la couleur affichée passe par colOf()
 function autoTagGroups(){                                   // « Par tag » : un groupe par tag fréquent (8 au plus)
   const t=allTags(),top=Object.keys(t).sort((a,b)=>t[b]-t[a]||a.localeCompare(b)).slice(0,8);
@@ -155,6 +157,9 @@ function draw(){
   x.strokeStyle=hot?acc(.05):acc(.15);x.lineWidth=1;x.beginPath();   // toutes les arêtes « normales » en un seul tracé
   G.edges.forEach(([a,b])=>{if(hot&&(a===hot||b===hot))return;x.moveTo(cx+a.x*S,cy+a.y*S);x.lineTo(cx+b.x*S,cy+b.y*S);});
   x.stroke();
+  /* v7 : liens suggérés par le sens (IA locale, option « ≈ sens ») : pointillés, ne comptent pas comme vrais liens */
+  if(G.semIds&&G.semIds.length){const by={};G.nodes.forEach(n=>by[n.id]=n);x.save();x.setLineDash([3,4]);x.strokeStyle=acc(.32);x.beginPath();
+    G.semIds.forEach(([i,j])=>{const a=by[i],b=by[j];if(a&&b){x.moveTo(cx+a.x*S,cy+a.y*S);x.lineTo(cx+b.x*S,cy+b.y*S);}});x.stroke();x.restore();}
   if(hot){x.strokeStyle=acc(.6);x.lineWidth=1.5;x.beginPath();
     G.edges.forEach(([a,b])=>{if(a===hot||b===hot){x.moveTo(cx+a.x*S,cy+a.y*S);x.lineTo(cx+b.x*S,cy+b.y*S);}});x.stroke();}
   const sc=Math.max(.45,Math.min(1.2,S));                    // nœuds plus petits quand on dézoome beaucoup
@@ -182,7 +187,7 @@ function draw(){
     const bx={a:L.sx-tw/2-4,b:ry,c:L.sx+tw/2+4,d:ry+14};
     if(!L.must&&boxes.some(o=>bx.a<o.c&&bx.c>o.a&&bx.b<o.d&&bx.d>o.b))continue;   // chevauche : on saute
     boxes.push(bx);count++;
-    x.fillStyle='rgba(6,6,10,.82)';x.fillRect(bx.a,ry,tw+8,14);
+    x.fillStyle=bgA(.82);x.fillRect(bx.a,ry,tw+8,14);
     x.fillStyle=dim?acc(.4):(n===hot?ACC.hex:acc(.85));
     x.textBaseline=below?'top':'bottom';x.fillText(t,L.sx,ly);
   }

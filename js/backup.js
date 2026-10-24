@@ -1,11 +1,12 @@
 /* backup.js — la sauvegarde COMPLÈTE d'AVERSE dans un seul fichier JSON :
-   notes (+ pierres tombales), favoris, récents, champs mémorisés des outils, réglages (style, pluie, couleur d'accent v6),
+   notes (+ pierres tombales), favoris, récents, champs mémorisés des outils, réglages (style, pluie, couleur d'accent v6, thème v7),
    et (v6) tes modèles de note (templates.js).
    Jamais dedans : les secrets (outil JWT, champs mot de passe / clé / jeton, valeurs qui ressemblent à un JWT).
    À l'import, TOUT est revérifié (on ne fait pas confiance au fichier) puis fusionné — rien n'est écrasé à l'aveugle.
    Utilisé par l'outil « Sauvegarde » (tools/sauvegarde.js) et par le carnet (notes.html). */
 const BACKUP=(function(){
-const K={notes:'noxe-notes',fav:'averse-fav',recent:'averse-recent',fields:'averse-in',style:'averse-style',rain:'averse-rain',accent:'averse-accent'};
+const K={notes:'noxe-notes',fav:'averse-fav',recent:'averse-recent',fields:'averse-in',style:'averse-style',rain:'averse-rain',accent:'averse-accent',theme:'averse-theme'};
+const THEMES=['defaut','neon','papier','terminal','orage'];   // v7 (même liste que js/theme.js)
 const RE_HEX=/^#[0-9a-f]{6}$/i;
 const RE_ID=/^[\w-]{1,40}$/,MAXLEN=20000;
 const ID={test:k=>RE_ID.test(k)&&!/^(__proto__|constructor|prototype)$/.test(k)};   // jamais de clé qui toucherait au prototype
@@ -38,6 +39,7 @@ function build(){
     settings:{style:raw(K.style)==='normal'?'normal':'ascii',rain:raw(K.rain)==='on'?'on':'off'}};
   /* v6 : couleur d'accent (absente = violet d'origine) et modèles */
   const acc=raw(K.accent);if(acc&&RE_HEX.test(acc))data.settings.accent=acc.toLowerCase();
+  const th=raw(K.theme);if(th&&THEMES.includes(th)&&th!=='defaut')data.settings.theme=th;   // v7 : thème (absent = Défaut)
   if(typeof TPL!=='undefined'){const t=TPL.payload();if(Object.keys(t.items).length||Object.keys(t.deleted).length)data.templates=t;}
   return{data,skipped};
 }
@@ -80,6 +82,7 @@ function validate(d){
     if(st.style==='ascii'||st.style==='normal')clean.settings.style=st.style;else if(st.style!=null)rejected++;
     if(st.rain==='on'||st.rain==='off')clean.settings.rain=st.rain;else if(st.rain!=null)rejected++;
     if(typeof st.accent==='string'&&RE_HEX.test(st.accent))clean.settings.accent=st.accent.toLowerCase();else if(st.accent!=null)rejected++;
+    if(typeof st.theme==='string'&&THEMES.includes(st.theme))clean.settings.theme=st.theme;else if(st.theme!=null)rejected++;
     /* v6 : modèles — chaque modèle est revérifié (TPL.clean) ; on n'en garde que des propres */
     const tp=d.templates;
     if(tp&&typeof tp==='object'&&typeof TPL!=='undefined'){
@@ -118,11 +121,12 @@ function apply(clean){
   setLS(K.fields,f);
   const s=clean.settings;
   if(s.style){
-    const ascii=document.documentElement.dataset.theme==='ascii';
+    const ascii=document.documentElement.dataset.style==='ascii';
     if((s.style==='ascii')!==ascii)toggleStyle();else try{localStorage.setItem(K.style,s.style);}catch(e){}
     if(window.rainSetColor)rainSetColor();
   }
   if(s.rain){if(window.rainToggle)rainToggle(s.rain==='on');else try{localStorage.setItem(K.rain,s.rain);}catch(e){}}
+  if(s.theme){if(typeof THEME!=='undefined')THEME.set(s.theme);else try{localStorage.setItem(K.theme,s.theme);}catch(e){}}
   if(s.accent){if(typeof ACCENT!=='undefined')ACCENT.set(s.accent);else try{localStorage.setItem(K.accent,s.accent);}catch(e){}}
   let templates=0;
   if(clean.templates&&typeof TPL!=='undefined'){templates=TPL.merge(clean.templates);if(window.tplRefresh)tplRefresh();}

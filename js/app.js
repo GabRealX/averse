@@ -20,7 +20,9 @@ function score(qn,t){
   if(title===qn||key===qn)return 1000;
   if(title.startsWith(qn))return 500;
   let s=0;
-  for(const w of qn.split(/\s+/).filter(Boolean)){
+  /* v8 : « json ? » cherche encore « json » (la ponctuation d'une question ne compte pas) */
+  const ws=qn.split(/\s+/).map(w=>w.replace(/[?!¿¡]+/g,'')).filter(Boolean);if(!ws.length)return 0;
+  for(const w of ws){
     const start=new RegExp('(^|[^a-z0-9])'+reEsc(w));
     if(start.test(title))s+=100;
     else if(start.test(key+' '+words))s+=60;
@@ -38,9 +40,18 @@ function score(qn,t){
 const LIM={tool:8,note:8,memo:6};
 const CMDS=[
   {id:'feedback',title:'Signaler / Suggérer (bug, idée, demande)',words:'signaler suggerer suggestion bug probleme erreur idee demande feedback avis contact ticket'},
-  {id:'accent',title:'Changer la couleur d\'accent',words:'couleur accent theme violet rouge bleu vert orange rose cyan jaune'}];
-const runCmd=id=>{if(id==='feedback'&&typeof FEEDBACK!=='undefined')FEEDBACK.open();else if(id==='accent'&&typeof ACCENT!=='undefined')ACCENT.picker();};
+  {id:'accent',title:'Changer la couleur d\'accent',words:'couleur accent violet rouge bleu vert orange rose cyan jaune'},
+  {id:'theme',title:'Changer de thème (Défaut, Néon, Papier, Terminal, Nuit d\'orage)',words:'theme apparence neon papier terminal orage nuit defaut clair sombre'}];
+/* v7 : d'autres fichiers (ai.js…) peuvent ajouter leurs commandes : NOXE.cmds.push({id,title,words,run}) */
+NOXE.cmds=CMDS;
+const runCmd=id=>{const c=CMDS.find(x=>x.id===id);if(c&&c.run){c.run();return;}
+  if(id==='feedback'&&typeof FEEDBACK!=='undefined')FEEDBACK.open();else if((id==='accent'||id==='theme')&&typeof ACCENT!=='undefined')ACCENT.picker();};
 let totals={tool:0,note:0,memo:0};
+/* v8 : options placées EN TÊTE des résultats par d'autres fichiers (ai-bar.js : « Demander à l'IA »).
+   NOXE.searchLead(texte, forcé) → [{type:'ai', title, hint, run}] ; elles ne prennent la sélection que si on les force
+   (préfixe « ? », Tab, bouton) ou s'il n'y a rien d'autre : Entrée garde son sens habituel. */
+let forceLead=false;
+NOXE.forceLead=()=>{if(!q.value.trim())return false;forceLead=true;sel=0;drawResults();return true;};
 NOXE.search=query=>{
   const qn=norm(query).trim();if(!qn)return[];
   const tools=NOXE.tools.map(t=>({type:'tool',key:t.key,title:t.title,hint:catName(t.cat),s:score(qn,t)})).filter(r=>r.s>0)
@@ -86,28 +97,33 @@ document.addEventListener('click',e=>{
 });
 
 /* ---------- résultats de recherche ---------- */
-let results=[],sel=0;
+let results=[],sel=0,autoSel=true;
 function drawResults(){
   const v=q.value.trim();
   blocks.hidden=!!v;resBox.hidden=!v;
   if(!v)return;
-  results=NOXE.search(v);sel=Math.min(sel,Math.max(0,results.length-1));
-  const G={tool:'Outils',note:'Notes',memo:'Mémo'};let last='',html='';
+  results=NOXE.search(v);
+  const lead=NOXE.searchLead?NOXE.searchLead(v,forceLead)||[]:[];
+  if(lead.length){const n=results.length;results=lead.concat(results);
+    if(autoSel)sel=forceLead||!n||/^\s*\?/.test(v)?0:lead.length;}
+  autoSel=false;sel=Math.min(sel,Math.max(0,results.length-1));
+  const G={tool:'Outils',note:'Notes',memo:'Mémo',ai:'IA'};let last='',html='';
   results.forEach((r,i)=>{
     if(r.type!==last){last=r.type;const n=totals[r.type],shown=results.filter(x=>x.type===r.type).length;
       html+='<div class="res-group" role="presentation">'+G[r.type]+(n>shown?' · '+shown+' sur '+n:'')+'</div>';}
-    const href=r.cmd?'#/':r.type==='tool'?'#/'+r.key:r.type==='memo'?'#/memo':'notes.html#'+encodeURIComponent(r.id);
+    const href=r.type==='ai'?'#/':r.cmd?'#/':r.type==='tool'?'#/'+r.key:r.type==='memo'?'#/memo':'notes.html#'+encodeURIComponent(r.id);
     /* titleHtml / snip / valueHtml : déjà échappés par search.js (seules des balises <mark> sont ajoutées) */
     const body=r.type==='note'?'<span class="res-t">'+r.titleHtml+'<small class="res-snip">'+(r.snip||'<i>note vide</i>')+'</small></span><em>Note</em>'
       :r.type==='memo'?'<span class="res-t">'+r.titleHtml+'<small class="res-snip">'+r.valueHtml+'</small></span><em>'+esc(r.hint)+'</em>'
       :'<span>'+esc(r.title)+'</span><em>'+esc(r.hint)+'</em>';
-    html+='<a class="res-item res-'+(r.cmd?'cmd':r.type)+(i===sel?' on':'')+'" data-i="'+i+'" role="option" aria-selected="'+(i===sel)+'" href="'+href+'">'+body+'</a>';
+    html+='<a class="res-item res-'+(r.cmd?'cmd':r.type)+(r.act?' res-ai-'+r.act:'')+(i===sel?' on':'')+'" data-i="'+i+'" role="option" aria-selected="'+(i===sel)+'" href="'+href+'">'+body+'</a>';
   });
   resBox.innerHTML=results.length?html:'<div class="res-none">Aucun outil, note ni fiche du mémo pour « '+esc(v)+' ».</div>';
   const on=resBox.querySelector('.res-item.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest'});
 }
 function go(r,newTab){
   if(!r)return;
+  if(r.type==='ai'){if(r.run)r.run();return;}
   if(r.type==='note'){if(window.notePanel&&!newTab)notePanel.open(r.id);else location.href='notes.html#'+encodeURIComponent(r.id);return;}
   if(r.cmd){runCmd(r.cmd);return;}
   if(r.type==='memo'){NOXE.open('memo',{text:q.value.trim(),input:'mq'});return;}   // le mémo s'ouvre filtré sur la recherche
@@ -117,10 +133,13 @@ resBox.addEventListener('click',e=>{
   const a=e.target.closest('[data-i]');if(!a||e.ctrlKey||e.metaKey)return;
   e.preventDefault();go(results[+a.dataset.i]);
 });
-q.addEventListener('input',()=>{sel=0;clearSuggest();drawResults();});
+q.addEventListener('input',()=>{sel=0;autoSel=true;if(!q.value.trim())forceLead=false;clearSuggest();drawResults();});
 q.addEventListener('keydown',e=>{
   if(e.key==='ArrowDown'&&results.length&&q.value){e.preventDefault();sel=(sel+1)%results.length;drawResults();}
   else if(e.key==='ArrowUp'&&results.length&&q.value){e.preventDefault();sel=(sel-1+results.length)%results.length;drawResults();}
+  /* v8 : Tab (sans Maj) avec du texte = proposer / choisir « Demander à l'IA » ; une 2e fois, Tab sort normalement du champ */
+  else if(e.key==='Tab'&&!e.shiftKey&&!e.ctrlKey&&!e.altKey&&q.value.trim()&&NOXE.searchLead&&!(results[sel]&&results[sel].type==='ai')&&(NOXE.searchLead(q.value,true)||[]).length){
+    e.preventDefault();NOXE.forceLead();}
   else if(e.key==='Enter'){
     e.preventDefault();
     if(!q.value.trim()&&pending.length){useSuggest(0);return;}     // Entrée = première suggestion du collage
@@ -300,6 +319,7 @@ if(typeof SITE!=='undefined'&&$('footerLinks'))
   if(a)a.onclick=e=>{e.preventDefault();toggleStyle();if(window.rainSetColor)rainSetColor();};
   const r=$('rainSwitch');if(!r)return;
   const lab=()=>{r.textContent='pluie : '+(window.rainOn&&rainOn()?'on':'off');};
+  document.addEventListener('averse-theme',lab);
   r.onclick=e=>{e.preventDefault();if(window.rainToggle)rainToggle();lab();};lab();
 })();
 

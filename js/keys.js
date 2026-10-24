@@ -63,7 +63,7 @@ addEventListener('keydown',e=>{
 addEventListener('keydown',e=>{
   if(e.defaultPrevented||e.altKey||e.isComposing)return;
   const t=e.target,inField=editable(t),mod=e.ctrlKey||e.metaKey;
-  if(e.key==='?'&&!mod&&(!inField||(t.id==='q'||t.id==='search')&&!t.value)){e.preventDefault();open();return;}
+  if(e.key==='?'&&!mod&&(!inField||t.id==='search'&&!t.value)){e.preventDefault();open();return;}
   if(e.key==='/'&&!mod&&!inField){e.preventDefault();toSearch();return;}
   /* v6 : Ctrl+K partout = la recherche GLOBALE de l'accueil (sur l'accueil, app.js s'en charge) */
   if(mod&&!e.shiftKey&&e.key.toLowerCase()==='k'&&page!=='index'){e.preventDefault();location.href='index.html#/';return;}

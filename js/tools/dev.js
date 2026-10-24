@@ -61,7 +61,8 @@ register({
       '<label class="check" style="padding-bottom:10px"><input type="checkbox" id="j_sort"> Trier les clés</label></div></div>'+
       '<div class="info" id="j_st"></div>'+
       '<div class="field" style="margin-top:12px"><label>Résultat</label><textarea id="j_out" readonly style="min-height:170px" spellcheck="false"></textarea></div>'+
-      '<div class="btn-row"><button class="btn primary" id="j_cp">Copier</button><button class="btn ghost" id="j_use">Remplacer l\'entrée</button></div>';
+      '<div class="btn-row"><button class="btn primary" id="j_cp">Copier</button><button class="btn ghost" id="j_use">Remplacer l\'entrée</button>'+
+      (window.AI?'<button class="btn ghost" id="j_ai" title="Envoie ce JSON au fournisseur d\'IA choisi (après confirmation)">✦ Expliquer (IA)</button>':'')+'</div>';
     function render(){
       const t=$('j_in').value,st=$('j_st');
       $('j_in').classList.remove('bad');
@@ -81,6 +82,7 @@ register({
     $('j_in').oninput=render;$('j_sort').onchange=render;seg('j_m',v=>{mode=v;render();});
     $('j_cp').onclick=()=>{if($('j_out').value)copy($('j_out').value);};
     $('j_use').onclick=()=>{if($('j_out').value){$('j_in').value=$('j_out').value;render();}};
+    if($('j_ai'))$('j_ai').onclick=()=>{const t=$('j_in').value.trim();if(t)AI.run('json',{text:t});else toast('Colle d\'abord un JSON');};   // v7
   }
 });
 
@@ -97,7 +99,15 @@ register({
       ['g','i','m','s','u'].map(f=>'<label class="check" title="'+f+'"><input type="checkbox" data-f="'+f+'"'+(f==='g'?' checked':'')+'>'+f+'</label>').join('')+'</div></div></div>'+
       '<div class="field"><label>Texte de test</label><textarea id="r_t" spellcheck="false" style="min-height:100px">contact: alice@example.com, bob@test.com</textarea></div>'+
       '<div class="field"><label>Remplacer par (optionnel — $1, $2, $&amp;)</label><input type="text" id="r_r" spellcheck="false" placeholder="ex : $2 (de $1)"></div></div>'+
+      (window.AI?'<div class="btn-row" style="margin-top:6px"><button class="btn ghost" id="r_aiX">✦ Expliquer la regex (IA)</button><button class="btn ghost" id="r_aiW">✦ Écrire une regex depuis une description (IA)</button></div>':'')+
       '<div id="r_out"></div>';
+    /* v7 : IA (fenêtre de confirmation : rien ne part sans « Envoyer ») */
+    if($('r_aiX')){
+      $('r_aiX').onclick=()=>{const fl=[...p.querySelectorAll('[data-f]:checked')].map(c=>c.dataset.f).join('');if($('r_p').value)AI.run('regexExplain',{text:'/'+$('r_p').value+'/'+fl});};
+      $('r_aiW').onclick=()=>AI.run('regexWrite',{text:$('r_t').value,useLabel:'Utiliser cette regex',onUse:t=>{
+        const m=/^\s*`*\/(.+)\/([dgimsuy]*)`*\s*$/m.exec(t);if(!m){toast('Pas de regex reconnue dans la réponse');return;}
+        $('r_p').value=m[1];p.querySelectorAll('[data-f]').forEach(c=>{c.checked=m[2].includes(c.dataset.f);});later();}});
+    }
     const R=NOXE.rxRunner();let deb=null,job=null;
     NOXE.onClose(()=>{R.stop();clearTimeout(deb);});
     function show(r){

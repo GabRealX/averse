@@ -7,7 +7,7 @@
    Ouvert par : liens [data-feedback-btn] (pied de page, carnet), la recherche (« signaler », « bug », « idée »…),
    le clic droit (dernière entrée de chaque menu AVERSE). */
 const FEEDBACK=(function(){
-const VERSION='v6 (cache averse-v14)';   // à mettre à jour avec sw.js
+const VERSION='v8 (cache averse-v16)';   // à mettre à jour avec sw.js
 const MAXURL=6000;
 const TYPES=[['bug','Bug','Quelque chose ne marche pas'],['idée','Idée','Une amélioration, un nouvel outil'],['demande','Demande','Une question, un besoin']];
 const S=()=>typeof SITE!=='undefined'?SITE:{};
@@ -25,7 +25,7 @@ function tech(){
     ['Langue',navigator.language||'?'],
     ['Écran',screen.width+'×'+screen.height+' (fenêtre '+innerWidth+'×'+innerHeight+', ×'+(devicePixelRatio||1)+')'],
     ['Page',page+(tool?' · outil : '+tool:'')],
-    ['Style',(r.dataset.theme||'normal')+' · couleur '+(r.dataset.accent||'#c7bce4')],
+    ['Style',(r.dataset.style||'normal')+' · couleur '+(r.dataset.accent||'#c7bce4')],
     ['Mode',(mm('(display-mode: standalone)')?'appli installée':'navigateur')+(navigator.onLine===false?' · hors ligne':'')+(mm('(pointer: coarse)')?' · tactile':'')]
   ];
 }

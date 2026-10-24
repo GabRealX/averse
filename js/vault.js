@@ -135,9 +135,15 @@ async function openData(v,key){
   const o=JSON.parse(td.decode(bytes));
   const r={notes:o&&typeof o.notes==='object'?o.notes:{},deleted:o&&typeof o.deleted==='object'?o.deleted:{}};
   if(o&&o.templates&&typeof o.templates==='object')r.templates=o.templates;   // v6 : les modèles de note voyagent aussi
+  if(o&&o.secrets&&typeof o.secrets==='object')r.secrets=o.secrets;           // v7 : clés d'API de l'IA (dans la boîte chiffrée)
   return r;
 }
+/* v7 : petit secret (clé d'API de l'IA) chiffré sur CET appareil, avec une clé AES-GCM non exportable
+   gardée dans IndexedDB (le navigateur ne laisse jamais lire ses octets). localStorage ne voit que {iv, ct}. */
+async function deviceKey(){return C.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+async function sealSecret(key,text,aad){return seal(key,te.encode(String(text)),aad||'averse-secret');}
+async function openSecret(key,box,aad){return td.decode(await open(key,box,aad||'averse-secret','secret'));}
 
 window.VAULT={ITER,MIN_ITER,create,addDevice,openDevice,addRecovery,openRecovery,addPair,openPair,resetPassword,sealData,openData,
-  check,pwBits,dkKey,b64,unb64,b32,unb32,rnd,VaultError};
+  check,pwBits,dkKey,deviceKey,sealSecret,openSecret,b64,unb64,b32,unb32,rnd,VaultError};
 })();

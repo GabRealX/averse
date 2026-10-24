@@ -76,16 +76,16 @@ function addToNotebook(title,body,tags){
     if(q)localStorage.setItem('averse-style',q[1]==='normal'?'normal':'ascii');
     if(localStorage.getItem('averse-style')==='normal')st='normal';
   }catch(e){}
-  if(st==='ascii')document.documentElement.dataset.theme='ascii';
+  if(st==='ascii')document.documentElement.dataset.style='ascii';
 })();
 function toggleStyle(){
-  const on=document.documentElement.dataset.theme==='ascii';
-  if(on)delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme='ascii';
+  const on=document.documentElement.dataset.style==='ascii';
+  if(on)delete document.documentElement.dataset.style;else document.documentElement.dataset.style='ascii';
   try{localStorage.setItem('averse-style',on?'normal':'ascii');}catch(e){}
   document.querySelectorAll('[data-style-label]').forEach(e=>e.textContent=on?'style : normal':'style : ascii');
   return !on;
 }
 addEventListener('DOMContentLoaded',()=>{
-  const on=document.documentElement.dataset.theme==='ascii';
+  const on=document.documentElement.dataset.style==='ascii';
   document.querySelectorAll('[data-style-label]').forEach(e=>e.textContent=on?'style : ascii':'style : normal');
 });

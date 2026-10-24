@@ -131,6 +131,7 @@ function sync(why){
   if(M.busy){M.again=true;return M.busy;}
   M.busy=(async()=>{
     try{
+      if(window.AI&&AI.ready)await AI.ready;               // v7 : clés de l'IA déchiffrées avant d'écrire (sinon on les effacerait du coffre)
       let res={n:0,c:0},remoteText=null,v=M.vault,ver=CS.version;
       const r=await gh('GET','/gists/'+CS.gistId,null,{etag:M.vault&&CS.etag});
       if(r.status!==304){

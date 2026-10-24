@@ -14,6 +14,7 @@ $('footerLinks').innerHTML=SITE.links.map(l=>'<a href="'+esc(l.url)+'" target="_
   if(a)a.onclick=e=>{e.preventDefault();toggleStyle();if(window.rainSetColor)rainSetColor();};
   const r=$('rainSwitch');if(!r)return;
   const lab=()=>{r.textContent='pluie : '+(window.rainOn&&rainOn()?'on':'off');};
+  document.addEventListener('averse-theme',lab);
   r.onclick=e=>{e.preventDefault();if(window.rainToggle)rainToggle();lab();};lab();
 })();
 

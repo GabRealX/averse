@@ -145,15 +145,17 @@ function toNotebook(text){
 }
 function textItems(text){
   const g=guess(text),T=hasNoxe()&&g&&NOXE.tools.find(t=>t.key===g.key);
-  return[
+  return tag({text},[
     {label:'Copier',hint:'',run:()=>copy(text,'Copié')},
     {label:'Envoyer vers…',sub:()=>sendItems({text})},
     {label:'Ajouter au carnet',run:()=>toNotebook(text)},
     T?{label:'Ouvrir l\'outil associé : '+T.title,run:()=>NOXE.open(g.key,{tab:g.tab,text:g.text,input:g.input})}:
       !hasNoxe()?{label:'Ouvrir dans AVERSE (outil deviné)',run:()=>{try{sessionStorage.setItem('averse-send',JSON.stringify({detect:text}));}catch(e){}location.href='index.html';}}:
       {label:'Ouvrir l\'outil associé',disabled:true,hint:'aucun'}
-  ];
+  ]);
 }
+/* v7 : on étiquette la liste (texte visé, note visée) pour que l'IA (ai.js) ajoute ses entrées */
+const tag=(o,a)=>Object.assign(a,o);
 function imageItems(getFile){
   return[
     {label:'Copier l\'image',run:async()=>copyImage(await getFile())},
@@ -206,7 +208,7 @@ function fileItems(spec,i){
 function noteItems(id,ops){
   const n=ops.get(id);if(!n)return null;
   const upd=fn=>{const x=JSON.parse(JSON.stringify(ops.get(id)));fn(x);x.updated=Date.now();ops.save(id,x);};
-  return[
+  return tag({noteId:id,noteGet:ops.get},[
     {label:'Ouvrir',run:()=>ops.open(id)},
     {label:'Renommer…',run:async()=>{const v=await ask('Nouveau titre',n.title||'','Renommer');if(v)upd(x=>{x.title=v.slice(0,300);});}},
     {label:'Dupliquer',run:()=>{ops.duplicate(id);toast('Note dupliquée');}},
@@ -218,7 +220,7 @@ function noteItems(id,ops){
     {label:'Exporter PDF',run:()=>ops.pdf(id)},
     '-',
     {label:'Supprimer…',danger:true,run:async()=>{if(await confirm('Supprimer « '+(n.title||'Sans titre')+' » ? Cette action est définitive.','Supprimer'))ops.remove(id);}}
-  ];
+  ]);
 }
 /* les mêmes opérations directement sur le stockage (panneau Ctrl+J, résultats de recherche) */
 const KEY='noxe-notes';
@@ -297,7 +299,9 @@ document.addEventListener('contextmenu',e=>{
       let x=e.clientX,y=e.clientY;
       if(!x&&!y){const b=t.getBoundingClientRect();x=b.left+8;y=b.top+Math.min(b.height,24);}   // ouvert au clavier (touche Menu)
       /* v6 : dernière entrée de chaque menu AVERSE */
-      const items=typeof FEEDBACK!=='undefined'?r.items.concat(['-',{label:'Signaler / Suggérer…',run:()=>FEEDBACK.open()}]):r.items;
+      let items=r.items;
+      if(typeof AI!=='undefined'&&(items.text||items.noteId))items=items.concat(AI.ctxItems(items));   // v7 : sous-menu IA ✦
+      if(typeof FEEDBACK!=='undefined')items=items.concat(['-',{label:'Signaler / Suggérer…',run:()=>FEEDBACK.open()}]);
       open(x,y,items,r.title);return;
     }
   }

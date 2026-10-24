@@ -91,7 +91,7 @@ function renderList0(){
   const host=$('list');
   let ns=allNotes().filter(n=>matchQuery(n)&&(!tagFilter||(n.tags||[]).includes(tagFilter)));
   ns.sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||b.updated-a.updated);   // épinglées d'abord
-  if(!ns.length){host.innerHTML='<div class="list-empty">Aucune note'+(query||tagFilter?' pour ce filtre.':' — crée la première.')+'</div>';return;}
+  if(!ns.length){host.innerHTML='<div class="list-empty">Aucune note'+(query||tagFilter?' pour ce filtre.':' — crée la première.')+'</div>';if(window.AINOTES)AINOTES.semantic(query,host,[]);return;}
   host.innerHTML=ns.map(n=>{
     const links=outLinks(n).length;
     return'<div class="note-item'+(n.id===data.openId?' active':'')+'" data-id="'+esc(n.id)+'">'+
@@ -101,6 +101,7 @@ function renderList0(){
       ((n.tags||[]).length?'<span class="dot"></span><span>'+esc(n.tags.join(' · '))+'</span>':'')+
       '</div></div>';
   }).join('');
+  if(window.AINOTES)AINOTES.semantic(query,host,ns.map(n=>n.id));   // v7 : « par le sens » sous les résultats
 }
 function renderTags(){
   const t=allTags(),keys=Object.keys(t).sort(),host=$('tagbar');
@@ -125,6 +126,7 @@ function renderBacklinks(n){
   const bl=backlinks(n),host=$('backlinks');
   host.innerHTML='<div class="bl-head">Référencé par ('+bl.length+')</div>'+
     (bl.length?bl.map(b=>'<a data-id="'+esc(b.id)+'">'+esc(b.title||'Sans titre')+'</a>').join(''):'<div class="none">Aucune note ne pointe encore ici.</div>');
+  if(window.AINOTES)AINOTES.related(n,host);                 // v7 : notes liées par le sens (si l'IA locale est activée)
 }
 let saveT;
 function liveSave(){
@@ -383,9 +385,13 @@ addEventListener('focus',()=>{if(FS.h)fsSync('focus');});
 document.addEventListener('visibilitychange',()=>{if(FS.h&&!document.hidden)fsSync('focus');});
 /* v5 : ce dont la synchro Gist (cloud.js) a besoin, sans toucher aux variables du carnet */
 window.notesApi={
-  payload:()=>{const o=JSON.parse(fileText()),p={notes:o.notes,deleted:o.deleted};if(o.templates)p.templates=o.templates;return p;},   // trié, sans l'état de l'appareil
+  payload:()=>{const o=JSON.parse(fileText()),p={notes:o.notes,deleted:o.deleted};if(o.templates)p.templates=o.templates;
+    /* v7 : clés d'API de l'IA — SEULEMENT ici (coffre Gist chiffré de bout en bout), jamais dans le fichier lié en clair (fileText) */
+    const sec=window.AI&&AI.syncPart();if(sec)p.secrets={ai:sec};
+    return p;},   // trié, sans l'état de l'appareil
   text:()=>JSON.stringify(window.notesApi.payload()),
   merge:(d,base)=>{const r=syncMerge(d,base);
+    if(d.secrets&&d.secrets.ai&&window.AI)AI.syncReceive(d.secrets.ai);   // v7
     if(r.n){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}renderAll();
       if(r.c)toast(r.c+' conflit(s) : les deux versions sont gardées (tag « conflit »)');}
     return r;},
