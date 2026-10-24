@@ -1,5 +1,6 @@
 /* keys.js — les raccourcis clavier, sur toutes les pages (accueil + outils, carnet, à propos).
      /            → aller à la recherche
+     Ctrl+K       → recherche globale (v6 : aussi depuis le carnet et « à propos »)
      ?            → afficher / masquer l'aide des raccourcis
      Ctrl+Entrée  → lancer / recalculer l'outil ouvert
      Ctrl+Maj+C   → copier le résultat principal de l'outil
@@ -18,8 +19,8 @@ const LIST={
   index:[['Partout',[['/','aller à la recherche'],['?','cette aide'],[C+'|K','recherche (même dans un champ)'],[C+'|J','panneau de notes'],['clic droit','copier, envoyer, ajouter au carnet'],['Maj|clic droit','menu habituel du navigateur'],['Échap','revenir en arrière']]],
          ['Dans un outil',[[C+'|Entrée','lancer / recalculer'],[C+'|Maj|C','copier le résultat'],['→ Envoyer vers…','passer le résultat à un autre outil'],['Échap','retour à la recherche']]],
          ['Accueil',[['↑|↓','choisir un outil'],['Entrée','ouvrir'],[C+'|V','coller : AVERSE devine l\'outil']]]],
-  notes:[['Carnet',[['/','chercher dans les notes'],['?','cette aide'],['clic droit','copier, envoyer vers un outil…'],['Échap','retour à l\'accueil (hors champ)']]]],
-  autre:[['Partout',[['/','aller à la recherche'],['?','cette aide'],[C+'|J','panneau de notes'],['Échap','retour à l\'accueil']]]]
+  notes:[['Carnet',[['/','chercher dans les notes'],[C+'|K','recherche globale (outils, notes, mémo)'],['?','cette aide'],['clic droit','copier, envoyer vers un outil…'],['Échap','retour à l\'accueil (hors champ)']]]],
+  autre:[['Partout',[['/','aller à la recherche'],[C+'|K','recherche globale'],['?','cette aide'],[C+'|J','panneau de notes'],['Échap','retour à l\'accueil']]]]
 };
 
 let box=null,before=null;
@@ -64,6 +65,8 @@ addEventListener('keydown',e=>{
   const t=e.target,inField=editable(t),mod=e.ctrlKey||e.metaKey;
   if(e.key==='?'&&!mod&&(!inField||(t.id==='q'||t.id==='search')&&!t.value)){e.preventDefault();open();return;}
   if(e.key==='/'&&!mod&&!inField){e.preventDefault();toSearch();return;}
+  /* v6 : Ctrl+K partout = la recherche GLOBALE de l'accueil (sur l'accueil, app.js s'en charge) */
+  if(mod&&!e.shiftKey&&e.key.toLowerCase()==='k'&&page!=='index'){e.preventDefault();location.href='index.html#/';return;}
   if(mod&&!e.shiftKey&&e.key==='Enter'&&tool()){e.preventDefault();NOXE.runMain();return;}
   if(mod&&e.shiftKey&&e.key.toLowerCase()==='c'&&tool()){e.preventDefault();NOXE.copyMain();return;}
   /* Échap hors outil, sur le carnet / à propos : retour à l'accueil (jamais quand une fenêtre est ouverte ou qu'on écrit) */

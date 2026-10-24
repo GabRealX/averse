@@ -47,7 +47,9 @@ function groupOf(note){
     if(g.kind==='tag'?(note.tags||[]).includes(g.tag):g.ids.includes(note.id))return i;}
   return -1;
 }
-const styleOfGroup=i=>i<0?GS.other:GS.groups[i];
+/* v6 : la 1re couleur de la palette (#c7bce4) veut dire « couleur d'accent du site » : elle suit le réglage couleur */
+const colOf=c=>c===PALETTE[0]?ACC.hex:c;
+const styleOfGroup=i=>i<0?GS.other:GS.groups[i];   // l'objet lui-même (modifiable) ; la couleur affichée passe par colOf()
 function autoTagGroups(){                                   // « Par tag » : un groupe par tag fréquent (8 au plus)
   const t=allTags(),top=Object.keys(t).sort((a,b)=>t[b]-t[a]||a.localeCompare(b)).slice(0,8);
   const have=new Set(GS.groups.filter(g=>g.kind==='tag').map(g=>g.tag));
@@ -160,9 +162,9 @@ function draw(){
   const packs=new Map();
   G.nodes.forEach(n=>{const sx=cx+n.x*S,sy=cy+n.y*S;if(sx<-30||sy<-30||sx>W+30||sy>H+30)return;
     const k=n.g+(hot&&!near[n.id]?'d':'');let p=packs.get(k);if(!p)packs.set(k,p={g:n.g,dim:k.endsWith('d'),list:[]});p.list.push(n);});
-  packs.forEach(p=>{const st=styleOfGroup(p.g);x.fillStyle=p.dim?rgba(st.color,.16):st.color;x.beginPath();
+  packs.forEach(p=>{const st=styleOfGroup(p.g);const cc=colOf(st.color);x.fillStyle=p.dim?rgba(cc,.16):cc;x.beginPath();
     p.list.forEach(n=>shapePath(x,st.shape,cx+n.x*S,cy+n.y*S,nodeSize(n)*sc/2));x.fill();});
-  if(G.focus){const n=G.focus,st=styleOfGroup(n.g);x.strokeStyle=st.color;x.lineWidth=2;x.beginPath();
+  if(G.focus){const n=G.focus,st=styleOfGroup(n.g);x.strokeStyle=colOf(st.color);x.lineWidth=2;x.beginPath();
     x.arc(cx+n.x*S,cy+n.y*S,nodeSize(n)*sc/2+6,0,Math.PI*2);x.stroke();}
   /* étiquettes : toutes s'il y a peu de nœuds ; sinon survol / focus + voisins, et au zoom (les plus liées d'abord, sans chevauchement) */
   const few=G.nodes.length<=FEW,mode=GS.labels,lab=[];
@@ -222,6 +224,7 @@ function renderFocus(){
 
 /* ===== LÉGENDE, FILTRE, ÉTIQUETTES ===== */
 function swatch(st,s){                                      // petite forme SVG (légende, carte de focus)
+  st={shape:st.shape,color:colOf(st.color)};                // v6 : « couleur du site » → l'accent actuel
   const r=s/2-1.5,c=s/2,p=[];
   if(st.shape==='circle')return'<svg width="'+s+'" height="'+s+'" aria-hidden="true"><circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="'+st.color+'"/></svg>';
   if(st.shape==='square')return'<svg width="'+s+'" height="'+s+'" aria-hidden="true"><rect x="2" y="2" width="'+(s-4)+'" height="'+(s-4)+'" fill="'+st.color+'"/></svg>';
@@ -266,8 +269,8 @@ function editGroup(i){
       '<button class="ico-btn" data-ge="addvis" title="Toutes les notes affichées (filtre de tag actuel)">+ notes affichées</button>'))+
     '<div class="ge-l">Forme <span class="ge-shapes">'+Object.entries(SHAPES).map(([lab,k])=>
       '<button data-shape="'+k+'" class="'+(g.shape===k?'on':'')+'" title="'+lab+'" aria-label="'+lab+'">'+swatch({shape:k,color:g.color},16)+'</button>').join('')+'</span></div>'+
-    '<div class="ge-l">Couleur <span class="ge-cols">'+PALETTE.map(c=>'<button data-col="'+c+'" class="'+(g.color===c?'on':'')+'" style="background:'+c+'" aria-label="'+c+'"></button>').join('')+
-      '<input type="color" id="geCol" value="'+g.color+'" aria-label="Autre couleur"></span></div>'+
+    '<div class="ge-l">Couleur <span class="ge-cols">'+PALETTE.map((c,k)=>'<button data-col="'+c+'" class="'+(g.color===c?'on':'')+'" style="background:'+colOf(c)+'" aria-label="'+(k?c:'couleur du site')+'"'+(k?'':' title="Couleur d\'accent du site (suit le réglage « couleur »)"')+'></button>').join('')+
+      '<input type="color" id="geCol" value="'+colOf(g.color)+'" aria-label="Autre couleur"></span></div>'+
     (i<0?'':'<div class="ge-acts"><button class="ico-btn" data-ge="up" title="Priorité plus haute (une note dans 2 groupes prend le premier)">↑</button>'+
       '<button class="ico-btn" data-ge="down">↓</button><button class="ico-btn danger" data-ge="del">Supprimer le groupe</button></div>');
 }

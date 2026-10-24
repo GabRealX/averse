@@ -1,10 +1,12 @@
 /* backup.js — la sauvegarde COMPLÈTE d'AVERSE dans un seul fichier JSON :
-   notes (+ pierres tombales), favoris, récents, champs mémorisés des outils, réglages (style, pluie).
+   notes (+ pierres tombales), favoris, récents, champs mémorisés des outils, réglages (style, pluie, couleur d'accent v6),
+   et (v6) tes modèles de note (templates.js).
    Jamais dedans : les secrets (outil JWT, champs mot de passe / clé / jeton, valeurs qui ressemblent à un JWT).
    À l'import, TOUT est revérifié (on ne fait pas confiance au fichier) puis fusionné — rien n'est écrasé à l'aveugle.
    Utilisé par l'outil « Sauvegarde » (tools/sauvegarde.js) et par le carnet (notes.html). */
 const BACKUP=(function(){
-const K={notes:'noxe-notes',fav:'averse-fav',recent:'averse-recent',fields:'averse-in',style:'averse-style',rain:'averse-rain'};
+const K={notes:'noxe-notes',fav:'averse-fav',recent:'averse-recent',fields:'averse-in',style:'averse-style',rain:'averse-rain',accent:'averse-accent'};
+const RE_HEX=/^#[0-9a-f]{6}$/i;
 const RE_ID=/^[\w-]{1,40}$/,MAXLEN=20000;
 const ID={test:k=>RE_ID.test(k)&&!/^(__proto__|constructor|prototype)$/.test(k)};   // jamais de clé qui toucherait au prototype
 const raw=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
@@ -34,6 +36,9 @@ function build(){
     notes:nd.notes||{},deleted:nd.deleted||{},
     fav:getLS(K.fav,[]),recent:getLS(K.recent,[]),fields,
     settings:{style:raw(K.style)==='normal'?'normal':'ascii',rain:raw(K.rain)==='on'?'on':'off'}};
+  /* v6 : couleur d'accent (absente = violet d'origine) et modèles */
+  const acc=raw(K.accent);if(acc&&RE_HEX.test(acc))data.settings.accent=acc.toLowerCase();
+  if(typeof TPL!=='undefined'){const t=TPL.payload();if(Object.keys(t.items).length||Object.keys(t.deleted).length)data.templates=t;}
   return{data,skipped};
 }
 function download(){
@@ -74,6 +79,15 @@ function validate(d){
     const st=d.settings||{};
     if(st.style==='ascii'||st.style==='normal')clean.settings.style=st.style;else if(st.style!=null)rejected++;
     if(st.rain==='on'||st.rain==='off')clean.settings.rain=st.rain;else if(st.rain!=null)rejected++;
+    if(typeof st.accent==='string'&&RE_HEX.test(st.accent))clean.settings.accent=st.accent.toLowerCase();else if(st.accent!=null)rejected++;
+    /* v6 : modèles — chaque modèle est revérifié (TPL.clean) ; on n'en garde que des propres */
+    const tp=d.templates;
+    if(tp&&typeof tp==='object'&&typeof TPL!=='undefined'){
+      clean.templates={items:Object.create(null),deleted:Object.create(null)};
+      if(tp.items&&typeof tp.items==='object')Object.keys(tp.items).slice(0,500).forEach(k=>{const c=TPL.clean(tp.items[k]);if(c&&c.id===k)clean.templates.items[k]=c;else rejected++;});
+      if(tp.deleted&&typeof tp.deleted==='object')Object.keys(tp.deleted).forEach(k=>{const v=+tp.deleted[k];
+        if(/^[\w-]{1,48}$/.test(k)&&!/^(__proto__|constructor|prototype)$/.test(k)&&isFinite(v)&&v>0)clean.templates.deleted[k]=Math.min(v,Date.now());else rejected++;});
+    }else if(tp!=null&&typeof TPL!=='undefined')rejected++;
   }
   return{ok:true,full,clean,rejected};
 }
@@ -109,8 +123,11 @@ function apply(clean){
     if(window.rainSetColor)rainSetColor();
   }
   if(s.rain){if(window.rainToggle)rainToggle(s.rain==='on');else try{localStorage.setItem(K.rain,s.rain);}catch(e){}}
+  if(s.accent){if(typeof ACCENT!=='undefined')ACCENT.set(s.accent);else try{localStorage.setItem(K.accent,s.accent);}catch(e){}}
+  let templates=0;
+  if(clean.templates&&typeof TPL!=='undefined'){templates=TPL.merge(clean.templates);if(window.tplRefresh)tplRefresh();}
   if(typeof NOXE!=='undefined'&&NOXE.notesChanged)NOXE.notesChanged();
-  return{notes,fav:clean.fav.length,fields};
+  return{notes,fav:clean.fav.length,fields,templates};
 }
 
 /* lire un fichier → vérifier → fusionner ; renvoie le compte rendu */
@@ -121,7 +138,7 @@ async function importFile(file){
   if(!v.ok){toast(v.error);return v;}
   const r=apply(v.clean);
   const res=Object.assign({ok:true,full:v.full,rejected:v.rejected},r);
-  toast(r.notes+' note(s) fusionnée(s)'+(v.full?', '+r.fav+' favori(s), '+r.fields+' champ(s)':'')+(v.rejected?' · '+v.rejected+' entrée(s) refusée(s)':''));
+  toast(r.notes+' note(s) fusionnée(s)'+(v.full?', '+r.fav+' favori(s), '+r.fields+' champ(s)':'')+(r.templates?', '+r.templates+' modèle(s)':'')+(v.rejected?' · '+v.rejected+' entrée(s) refusée(s)':''));
   return res;
 }
 return{build,download,validate,apply,importFile,isSecret};

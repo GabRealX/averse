@@ -53,6 +53,10 @@ const SECTIONS=[
 ['bin','Binaire',[...pow2,['Hex → décimal','0xFF = 255'],['Octet','8 bits = 2 chiffres hexa'],['Ko / Kio','1 Ko = 1000 o · 1 Kio = 1024 o']]]
 ];
 
+/* v6 : exposé pour la recherche globale de l'accueil (search.js) */
+NOXE.memo=SECTIONS;
+const mnorm=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
 register({
   key:'memo',cat:'memo',title:'Aide-mémoire',
   words:'ports commandes linux cisco windows osi cidr masque formules ohm binaire puissances aide fiche mémo vlan ssh ping chmod ipconfig tcp udp',
@@ -64,7 +68,7 @@ register({
       '<div class="line" data-copy="'+esc(r[1])+'"><span>'+esc(r[0])+'</span><span style="white-space:pre-wrap;text-align:right">'+esc(r[1])+'</span></div>').join('')+'</div>';
     let cur=SECTIONS[0][0];
     function show(){
-      const q=$('mq').value.trim().toLowerCase();
+      const q=mnorm($('mq').value.trim());   // v6 : sans accents (« hote » trouve « hôte »)
       if(!q){
         body.innerHTML='<div class="segmented tabs" id="mtabs">'+SECTIONS.map(s=>'<button data-v="'+s[0]+'"'+(s[0]===cur?' class="active"':'')+'>'+s[1]+'</button>').join('')+'</div><div class="tab-body">'+rows(SECTIONS.find(s=>s[0]===cur)[2])+'</div>';
         body.querySelectorAll('#mtabs button').forEach(b=>b.onclick=()=>{cur=b.dataset.v;show();});
@@ -72,10 +76,10 @@ register({
       }
       let html='';
       SECTIONS.forEach(s=>{
-        const l=s[2].filter(r=>(r[0]+' '+r[1]).toLowerCase().includes(q));
+        const l=s[2].filter(r=>mnorm(r[0]+' '+r[1]).includes(q));
         if(l.length){html+='<div class="lbl" style="margin-top:16px">'+esc(s[1])+'</div>'+rows(l);}
       });
-      body.innerHTML=html||'<div class="info">Rien ne correspond à « '+esc(q)+' ».</div>';
+      body.innerHTML=html||'<div class="info">Rien ne correspond à « '+esc($('mq').value.trim())+' ».</div>';
     }
     $('mq').oninput=show;show();
     $('mq').focus();

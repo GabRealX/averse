@@ -20,6 +20,8 @@
 <link rel="stylesheet" href="css/ui.css">
 <link rel="stylesheet" href="css/ascii.css">
 <script src="js/core.js"></script>
+<script src="js/accent.js"></script>
+<script src="js/templates.js"></script>
 </head>
 <body>
 
@@ -35,6 +37,8 @@
       <button data-v="graph">Graphe</button>
     </div>
     <button class="ico-btn" id="styleBtn" data-style-label >style : normal</button>
+    <button class="ico-btn" data-accent-btn title="Couleur d'accent du site">couleur</button>
+      <button class="ico-btn" data-feedback-btn title="Signaler un bug, proposer une idée">signaler</button>
     <button class="ico-btn" id="fileBtn" title="Synchro : lie le carnet à un fichier (ex. dans ton dossier OneDrive / Google Drive)">Fichier</button>
     <span class="sync-state" id="syncState" role="status" aria-live="polite" hidden></span>
     <button class="ico-btn" id="cloudBtn" title="Synchro chiffrée entre tes appareils (PC + téléphone) via un Gist GitHub secret">Synchro</button>
@@ -81,6 +85,8 @@
           <input class="tags-in" id="tagsIn" placeholder="séparés par des virgules">
           <button class="del" id="mdBtn" style="margin-left:auto">Exporter .md</button>
           <button class="del" id="pdfBtn" style="margin-left:0" title="Vue d'impression propre → « Enregistrer au format PDF »">PDF</button>
+          <button class="del" id="shareBtn" style="margin-left:0" title="Partager cette note : lien chiffré, fichier, ou partage du téléphone">Partager</button>
+          <button class="del" id="tplSaveBtn" style="margin-left:0" title="Enregistrer comme modèle (réutilisable pour tes prochaines notes)">Modèle</button>
           <button class="del" id="delBtn" style="margin-left:0">Supprimer</button>
         </div>
       </div>
@@ -118,8 +124,13 @@
 <script src="js/keys.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/ctxmenu.js"></script>
+<script src="js/data.js"></script>
+<script src="js/feedback.js"></script>
 <script src="js/notes-graph.js"></script>
+<script src="js/md.js"></script>
 <script src="js/notes.js"></script>
+<script src="js/notes-tpl.js"></script>
+<script src="js/share.js"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/vault.js"></script>
 <script src="js/cloud.js"></script>

@@ -133,7 +133,9 @@ async function openData(v,key){
   let bytes=await open(key,v.data,dataAad(v),'data');
   if(v.data.z==='gzip'){if(!canZ)fail('z','navigateur trop ancien pour lire ce coffre (compression)');bytes=await gz(bytes,false);}
   const o=JSON.parse(td.decode(bytes));
-  return{notes:o&&typeof o.notes==='object'?o.notes:{},deleted:o&&typeof o.deleted==='object'?o.deleted:{}};
+  const r={notes:o&&typeof o.notes==='object'?o.notes:{},deleted:o&&typeof o.deleted==='object'?o.deleted:{}};
+  if(o&&o.templates&&typeof o.templates==='object')r.templates=o.templates;   // v6 : les modèles de note voyagent aussi
+  return r;
 }
 
 window.VAULT={ITER,MIN_ITER,create,addDevice,openDevice,addRecovery,openRecovery,addPair,openPair,resetPassword,sealData,openData,

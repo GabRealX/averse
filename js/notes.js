@@ -30,8 +30,11 @@ function confirmBox(message,okLabel){
   });
 }
 
-/* ===== TEINTE du graphe ===== (v4 : parseColor, jamais appelée, retirée) */
+/* ===== TEINTE du graphe ===== v6 : suit la couleur d'accent du site (accent.js), relue à chaque changement */
 const ACC={hex:'#c7bce4',rgb:[199,188,228]};
+function accRead(){if(typeof ACCENT==='undefined')return;const h=ACCENT.readable(ACCENT.get());ACC.hex=h;ACC.rgb=ACCENT.rgb(h);}
+accRead();
+document.addEventListener('averse-accent',e=>{ACC.hex=e.detail.hex;ACC.rgb=e.detail.rgb;if(typeof redraw==='function'&&G.canvas){redraw();renderLegend();}});
 const acc=a=>'rgba('+ACC.rgb[0]+','+ACC.rgb[1]+','+ACC.rgb[2]+','+a+')';
 
 /* ===== ÉTAT / PERSISTANCE ===== */
@@ -72,59 +75,13 @@ function backlinks(note){const k=norm(note.title);return allNotes().filter(n=>n.
 function allTags(){const s={};allNotes().forEach(n=>(n.tags||[]).forEach(t=>{s[t]=(s[t]||0)+1;}));return s;}
 
 /* ===== RENDU MARKDOWN LÉGER ===== */
-// N'autorise que des schémas sûrs (http/https/mailto/ancre/relatif). Bloque javascript:, data:, vbscript:…
-function safeUrl(u){const s=String(u==null?'':u).trim();
-  return /^(https?:|mailto:|#|\/|\.|[^:]*$)/i.test(s)?s:'#';}
-function inline(text){
-  return esc(text).replace(
-    /(`[^`]+`)|(\[\[[^\]]+\]\])|(\[[^\]]+\]\([^)]+\))|(\bhttps?:\/\/[^\s<]+)|(\*\*[^*]+\*\*)|(\*[^*]+\*)/g,
-    (m,code,wiki,link,url,bold,ital)=>{
-      if(code)return'<code>'+code.slice(1,-1)+'</code>';
-      if(wiki){const t=wiki.slice(2,-2).trim().replace(/&(lt|gt|quot|amp);/g,(_,k)=>({lt:'<',gt:'>',quot:'"',amp:'&'}[k])),exist=byTitle(t);   // le texte a déjà été échappé : on le remet à l'état brut
-        return'<a class="wl'+(exist?'':' missing')+'" data-title="'+esc(t)+'">'+esc(t)+'</a>';}
-      if(link){const mm=/\[([^\]]+)\]\(([^)]+)\)/.exec(link);
-        return'<a href="'+safeUrl(mm[2])+'" target="_blank" rel="noopener">'+mm[1]+'</a>';}
-      if(url)return'<a href="'+safeUrl(url)+'" target="_blank" rel="noopener">'+url+'</a>';
-      if(bold)return'<strong>'+bold.slice(2,-2)+'</strong>';
-      if(ital)return'<em>'+ital.slice(1,-1)+'</em>';
-      return m;});
-}
-/* rendu complet : les formules sont mises de côté (math.js), le Markdown est rendu, puis les formules reviennent (échappées) */
-function render(body){
-  if(typeof MATH==='undefined')return renderMd(body);
-  const m=MATH.extract(body);return MATH.restore(renderMd(m.src),m.list);
-}
+// v6 : le moteur est dans md.js (partagé avec share.html, la page de lecture d'une note partagée)
+const safeUrl=MD.safeUrl;
+const MDO={exists:t=>!!byTitle(t)};
+const inline=t=>MD.inline(t,MDO);
+const render=body=>MD.render(body,MDO);
+const renderMd=body=>MD.renderMd(body,MDO);
 const typeset=el=>{if(typeof MATH!=='undefined')MATH.typeset(el);};
-function renderMd(body){
-  if(!body||!body.trim())return'<p class="empty">Note vide — commence à écrire à gauche.</p>';
-  const L=body.replace(/\r/g,'').split('\n');let html='',para=[],i=0;
-  const flushP=()=>{if(para.length){html+='<p>'+para.map(inline).join('<br>')+'</p>';para=[];}};
-  const cells=l=>l.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
-  const isSep=l=>/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
-  while(i<L.length){
-    const l=L[i].replace(/\s+$/,'');
-    if(/^```/.test(l)){flushP();const code=[];i++;while(i<L.length&&!/^```/.test(L[i])){code.push(L[i]);i++;}i++;
-      html+='<pre><code>'+esc(code.join('\n'))+'</code></pre>';continue;}
-    const h=/^(#{1,3})\s+(.*)$/.exec(l);
-    if(h){flushP();html+='<h'+h[1].length+'>'+inline(h[2])+'</h'+h[1].length+'>';i++;continue;}
-    if(/^-{3,}$/.test(l.trim())){flushP();html+='<hr>';i++;continue;}
-    if(l.includes('|')&&i+1<L.length&&isSep(L[i+1])){
-      flushP();const head=cells(l);i+=2;const rows=[];
-      while(i<L.length&&L[i].includes('|')&&L[i].trim()){rows.push(cells(L[i]));i++;}
-      html+='<div class="tw"><table><thead><tr>'+head.map(c=>'<th>'+inline(c)+'</th>').join('')+'</tr></thead><tbody>'+
-        rows.map(r=>'<tr>'+head.map((_,k)=>'<td>'+inline(r[k]||'')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';continue;}
-    if(/^>\s?/.test(l)){flushP();const q=[];while(i<L.length&&/^>\s?/.test(L[i])){q.push(L[i].replace(/^>\s?/,''));i++;}
-      html+='<blockquote>'+q.map(inline).join('<br>')+'</blockquote>';continue;}
-    if(/^\s*([-*]|\d+[.)])\s+/.test(l)){flushP();const ord=/^\s*\d+[.)]/.test(l),items=[];
-      while(i<L.length&&/^\s*([-*]|\d+[.)])\s+/.test(L[i])){
-        const m=/^\s*(?:[-*]|\d+[.)])\s+(\[( |x|X)?\](?:\s+|$))?(.*)$/.exec(L[i]);
-        items.push(m[1]?'<li class="task"><input type="checkbox" data-ln="'+i+'"'+(m[2]&&m[2]!==' '?' checked':'')+'> '+inline(m[3])+'</li>':'<li>'+inline(m[3])+'</li>');i++;}
-      html+=(ord?'<ol>':'<ul>')+items.join('')+(ord?'</ol>':'</ul>');continue;}
-    if(!l.trim()){flushP();i++;continue;}
-    para.push(l);i++;
-  }
-  flushP();return html;
-}
 
 /* ===== LISTE ===== */
 function matchQuery(n){if(!query)return true;const q=norm(query);
@@ -181,17 +138,12 @@ function livePreview(){
   const n=data.notes[data.openId];if(!n)return;
   $('preview').innerHTML='<div class="rendered">'+render($('bodyIn').value)+'</div>';typeset($('preview'));
 }
-const TEMPLATES={
-  tp:{t:'TP — ',tags:['tp'],b:'## Objectif\n\n## Matériel et logiciels\n- \n\n## Manipulations\n1. \n2. \n\n## Résultats\n\n## Conclusion\n'},
-  cours:{t:'Cours — ',tags:['cours'],b:'## L\'essentiel\n\n## Définitions\n- **terme** : \n\n## Exemple\n```\n\n```\n\n## À retenir pour le contrôle\n- [ ] \n'},
-  stage:{t:'Stage — '+new Date().toLocaleDateString('fr-FR'),tags:['stage'],b:'## Ce que j\'ai fait\n- \n\n## Ce que j\'ai appris\n- \n\n## Difficultés\n- \n\n## À faire demain\n- [ ] \n'},
-  adressage:{t:'Plan d\'adressage — ',tags:['réseau'],b:'| Équipement | Interface | Adresse IP | Masque | Passerelle |\n|---|---|---|---|---|\n| R1 | g0/0 | 192.168.1.1 | 255.255.255.0 | — |\n| PC1 | eth0 | 192.168.1.10 | 255.255.255.0 | 192.168.1.1 |\n\n## Remarques\n'},
-  incident:{t:'Dépannage — ',tags:['dépannage'],b:'## Symptôme\n\n## Hypothèses\n- [ ] \n\n## Tests effectués\n```\n\n```\n\n## Cause\n\n## Solution\n'},
-  taches:{t:'À faire',tags:['tâches'],b:'- [ ] \n- [ ] \n- [ ] \n'}
-};
+/* modèles : v6 → templates.js (ceux d'AVERSE + les tiens, avec variables {{date}}, {{titre}}…).
+   tpl = id d'un modèle AVERSE (« tp », « cours »…) ou « u:<id> » pour un des tiens */
+function tplOf(v){if(!v||typeof TPL==='undefined')return null;return v.startsWith('u:')?TPL.get(v.slice(2)):TPL.builtin(v);}
 function newNote(title,tpl){
-  const T=tpl&&TEMPLATES[tpl];
-  const id=uid();data.notes[id]={id:id,title:T?T.t:(title||'Sans titre'),tags:T?T.tags.slice():[],created:now(),updated:now(),body:T?T.b:''};
+  const T=tplOf(tpl),X=T?TPL.expand(T):null;
+  const id=uid();data.notes[id]={id:id,title:X?X.title:(title||'Sans titre'),tags:X?X.tags:[],created:now(),updated:now(),body:X?X.body:''};
   data.openId=id;save();renderAll();$('titleIn').focus();$('titleIn').select&&$('titleIn').select();
 }
 async function delNote(){
@@ -301,7 +253,9 @@ function fileText(){
   const notes={},deleted={},del=data.deleted||{};
   Object.keys(data.notes).sort().forEach(k=>{const n=sanitizeNote(data.notes[k]);if(n)notes[k]=n;});
   Object.keys(del).sort().forEach(k=>{deleted[k]=del[k];});
-  return JSON.stringify({app:'averse',kind:'carnet',version:2,notes,deleted},null,1);
+  const o={app:'averse',kind:'carnet',version:2,notes,deleted};
+  if(typeof TPL!=='undefined'){const t=TPL.payload();if(Object.keys(t.items).length||Object.keys(t.deleted).length)o.templates=t;}   // v6 : tes modèles voyagent avec les notes (absents s'il n'y en a pas : fichier identique à la v5)
+  return JSON.stringify(o,null,1);
 }
 const baseNow=()=>{const b={};Object.values(data.notes).forEach(n=>{b[n.id]=n.updated||0;});return b;};
 function setBase(){FS.base=baseNow();
@@ -339,7 +293,8 @@ function syncMerge(d,base){
     if(l&&!notes[id]&&(+rdel[id]||0)>=(l.updated||0)&&base&&base[id]!=null&&l.updated>base[id])
       c+=conflictCopy(l,'modifiée ici, supprimée sur l\'autre appareil');
   }
-  const n=mergeNotes(keep)+c;
+  let n=mergeNotes(keep)+c;
+  if(d.templates&&typeof TPL!=='undefined'){const t=TPL.merge(d.templates);if(t){n+=t;if(typeof tplRefresh==='function')tplRefresh();}}   // v6 : modèles
   return {n,c};
 }
 /* LA synchro : relit le fichier, fusionne si besoin, puis écrit si le fichier n'est pas à jour */
@@ -428,8 +383,8 @@ addEventListener('focus',()=>{if(FS.h)fsSync('focus');});
 document.addEventListener('visibilitychange',()=>{if(FS.h&&!document.hidden)fsSync('focus');});
 /* v5 : ce dont la synchro Gist (cloud.js) a besoin, sans toucher aux variables du carnet */
 window.notesApi={
-  payload:()=>{const o=JSON.parse(fileText());return{notes:o.notes,deleted:o.deleted};},   // trié, sans l'état de l'appareil
-  text:()=>{const o=JSON.parse(fileText());return JSON.stringify({notes:o.notes,deleted:o.deleted});},
+  payload:()=>{const o=JSON.parse(fileText()),p={notes:o.notes,deleted:o.deleted};if(o.templates)p.templates=o.templates;return p;},   // trié, sans l'état de l'appareil
+  text:()=>JSON.stringify(window.notesApi.payload()),
   merge:(d,base)=>{const r=syncMerge(d,base);
     if(r.n){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}renderAll();
       if(r.c)toast(r.c+' conflit(s) : les deux versions sont gardées (tag « conflit »)');}
@@ -520,7 +475,7 @@ if(typeof CTX!=='undefined')CTX.add((t,e)=>{
 },5);
 /* une note ajoutée ailleurs (clic droit → « Ajouter au carnet ») : on relit le stockage avant d'écraser */
 /* v5 : accès pour tests.html (les const/let ne sont pas sur window, et la page interdit eval : CSP) */
-window.notesDebug={get data(){return data;},FS,G,step,tick,get settings(){return GS;},groupOf:id=>groupOf(data.notes[id]),
+window.notesDebug={get data(){return data;},get acc(){return ACC.hex;},FS,G,step,tick,get settings(){return GS;},groupOf:id=>groupOf(data.notes[id]),
   styleOf:id=>styleOfGroup(groupOf(data.notes[id])),zoomAt,fit:()=>{fitGraph();redraw();},draw,setFocus:id=>setFocus(G.nodes.find(n=>n.id===id))};
 window.notesReloadFromStorage=()=>{const d=load();if(d&&mergeNotes(d))renderAll();};
 

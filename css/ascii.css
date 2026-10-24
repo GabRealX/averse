@@ -3,7 +3,7 @@
    S'active avec html[data-theme="ascii"] (bouton -- style -- en bas de l'accueil / en haut du carnet). */
 .ascii-logo{display:none}
 
-html[data-theme="ascii"]{--display:var(--mono);--line:rgba(199,188,228,.16);--line-2:rgba(199,188,228,.34)}
+html[data-theme="ascii"]{--display:var(--mono);--line:rgba(var(--acc-rgb),.16);--line-2:rgba(var(--acc-rgb),.34)}
 html[data-theme="ascii"] *{text-transform:none!important;letter-spacing:0!important;border-radius:0!important}
 html[data-theme="ascii"] body{font-weight:400;font-size:14px}
 html[data-theme="ascii"] ::selection{background:var(--fg);color:var(--bg)}

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- v6 : lecture d'une note partagée. La note est chiffrée DANS le lien (après le #) : le serveur ne la reçoit jamais.
+     CSP stricte : aucun script en ligne, aucun accès réseau (connect-src 'none'), aucun formulaire envoyé. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Note partagée — AVERSE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#06060a">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/ui.css">
+<link rel="stylesheet" href="css/share.css">
+<link rel="stylesheet" href="css/ascii.css">
+<script src="js/core.js"></script>
+<script src="js/accent.js"></script>
+</head>
+<body class="share-page">
+<canvas id="rain"></canvas>
+<header class="bar">
+  <div class="bar-left">
+    <a class="logo" href="index.html">AVERSE <b>· note partagée</b></a>
+  </div>
+  <div class="bar-right">
+    <a class="back" href="notes.html">mon carnet →</a>
+  </div>
+</header>
+<main class="sv" id="sv" aria-live="polite">
+  <p class="sv-state" id="svState">Déchiffrement…</p>
+  <form class="sv-keyf" id="svKeyForm" hidden>
+    <label for="svKey">Ce lien n'a pas la clé : colle la clé que la personne t'a envoyée à part.</label>
+    <div class="sv-keyrow"><input id="svKey" type="password" autocomplete="off" spellcheck="false" maxlength="40" placeholder="clé (22 caractères)"><button type="submit" class="tpl-b primary">Ouvrir</button></div>
+  </form>
+  <article class="sv-note" id="svNote" hidden>
+    <div class="sv-meta">lecture seule · chiffrée de bout en bout · <span id="svSize"></span></div>
+    <h1 class="sv-title" id="svTitle"></h1>
+    <div class="sv-tags" id="svTags"></div>
+    <div class="rendered sv-body" id="svBody"></div>
+    <div class="sv-actions">
+      <button type="button" class="tpl-b primary" id="svImport">Importer dans mon carnet</button>
+      <button type="button" class="tpl-b" id="svMd">Télécharger .md</button>
+      <a class="tpl-b" id="svOpen" href="notes.html" hidden>Ouvrir mon carnet</a>
+    </div>
+    <p class="sv-help">Importer crée une copie dans <b>ton</b> carnet (sur cet appareil). Les liens [[vers d'autres notes]] ne sont pas partagés : ils restent en simple texte.</p>
+  </article>
+</main>
+<script src="js/rain.js"></script>
+<script src="js/math.js"></script>
+<script src="js/md.js"></script>
+<script src="js/share.js"></script>
+<script src="js/share-view.js"></script>
+</body>
+</html>

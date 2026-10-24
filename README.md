@@ -9,7 +9,7 @@ Il faut un petit serveur local (service worker, Worker et crypto ne marchent pas
     python3 -m http.server 8000     # puis http://localhost:8000
 
 ## Utiliser
-- **L'accueil est une recherche** : tape quelques lettres (« jsn », « fusion pdf », « qr »…), **Entrée** ouvre le meilleur résultat, ↑ ↓ pour choisir. Les notes du carnet sortent aussi dans les résultats. **Ctrl+K** remet le curseur dans la recherche.
+- **L'accueil est une recherche** : tape quelques lettres (« jsn », « fusion pdf », « qr »…), **Entrée** ouvre le meilleur résultat, ↑ ↓ pour choisir. Les notes du carnet sortent aussi dans les résultats. **Ctrl+K** remet le curseur dans la recherche (depuis les autres pages : revient à l'accueil).
 - **Favoris** : l'étoile ☆ sur une carte ou en haut d'un outil. Favoris et **récents** s'affichent sous la recherche.
 - **Collage malin** : colle (Ctrl+V) directement sur l'accueil un JSON, un JWT, une URL, une couleur (#ff8800), un timestamp, un UUID, du Base64, une IP, un hash… ou une image : l'outil qui va bien est proposé (Entrée pour l'ouvrir).
 - **Glisser-déposer** un fichier n'importe où : un PDF ouvre l'outil PDF, une image propose optimiser / convertir / éditer / mettre en PDF, un autre fichier propose hash ou Base64.
@@ -18,6 +18,16 @@ Il faut un petit serveur local (service worker, Worker et crypto ne marchent pas
 - **Carnet** : **Ctrl+J** (⌘+J sur Mac) ouvre le panneau des notes partout. **→ Carnet** en haut de chaque outil envoie entrées + résultats dans une note. Le carnet complet reste `notes.html`.
 - **Autres outils** (`#/autres`) : réseau, électronique, texte & dates, aide-mémoire. Moins utilisés, mais toujours trouvables par la recherche.
 - **Pluie** : désactivée par défaut, lien « pluie : off/on » en bas de page. **Style ASCII** : lien « style » en bas (ou `?style=ascii`).
+
+## Nouveautés v6
+- **Recherche globale** (accueil, **Ctrl+K** depuis n'importe quelle page) : outils, **texte intégral des notes** (sans accents : « reseau » trouve « réseau », extrait avec le mot surligné) et fiches du **mémo**, en groupes Outils / Notes / Mémo, ↑ ↓ Entrée. Index précalculé (texte « plié » par note, recalculé seulement pour la note modifiée) : quelques ms avec 600 notes. Commandes : « signaler », « couleur ».
+- **Mes modèles de note** : dans le carnet, bouton **Modèle** (« Enregistrer comme modèle » depuis la note ouverte), ou « Gérer mes modèles… » dans la liste des modèles. Créer / modifier / supprimer / copier un modèle intégré. Variables : `{{date}}` `{{heure}}` `{{jour}}` `{{année}}` `{{titre}}` (boutons pour les insérer, aperçu du titre). Ils apparaissent à côté des modèles intégrés, et sont dans la sauvegarde et la synchro (fichier + Gist chiffré).
+- **Partager une note** (bouton **Partager**) sans serveur : la note est compressée puis chiffrée (AES-GCM, clé au hasard) **dans le lien, après le #** — cette partie n'est jamais envoyée au serveur. Le lien ouvre `share.html` : lecture seule, rendu Markdown nettoyé (XSS testés), bouton « Importer dans mon carnet ». Option « envoyer la clé à part » (le lien seul ne suffit plus). Avertissement au-delà de ~8 000 caractères, au-delà de ~60 000 → fichier .md ou PDF. Sur mobile : bouton **Partager…** (feuille de partage du téléphone).
+- **Couleur d'accent** (lien « couleur » en bas de page / dans le carnet) : violet (défaut), rouge, bleu, vert, orange, rose, cyan, jaune, ou n'importe quelle couleur. Tout suit : boutons, liens, graphe, pluie, style ASCII, couleur de la barre du téléphone (PWA). Une couleur trop sombre est éclaircie pour rester lisible (contraste ≥ 4,5:1). Gardée dans la sauvegarde.
+  (Historique : aucun ancien code de sélecteur n'a été retrouvé dans les fichiers de NOXE ; on a repris le principe d'origine : une seule teinte `--fg` dont dérivent toutes les autres.)
+- **Signaler / Suggérer** (lien en bas de page, bouton « signaler » du carnet, recherche « signaler / bug / idée », dernière entrée du clic droit) : type Bug / Idée / Demande, titre, message, case « joindre les infos techniques » (version, navigateur, langue, écran, page et outil ouverts, style — **jamais** tes notes, jetons ni l'adresse complète). Le bouton ouvre **GitHub « New issue » prérempli** (titre, texte, étiquette) : rien ne part tant que tu ne valides pas sur GitHub (il faut un compte GitHub). Lien raccourci sous ~6 000 caractères.
+  - Dépôt et e-mail de secours : `js/data.js` → `feedbackRepo` (`GabRealX/averse`) et `feedbackEmail` (vide = bouton « Par e-mail » caché).
+  - **Étiquettes** : le dossier `.github/ISSUE_TEMPLATE/` (bug.yml, idee.yml, demande.yml, config.yml) est à mettre dans le dépôt (il commence par un point : l'explorateur le masque, voir plus bas). Crée aussi les étiquettes `bug`, `idée` et `demande` (Issues → Labels → New label ; `bug` existe déjà par défaut). Sans elles, le ticket s'ouvre quand même, sans étiquette. Note : GitHub n'applique `labels=` venant d'un lien que pour les gens qui ont le droit de trier ; pour les autres, les modèles (qui portent les étiquettes) et toi s'en chargent. `config.yml` garde `blank_issues_enabled: true`, nécessaire au ticket prérempli.
 
 ## Nouveautés v5
 - **Synchro chiffrée PC ↔ téléphone** (bouton **Synchro** du carnet), marche aussi sur mobile, Firefox et Safari. Détails plus bas.
@@ -160,11 +170,13 @@ Pas de fichier .reg fourni, volontairement :
     index.html     recherche + pages d'outils + « Autres outils »
     about.html     projets et liens (l'ancienne page d'accueil)
     notes.html     le carnet complet
+    share.html     lecture d'une note partagée (v6, CSP sans réseau)
+    .github/ISSUE_TEMPLATE/  modèles de tickets GitHub en français (v6)
     tests.html     tests automatiques (ouvre-le via le serveur : tout doit être ✓)
     sw.js, manifest.json, icon.svg, icons/ (PNG 192/512 normales + maskable, sources SVG)
     css/   base.css (couleurs, texte) · home.css (barre du haut, cartes, pied de page) · tools.css (pages d'outils)
            app.css (recherche, panneau de notes, dépôt) · notes.css (carnet) · ascii.css (style ASCII)
-           ui.css (partagé : bouton Installer, menus Envoyer vers / clic droit, aide des raccourcis)
+           ui.css (partagé : bouton Installer, menus Envoyer vers / clic droit, aide des raccourcis, fenêtres v6) · share.css (share.html)
     js/
       core.js       petites fonctions communes ($, esc, getLS/setLS, envoi vers le carnet…)
       app.js        l'accueil : recherche, favoris/récents, collage malin, glisser-déposer, routage #/outil
@@ -178,6 +190,12 @@ Pas de fichier .reg fourni, volontairement :
       about.js      la page à propos (projets, liens) · data.js : projets + liens
       rain.js       la pluie (en option) · notes.js : le carnet
       notes-graph.js  le graphe (groupes, formes, zoom, focus) · notes-page.js : branchements + barre mobile
+      accent.js     couleur d'accent (palette, contraste, variables CSS, theme-color)
+      search.js     recherche plein texte des notes et du mémo (texte plié sans accents, extraits surlignés)
+      templates.js  modèles de note (intégrés + les tiens, variables, fusion pour la synchro) · notes-tpl.js : leur fenêtre
+      md.js         le rendu Markdown (partagé par le carnet et share.html, liens nettoyés)
+      share.js      lien de partage chiffré + fenêtre « Partager » · share-view.js : la page share.html
+      feedback.js   « Signaler / Suggérer » (ticket GitHub prérempli)
       vault.js      le coffre chiffré (AES-GCM, PBKDF2, HKDF, enveloppes par appareil) · cloud.js : synchro Gist + assistant
       tools/base.js        le moteur : NOXE.register(), page d'outil, dépôt de fichiers, mémoire des champs, favoris
       tools/image.js       optimiser, convertir, images → PDF
@@ -210,25 +228,26 @@ Options : `image:true` / `multi:true` (outil à fichiers), `accept` et `hint` (t
 Pour le chaînage et Ctrl+Entrée / Ctrl+Maj+C : `data-main` sur le bouton principal, `data-result` sur l'élément résultat, ou `NOXE.setResult({text})` / `NOXE.fileItems({...})` pour un résultat fichier (voir le commentaire en tête de tools/base.js).
 
 ## À savoir
-- Après toute modif de fichier : augmenter `averse-vN` dans sw.js (actuellement `averse-v13`), sinon le cache garde l'ancienne version. Un nouveau fichier doit aussi être ajouté dans la liste `ASSETS`.
+- Après toute modif de fichier : augmenter `averse-vN` dans sw.js (actuellement `averse-v14` ; penser aussi à `VERSION` en tête de js/feedback.js), sinon le cache garde l'ancienne version. Un nouveau fichier doit aussi être ajouté dans la liste `ASSETS`.
 - Les notes sont dans le localStorage (clé `noxe-notes`) : bouton Sauvegarde (tout) ou Export (notes seules) pour sauvegarder. Une note supprimée laisse une « pierre tombale » (gardée 90 jours) pour qu'un autre onglet ouvert ne la fasse pas revenir.
-- Autres clés : `averse-fav` (favoris), `averse-recent` (récents), `averse-in` (valeurs des champs), `averse-rain` (pluie), `averse-style` (style). `averse-ocr-lang` (langue de l'OCR), `noxe-sync` (état de la dernière synchro par fichier), `averse-graph` (réglages du graphe), `averse-cloud` (synchro chiffrée : jeton, n° du Gist, appareil — jamais exporté), `averse-bar-hint`. IndexedDB `averse` : fichier lié et clé de synchro non exportable. Cache `averse-share` : contenu partagé en attente (vidé dès qu'il est lu). Cache `averse-ocr-1` : fichiers de l'OCR.
+- Autres clés : `averse-fav` (favoris), `averse-recent` (récents), `averse-in` (valeurs des champs), `averse-rain` (pluie), `averse-style` (style). `averse-ocr-lang` (langue de l'OCR), `noxe-sync` (état de la dernière synchro par fichier), `averse-graph` (réglages du graphe), `averse-cloud` (synchro chiffrée : jeton, n° du Gist, appareil — jamais exporté), `averse-bar-hint`, `averse-accent` (couleur d'accent, v6), `averse-tpl` (tes modèles de note, v6). IndexedDB `averse` : fichier lié et clé de synchro non exportable. Cache `averse-share` : contenu partagé en attente (vidé dès qu'il est lu). Cache `averse-ocr-1` : fichiers de l'OCR.
 - Changer de nom : rechercher/remplacer « AVERSE » (index.html, about.html, notes.html, manifest.json, sw.js, data.js).
 - Projets et liens : js/data.js (url vide = « bientôt »).
 
 ## Mettre en ligne sur GitHub Pages
 Tous les chemins sont relatifs (manifeste, service worker, partage, « Ouvrir avec ») : le site marche tel quel dans un sous-dossier comme `https://ton-pseudo.github.io/averse/`.
 1. Crée un dépôt sur GitHub, par exemple `averse` (public, ou privé avec un compte qui permet Pages).
-2. Mets-y **le contenu** de ce dossier, avec `index.html` à la racine du dépôt. Garde le fichier `.nojekyll` : il évite que GitHub retraite le site avec Jekyll.
+2. Mets-y **le contenu** de ce dossier, avec `index.html` à la racine du dépôt. Garde le fichier `.nojekyll` (il évite que GitHub retraite le site avec Jekyll) et le dossier `.github/` (modèles de tickets).
    En ligne de commande, depuis ce dossier :
 
-       git init && git add . && git commit -m "AVERSE v5"
+       git init && git add . && git commit -m "AVERSE v6"
        git branch -M main
        git remote add origin https://github.com/ton-pseudo/averse.git
        git push -u origin main
 
    Sans ligne de commande : sur la page du dépôt, « Add file » → « Upload files », puis glisse le contenu du dossier.
    ⚠ L'explorateur de fichiers masque `.nojekyll` (fichier qui commence par un point), et il manque aujourd'hui dans ton dépôt. Ce n'est pas grave (le site marche sans), mais pour l'ajouter : « Add file » → « Create new file », nom `.nojekyll`, contenu vide, « Commit ».
+   Pareil pour `.github/ISSUE_TEMPLATE/` : « Create new file », tape le nom `.github/ISSUE_TEMPLATE/bug.yml` (les `/` créent les dossiers), colle le contenu, « Commit » ; idem pour idee.yml, demande.yml, config.yml.
 3. Sur GitHub : **Settings → Pages → Build and deployment → Source : « Deploy from a branch »**, branche `main`, dossier `/ (root)`, puis **Save**.
 4. Attends une à deux minutes, puis ouvre `https://ton-pseudo.github.io/averse/`. Le lien est aussi affiché dans Settings → Pages.
 5. Chaque mise à jour : augmente `averse-vN` dans `sw.js`, puis commit et push. Les visiteurs reçoivent la nouvelle version au chargement suivant.
@@ -239,9 +258,10 @@ Tous les chemins sont relatifs (manifeste, service worker, partage, « Ouvrir av
 - Le dossier pèse ~17 Mo, dont 15,6 Mo pour l'OCR. C'est bien sous les limites de GitHub (1 Go par site, 100 Mo par fichier). Le plus gros fichier fait 3,9 Mo.
 
 ## Tests
-- `tests.html` (via le serveur, ou en ligne sur ton site) : **124 tests**. Vert = réussi, rouge = vrai problème, gris = « ignoré : non disponible sur ce navigateur » (API absente, jamais pour cacher un résultat faux). `tests.html?only=Graphe` ne lance que les tests dont le nom contient ce mot.
-  - v5 : graphe (groupes par tag, formes et couleurs, légende, filtre, étiquettes, zoom molette et pincement, focus, groupe par clic droit, réglages gardés) en pas à pas déterministe ; coffre chiffré (mauvais mot de passe, passkey manquante, code de secours, appairage) ; synchro Gist avec un faux GitHub (2 appareils, conflit, ETag/304, écriture concurrente, appareil retiré).
-  - v4 : synchro par fichier, OCR, regex en Worker, jours ouvrés, fuites d'URL. Avant : chaînage, sauvegarde, KaTeX, raccourcis, menus clic droit, impression, « Ouvrir avec » et partage simulés.
+- `tests.html` (via le serveur, ou en ligne sur ton site) : **149 tests**. Vert = réussi, rouge = vrai problème, gris = « ignoré : non disponible sur ce navigateur » (API absente, jamais pour cacher un résultat faux). `tests.html?only=Graphe` ne lance que les tests dont le nom contient ce mot.
+  - v6 : couleur d'accent (contraste, variables, theme-color, sauvegarde) ; recherche (texte plié de même longueur, accents, extraits échappés, 600 notes, mémo, groupes et clavier) ; modèles (variables, fusion, pierres tombales, sauvegarde, synchro Gist) ; partage (aller-retour, clé à part, mauvaise clé, lien abîmé, bombe de décompression, charges XSS, CSP, import) ; signaler (adresse exacte, échappement `& # ? + %` / emoji / `<script>`, limite 6 000, aucune note ni jeton, e-mail caché par défaut — `window.open` est remplacé : aucun vrai ticket n'est ouvert).
+  - Corrigé dans les tests v6 : un test cherchait `k1` dans le coffre chiffré et pouvait tomber dessus par hasard dans le Base64 (faux positif) ; le test CONFLIT échouait parfois (WebKit) parce qu'une synchro de fond envoyait la modif locale pendant que le faux « autre appareil » écrivait à l'aveugle — l'appli avait raison, l'ordre du test est maintenant fixe.
+  - v5 : graphe, coffre chiffré, synchro Gist avec un faux GitHub (2 appareils, conflit, ETag/304, écriture concurrente, appareil retiré). v4 : synchro par fichier, OCR, regex en Worker, jours ouvrés, fuites d'URL. Avant : chaînage, sauvegarde, KaTeX, raccourcis, menus clic droit, impression, « Ouvrir avec » et partage simulés.
   - Les tests ne touchent pas à tes notes : copie avant, remise en place après, base et clés à part, aucun accès réseau (faux GitHub).
-- Vérifié pour la v5 : Chrome ordinateur, Chrome mobile émulé avec un processeur 6× plus lent, Firefox et WebKit (moteur de Safari) en iPhone émulé : 124/124 partout. La synchro a aussi été testée de bout en bout avec 2 à 3 navigateurs, un faux serveur GitHub et des passkeys virtuelles (avec et sans PRF).
-- **Non testable automatiquement** : le vrai GitHub avec ton jeton (la configuration réseau d'api.github.com a été vérifiée : en-têtes et ETag autorisés), les vraies passkeys (Windows Hello, Android, iPhone), un vrai téléphone, le vrai « Ouvrir avec » Windows et la vraie feuille de partage. À essayer une fois à la main.
+- Vérifié pour la v6 : Chrome ordinateur, Chrome mobile émulé, Firefox et WebKit (moteur de Safari) en iPhone émulé : 149/149 partout (WebKit 8 fois de suite). Synchro de bout en bout à 2–3 navigateurs avec faux GitHub : OK.
+- **Non testable automatiquement** : le vrai formulaire GitHub « New issue » (adresse vérifiée, jamais ouverte), la vraie feuille de partage mobile (Web Share), le vrai GitHub avec ton jeton (la configuration réseau d'api.github.com a été vérifiée : en-têtes et ETag autorisés), les vraies passkeys (Windows Hello, Android, iPhone), un vrai téléphone, le vrai « Ouvrir avec » Windows et la vraie feuille de partage. À essayer une fois à la main.

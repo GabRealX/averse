@@ -296,7 +296,9 @@ document.addEventListener('contextmenu',e=>{
       e.preventDefault();
       let x=e.clientX,y=e.clientY;
       if(!x&&!y){const b=t.getBoundingClientRect();x=b.left+8;y=b.top+Math.min(b.height,24);}   // ouvert au clavier (touche Menu)
-      open(x,y,r.items,r.title);return;
+      /* v6 : dernière entrée de chaque menu AVERSE */
+      const items=typeof FEEDBACK!=='undefined'?r.items.concat(['-',{label:'Signaler / Suggérer…',run:()=>FEEDBACK.open()}]):r.items;
+      open(x,y,items,r.title);return;
     }
   }
 });

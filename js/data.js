@@ -22,5 +22,11 @@ const SITE={
     {label:'discord',   url:'https://discord.com/'},
     {label:'twitch',    url:'https://www.twitch.tv/twitch'},
     {label:'reddit',    url:'https://www.reddit.com/user/reddit/'}
-  ]
+  ],
+
+  /* v6 — « Signaler / Suggérer » (js/feedback.js) :
+     feedbackRepo  : le dépôt GitHub où s'ouvre le ticket (formulaire prérempli, rien n'est envoyé sans toi)
+     feedbackEmail : adresse de secours (bouton « Par e-mail ») ; vide = bouton caché */
+  feedbackRepo:'GabRealX/averse',
+  feedbackEmail:''
 };

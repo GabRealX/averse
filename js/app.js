@@ -33,19 +33,26 @@ function score(qn,t){
   if(NOXE.recents().includes(t.key))s+=3;
   return s;
 }
-const allNotes=()=>{const d=getLS('noxe-notes',null);return d&&d.notes?Object.values(d.notes):[];};
-/* résultats : [{type:'tool'|'note', key|id, title, hint, s}] triés, les meilleurs d'abord */
+/* résultats (v6) : [{type:'tool'|'note'|'memo', group, …}] — groupés Outils / Notes / Mémo, les meilleurs d'abord.
+   Notes et mémo : search.js (sans accents, extrait surligné, index précalculé). */
+const LIM={tool:8,note:8,memo:6};
+const CMDS=[
+  {id:'feedback',title:'Signaler / Suggérer (bug, idée, demande)',words:'signaler suggerer suggestion bug probleme erreur idee demande feedback avis contact ticket'},
+  {id:'accent',title:'Changer la couleur d\'accent',words:'couleur accent theme violet rouge bleu vert orange rose cyan jaune'}];
+const runCmd=id=>{if(id==='feedback'&&typeof FEEDBACK!=='undefined')FEEDBACK.open();else if(id==='accent'&&typeof ACCENT!=='undefined')ACCENT.picker();};
+let totals={tool:0,note:0,memo:0};
 NOXE.search=query=>{
   const qn=norm(query).trim();if(!qn)return[];
-  const out=NOXE.tools.map(t=>({type:'tool',key:t.key,title:t.title,hint:catName(t.cat),s:score(qn,t)})).filter(r=>r.s>0);
-  const ws=qn.split(/\s+/);
-  allNotes().forEach(n=>{
-    const ti=norm(n.title),all=ti+' '+norm(n.body)+' '+norm((n.tags||[]).join(' '));
-    if(!ws.every(w=>all.includes(w)))return;
-    out.push({type:'note',id:n.id,title:n.title||'Sans titre',hint:'Note',s:ws.every(w=>ti.includes(w))?40:12});
-  });
-  return out.sort((a,b)=>b.s-a.s||a.title.localeCompare(b.title)).slice(0,12);
+  const tools=NOXE.tools.map(t=>({type:'tool',key:t.key,title:t.title,hint:catName(t.cat),s:score(qn,t)})).filter(r=>r.s>0)
+    .sort((a,b)=>b.s-a.s||a.title.localeCompare(b.title));
+  const notes=typeof SEARCH!=='undefined'?SEARCH.notes(query,LIM.note):{list:[],total:0};
+  const memo=typeof SEARCH!=='undefined'?SEARCH.memo(query,LIM.memo):{list:[],total:0};
+  /* v6 : commandes (rangées après les outils : chaque mot tapé doit commencer un mot-clé) */
+  const cmds=CMDS.filter(c=>qn.split(/\s+/).every(w=>c.words.split(' ').some(x=>x.startsWith(w)))).map(c=>({type:'tool',cmd:c.id,key:'',title:c.title,hint:'Commande',s:1}));
+  totals={tool:tools.length+cmds.length,note:notes.total,memo:memo.total};
+  return tools.slice(0,LIM.tool-cmds.length).concat(cmds,notes.list,memo.list);
 };
+NOXE.searchTotals=()=>totals;
 
 /* ---------- cartes ---------- */
 const card=t=>{
@@ -85,13 +92,25 @@ function drawResults(){
   blocks.hidden=!!v;resBox.hidden=!v;
   if(!v)return;
   results=NOXE.search(v);sel=Math.min(sel,Math.max(0,results.length-1));
-  resBox.innerHTML=results.length?results.map((r,i)=>
-    '<a class="res-item'+(i===sel?' on':'')+'" data-i="'+i+'" href="'+(r.type==='tool'?'#/'+r.key:'notes.html#'+encodeURIComponent(r.id))+'">'+
-    '<span>'+esc(r.title)+'</span><em>'+esc(r.hint)+'</em></a>').join(''):'<div class="res-none">Aucun outil ni note pour « '+esc(v)+' ».</div>';
+  const G={tool:'Outils',note:'Notes',memo:'Mémo'};let last='',html='';
+  results.forEach((r,i)=>{
+    if(r.type!==last){last=r.type;const n=totals[r.type],shown=results.filter(x=>x.type===r.type).length;
+      html+='<div class="res-group" role="presentation">'+G[r.type]+(n>shown?' · '+shown+' sur '+n:'')+'</div>';}
+    const href=r.cmd?'#/':r.type==='tool'?'#/'+r.key:r.type==='memo'?'#/memo':'notes.html#'+encodeURIComponent(r.id);
+    /* titleHtml / snip / valueHtml : déjà échappés par search.js (seules des balises <mark> sont ajoutées) */
+    const body=r.type==='note'?'<span class="res-t">'+r.titleHtml+'<small class="res-snip">'+(r.snip||'<i>note vide</i>')+'</small></span><em>Note</em>'
+      :r.type==='memo'?'<span class="res-t">'+r.titleHtml+'<small class="res-snip">'+r.valueHtml+'</small></span><em>'+esc(r.hint)+'</em>'
+      :'<span>'+esc(r.title)+'</span><em>'+esc(r.hint)+'</em>';
+    html+='<a class="res-item res-'+(r.cmd?'cmd':r.type)+(i===sel?' on':'')+'" data-i="'+i+'" role="option" aria-selected="'+(i===sel)+'" href="'+href+'">'+body+'</a>';
+  });
+  resBox.innerHTML=results.length?html:'<div class="res-none">Aucun outil, note ni fiche du mémo pour « '+esc(v)+' ».</div>';
+  const on=resBox.querySelector('.res-item.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest'});
 }
 function go(r,newTab){
   if(!r)return;
   if(r.type==='note'){if(window.notePanel&&!newTab)notePanel.open(r.id);else location.href='notes.html#'+encodeURIComponent(r.id);return;}
+  if(r.cmd){runCmd(r.cmd);return;}
+  if(r.type==='memo'){NOXE.open('memo',{text:q.value.trim(),input:'mq'});return;}   // le mémo s'ouvre filtré sur la recherche
   NOXE.open(r.key);
 }
 resBox.addEventListener('click',e=>{

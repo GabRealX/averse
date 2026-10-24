@@ -1,9 +1,9 @@
 /* sw.js — fait fonctionner le site hors-ligne, et reçoit les partages (share_target).
    ⚠ À chaque modification d'un fichier, change le numéro de version ci-dessous
-   (averse-v13 → averse-v14…) pour que les visiteurs reçoivent la nouvelle version.
+   (averse-v14 → averse-v15…) pour que les visiteurs reçoivent la nouvelle version.
    Tous les chemins sont RELATIFS à ce fichier : le site marche aussi dans un sous-dossier
    (ex. https://toi.github.io/averse/ sur GitHub Pages). */
-const CACHE = 'averse-v13';
+const CACHE = 'averse-v14';
 const SHARE = 'averse-share';          // contenu partagé en attente (lu puis vidé par app.js)
 /* OCR (v4) : Tesseract.js pèse ~11 Mo (moteur wasm + langues). Il n'est PAS dans ASSETS : sinon chaque visiteur
    téléchargerait 11 Mo à l'installation, même sans jamais utiliser l'OCR, et à chaque nouvelle version du site.
@@ -34,12 +34,13 @@ const KATEX_FONTS = [
   'Typewriter-Regular'
 ].map(f => './js/vendor/katex/fonts/KaTeX_' + f + '.woff2');
 const ASSETS = [
-  './', './index.html', './notes.html', './about.html', './manifest.json', './icon.svg',
+  './', './index.html', './notes.html', './about.html', './share.html', './manifest.json', './icon.svg',
   './icons/icon.svg', './icons/maskable.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png',
-  './css/base.css', './css/home.css', './css/tools.css', './css/app.css', './css/ui.css', './css/notes.css', './css/ascii.css',
+  './css/base.css', './css/home.css', './css/tools.css', './css/app.css', './css/ui.css', './css/notes.css', './css/ascii.css', './css/share.css',
   './js/core.js', './js/data.js', './js/rain.js', './js/app.js', './js/about.js', './js/detect.js', './js/panel.js', './js/notes.js',
   './js/keys.js', './js/pwa.js', './js/ctxmenu.js', './js/backup.js', './js/math.js',
   './js/notes-graph.js', './js/notes-page.js', './js/vault.js', './js/cloud.js',   // v5 : graphe, barre mobile, synchro chiffrée
+  './js/accent.js', './js/search.js', './js/templates.js', './js/notes-tpl.js', './js/md.js', './js/share.js', './js/share-view.js', './js/feedback.js',   // v6
   './js/tools/base.js', './js/tools/image.js', './js/tools/editeur.js', './js/tools/pdf.js', './js/tools/reseau.js',
   './js/tools/electronique.js', './js/tools/dev.js', './js/tools/encodage.js', './js/tools/carnet.js', './js/tools/texte.js', './js/tools/memo.js',
   './js/tools/sauvegarde.js', './js/tools/ocr.js',

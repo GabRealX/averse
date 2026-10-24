@@ -12,7 +12,7 @@ try{const old=localStorage.getItem('averse-tests-backup');
   localStorage.setItem('averse-tests-backup',JSON.stringify(o));sessionStorage.setItem('averse-tests','1');
 }catch(e){}
 </script>
-<script src="js/core.js"></script></head>
+<script src="js/core.js"></script><script src="js/accent.js"></script><script src="js/templates.js"></script></head>
 <body>
 <h1>Tests des calculs</h1>
 <div id="sum">en cours…</div><div id="res"></div>
@@ -23,7 +23,7 @@ try{const old=localStorage.getItem('averse-tests-backup');
 <script src="js/tools/dev.js"></script><script src="js/tools/texte.js"></script><script src="js/tools/memo.js"></script>
 <script src="js/tools/encodage.js"></script><script src="js/tools/pdf.js"></script><script src="js/tools/carnet.js"></script><script src="js/tools/image.js"></script><script src="js/tools/editeur.js"></script><script src="js/tools/ocr.js"></script>
 <script src="js/vault.js"></script><script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
-<script src="js/math.js"></script><script src="js/ctxmenu.js"></script>
+<script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script>
 <link rel="stylesheet" href="css/ui.css">
 <script>
 /* Ouvre chaque outil comme le ferait un clic, remplit les champs, et compare avec des résultats vérifiés à la main.
@@ -613,7 +613,8 @@ T('Synchro Gist : 1er appareil → Gist SECRET, notes chiffrées ; rien de neuf 
   cd().setFetch(GH.fetch);cd().setCreds(PK);cd().setTimes(600000,150);
   const r=await cd().setup(GTOK,GPW,'PC test');DKT=r.dk.slice();await W.cloudSync.sync('t');
   const g=GH.one();if(!g||g.public!==false)throw new Error('pas secret');const txt=g.hist[0].files['averse-carnet.json'];
-  if(/Kilo|Lima|k1/.test(txt))throw new Error('notes en clair dans le Gist');if(cst()!=='ok')throw new Error(cst());has(W.document.getElementById('cloudState').textContent,'synchronisé');
+  if(/Kilo|Lima|\\?"k1\\?"/.test(txt))throw new Error('notes en clair dans le Gist');   // v6 : « k1 » seul pouvait apparaître par hasard dans le base64 chiffré (faux positif)
+  if(cst()!=='ok')throw new Error(cst());has(W.document.getElementById('cloudState').textContent,'synchronisé');
   const n=GH.log.length;await W.cloudSync.sync('t');const l=GH.log.slice(n);if(l.length!==1||!l[0].inm)throw new Error(JSON.stringify(l));
   if(JSON.stringify(localStorage).includes(GPW))throw new Error('mot de passe enregistré !');});
 T('Synchro Gist : modif sur l\'autre appareil → fusionnée ; modif ici → envoyée seule',async()=>{
@@ -622,12 +623,22 @@ T('Synchro Gist : modif sur l\'autre appareil → fusionnée ; modif ici → env
   W.document.querySelector('#list [data-id="k_b"]').click();await until(()=>W.document.getElementById('titleIn').value==='Lima');
   const b=W.document.getElementById('bodyIn');b.value='l2 tapé ici';b.dispatchEvent(new W.Event('input',{bubbles:true}));
   await until(async()=>{const k=await VAULT.dkKey(DKT);return(await VAULT.openData(GH.vault(),k)).notes.k_b.body==='l2 tapé ici';},5000);});
-T('Synchro Gist : CONFLIT → les deux versions gardées',async()=>{await W.cloudSync.sync('t');
-  const t=Date.now(),l=nd().notes.k_c;l.body='Mike ICI';l.updated=t;
+T('Synchro Gist : CONFLIT → les deux versions gardées',async()=>{
+  /* v6 : « l'autre appareil » du test écrit dans le faux Gist SANS vérifier l'historique (un vrai AVERSE le ferait).
+     Si une synchro de fond (focus de la fenêtre, surtout WebKit) envoyait notre « Mike ICI » PENDANT qu'il préparait son
+     écriture, il l'écrasait à l'aveugle : plus un conflit vu d'ici → pas de copie (échec ~1 fois sur 3 sur WebKit).
+     Donc : synchro au repos, l'autre appareil écrit d'abord, puis la modif locale et la synchro, d'un seul coup. */
+  const CM=W.cloudDebug.M;clearTimeout(CM.t);
+  for(let i=0;i<5;i++){await W.cloudSync.sync('t');await sleep(150);if(!CM.busy&&!CM.again)break;}
+  if(CM.busy)throw new Error('synchro jamais au repos');
+  const t=Date.now();
   await otherDevice(d=>{d.notes.k_c.body='Mike LÀ-BAS';d.notes.k_c.updated=t+5;});
-  await W.cloudSync.sync('t');const cp=Object.values(nd().notes).find(n=>n.id!=='k_c'&&(n.tags||[]).includes('conflit'));
-  if(nd().notes.k_c.body!=='Mike LÀ-BAS'||!cp||cp.body!=='Mike ICI')throw new Error('conflit mal géré');
-  const k=await VAULT.dkKey(DKT),d=await VAULT.openData(GH.vault(),k);if(!d.notes[cp.id])throw new Error('copie pas envoyée');});
+  const l=nd().notes.k_c;l.body='Mike ICI';l.updated=t;
+  await W.cloudSync.sync('t');const cpOf=()=>Object.values(nd().notes).find(n=>n.id!=='k_c'&&(n.tags||[]).includes('conflit'));
+  await until(()=>{const c=cpOf();return nd().notes.k_c.body==='Mike LÀ-BAS'&&c&&c.body==='Mike ICI';},4000).catch(()=>{const c=cpOf();throw new Error('conflit mal géré : k_c='+JSON.stringify(nd().notes.k_c.body)+' copie='+JSON.stringify(c&&c.body)+' état='+cst());});const cp=cpOf();
+  /* v6 : si une synchro était déjà en cours (focus, envoi différé), sync() rend CELLE-LÀ et la nôtre suit 60 ms après (M.again) :
+     on attend donc que la copie arrive dans le Gist au lieu de la vérifier à l'instant (échec aléatoire ~1 fois sur 4 sur mobile) */
+  const k=await VAULT.dkKey(DKT);await until(async()=>!!(await VAULT.openData(GH.vault(),k)).notes[cp.id],4000).catch(()=>{throw new Error('copie pas envoyée');});});
 T('Synchro Gist : écriture de l\'autre appareil PENDANT la nôtre → récupérée (historique), rien perdu',async()=>{await W.cloudSync.sync('t');
   nd().notes.k_a.body='k3 ici';nd().notes.k_a.updated=Date.now();
   GH.beforePatch(()=>otherDevice(d=>{d.notes.k_b.body='l3 là-bas';d.notes.k_b.updated=Date.now();}));
@@ -644,6 +655,14 @@ T('Synchro Gist : appairage → le nouvel appareil reçoit clé + jeton (mot de 
   const o=await VAULT.openPair(GH.vault(),p.code,GPW);if(o.token!==GTOK||VAULT.b64(o.dk)!==VAULT.b64(DKT))throw new Error('contenu');
   let e=null;try{await VAULT.openPair(GH.vault(),p.code,'faux');}catch(x){e=x;}if(!e)throw new Error('sans mot de passe');
   if(!W.cloudSync.parsePair(p.link)||W.cloudSync.parsePair('n\'importe quoi'))throw new Error('lecture du code');});
+T('Synchro Gist (v6) : un modèle de note part chiffré avec les notes ; rien de neuf → 304 ; modèle de l\'autre appareil reçu',async()=>{await W.cloudSync.sync('t');
+  const t=W.TPL.save({name:'Modèle synchro',title:'S {{date}}',body:'corps'});await W.cloudSync.sync('t');
+  const k=await VAULT.dkKey(DKT);let d=await VAULT.openData(GH.vault(),k);if(!d.templates||!d.templates.items[t.id])throw new Error('modèle pas envoyé');
+  if(/Modèle synchro/.test(JSON.stringify(GH.vault())))throw new Error('modèle en clair');
+  await W.cloudSync.sync('t');                               // relit le Gist (après un envoi, l'etag est remis à zéro) : AUCUN renvoi attendu
+  const n=GH.log.length;await W.cloudSync.sync('t');const l=GH.log.slice(n);if(l.length!==1||!l[0].inm)throw new Error('pas 304 : '+JSON.stringify(l));
+  await otherDevice(d=>{d.templates.items.tel={id:'tel',name:'Du téléphone',title:'',body:'',updated:Date.now()};});
+  await W.cloudSync.sync('t');if(!W.TPL.get('tel'))throw new Error('modèle distant pas reçu');});
 T('Synchro Gist : code de secours sur un appareil « neuf » → tout récupéré',async()=>{
   const code=await cd().addRecoveryNow(DKT.slice());await cd().reset();if(W.cloudSync.configured())throw new Error('pas désactivé');
   delete nd().notes.k_c;
@@ -689,6 +708,329 @@ T('OCR : changer de langue relance la lecture (anglais)',async()=>{$('ocr_lang')
   await until(()=>/eng|Anglais/.test(localStorage.getItem('averse-ocr-lang')||'')&&$('ocr_out').value,60000);NOXE.close();localStorage.removeItem('averse-ocr-lang');});
 
 T('ZIP : signature PK',async()=>{const b=await NOXE.zip([{name:'a.txt',blob:new Blob(['salut'])}]);const u=new Uint8Array(await b.slice(0,2).arrayBuffer());if(u[0]!==0x50||u[1]!==0x4b)throw new Error('pas un zip');});
+
+/* ---- v6 : couleur d'accent, recherche globale, modèles, partage d'une note ---- */
+T('Accent : 8 couleurs prêtes, toutes lisibles (contraste ≥ 4,5:1 même en texte secondaire)',async()=>{
+  if(ACCENT.PRESETS.length!==8)throw new Error(ACCENT.PRESETS.length+' couleurs');
+  has(ACCENT.PRESETS.map(p=>p[0]).join(' '),'violet','rouge','bleu','vert','orange','rose','cyan','jaune');
+  const bad=ACCENT.PRESETS.filter(([n,c])=>{const k=ACCENT.check(ACCENT.readable(c));return k.soft<4.5||k.fg<7;});
+  if(bad.length)throw new Error('peu lisible : '+bad.map(b=>b[0]).join(','));
+  if(ACCENT.PRESETS.some(([n,c])=>ACCENT.readable(c)!==c))throw new Error('une couleur prête serait modifiée');
+  return ACCENT.PRESETS.map(([n,c])=>n+' '+ACCENT.check(c).soft.toFixed(1)).join(' · ');});
+T('Accent : couleur trop sombre → éclaircie automatiquement jusqu\'au contraste minimal',async()=>{
+  for(const c of ['#1a1a6e','#400000','#000000','#0a3d0a']){const r=ACCENT.readable(c);if(ACCENT.check(r).soft<4.5)throw new Error(c+' → '+r);if(r===c)throw new Error(c+' pas éclaircie');}
+  if(ACCENT.readable('rouge')!==ACCENT.DEF||ACCENT.readable('#12345')!==ACCENT.DEF)throw new Error('valeur invalide acceptée');});
+T('Accent : appliquée via les variables CSS (--fg, --acc-rgb), theme-color, mémorisée ; violet = rien de stocké',async()=>{const S=snap();
+  try{
+    const h=ACCENT.set('#8fb4ff'),r=document.documentElement,cs=getComputedStyle(r);
+    if(h!=='#8fb4ff'||cs.getPropertyValue('--fg').trim()!=='#8fb4ff'||cs.getPropertyValue('--acc-rgb').replace(/\s/g,'')!=='143,180,255')throw new Error('variables');
+    if(!/143,\s*180,\s*255/.test(cs.getPropertyValue('--fg-soft')))throw new Error('--fg-soft ne suit pas : '+cs.getPropertyValue('--fg-soft'));
+    if(localStorage.getItem('averse-accent')!=='#8fb4ff')throw new Error('pas mémorisée');
+    const tc=document.querySelector('meta[name=theme-color]');if(tc&&tc.content==='#06060a')throw new Error('theme-color inchangé');
+    let ev=null;const f=e=>ev=e.detail;document.addEventListener('averse-accent',f);ACCENT.set('#FF9494');document.removeEventListener('averse-accent',f);
+    if(!ev||ev.hex!=='#ff9494'||ev.rgb.join()!=='255,148,148')throw new Error('événement');
+    ACCENT.set(ACCENT.DEF);if(localStorage.getItem('averse-accent')!==null||r.style.getPropertyValue('--fg'))throw new Error('violet : clé ou style restant');
+  }finally{restoreLS(S);ACCENT.apply(ACCENT.get());}});
+T('Accent : dans la Sauvegarde (export, import, valeur piégée refusée)',async()=>{const S=snap();
+  try{
+    ACCENT.set('#8fdca6');const {data}=BACKUP.build();if(data.settings.accent!=='#8fdca6')throw new Error('pas exportée');
+    ACCENT.set(ACCENT.DEF);const v=BACKUP.validate(data);BACKUP.apply(v.clean);if(ACCENT.get()!=='#8fdca6')throw new Error('pas réimportée');
+    const bad=BACKUP.validate(Object.assign({},data,{settings:{accent:'red;background:url(x)'}}));
+    if(bad.clean.settings.accent||!bad.rejected)throw new Error('valeur piégée acceptée');
+  }finally{restoreLS(S);ACCENT.apply(ACCENT.get());}});
+T('Accent : la fenêtre « couleur » (pastilles, Annuler remet l\'ancienne)',async()=>{const S=snap();
+  try{ACCENT.picker();const d=$('accentDlg');if(!d)throw new Error('pas ouverte');
+    if(d.querySelectorAll('[data-acc]').length!==8||!d.querySelector('input[type=color]'))throw new Error('contenu');
+    d.querySelector('[data-acc="#73d9e6"]').click();if(ACCENT.get()!=='#73d9e6')throw new Error('clic pastille');has(d.textContent,'Contraste');
+    d.querySelector('[data-x]').click();if($('accentDlg')||ACCENT.get()!==ACCENT.DEF)throw new Error('Annuler');
+  }finally{const d=$('accentDlg');if(d)d.remove();restoreLS(S);ACCENT.apply(ACCENT.get());}});
+
+const sNotes=(list)=>{const notes={};list.forEach((n,i)=>{const id=n.id||'s'+i;notes[id]=Object.assign({id,tags:[],created:1,updated:1+i},n,{id});});setLS('noxe-notes',{notes,openId:null,deleted:{}});};
+T('Recherche : texte « plié » sans accents et de MÊME longueur (positions exactes)',async()=>{
+  for(const s of ['Ça a été l\'été à Noël','İstanbul ŒUF ß ﬁ 😀 Ä ǅ','ABC défi'])
+    if(SEARCH.fold(s).length!==s.length)throw new Error('longueur changée : '+s);
+  if(SEARCH.fold('Élève RÉSEAU Çà')!=='eleve reseau ca')throw new Error(SEARCH.fold('Élève RÉSEAU Çà'));});
+T('Recherche : notes en texte intégral, sans accents, extrait surligné, échappé',async()=>{const S=snap();
+  try{
+    sNotes([{title:'Cours réseau',body:'Le protocole OSPF calcule le plus court chemin.'},
+      {title:'Divers',body:'x'.repeat(300)+' Ici on parle de la Télécommunication et du RÉSEAU <img src=x onerror=alert(1)> fin.'},
+      {title:'Autre',body:'rien à voir'}]);SEARCH.reset();
+    const r=SEARCH.notes('reseau');if(r.total!==2)throw new Error(r.total+' résultats');
+    if(r.list[0].title!=='Cours réseau')throw new Error('le titre doit passer devant');
+    has(r.list[0].titleHtml,'<mark>réseau</mark>');
+    const s=r.list[1].snip;has(s,'<mark>RÉSEAU</mark>','&lt;img','…');if(/<img/i.test(s))throw new Error('balise non échappée');
+    if(s.length>400)throw new Error('extrait trop long');
+    const two=SEARCH.notes('telecom reseau');if(two.total!==1)throw new Error('plusieurs mots');has(two.list[0].snip,'<mark>Télécom</mark>munication');
+    if(SEARCH.notes('ospf chemin').list[0].snip.indexOf('<mark>OSPF</mark>')<0)throw new Error('casse');
+    if(SEARCH.notes('zzz').total)throw new Error('faux positif');
+  }finally{restoreLS(S);SEARCH.reset();}});
+T('Recherche : rapide avec 600 notes ; seule la note modifiée est recalculée',async()=>{const S=snap();
+  try{
+    const W2=['réseau','routeur','commutateur','adresse','masque','passerelle','protocole','élève','sécurité','système','fichier','mémoire'];
+    const L=[];for(let i=0;i<600;i++){let b='';for(let k=0;k<220;k++)b+=W2[(i*7+k*13)%W2.length]+(k%17?' ':'.\n');L.push({title:'Note '+i+' '+W2[i%12],body:b+(i===437?' aiguille-unique':'')});}
+    sNotes(L);SEARCH.reset();
+    let t0=performance.now();SEARCH.notes('x');const build=performance.now()-t0;
+    t0=performance.now();let r;for(let k=0;k<10;k++)r=SEARCH.notes('aiguille unique');const q=(performance.now()-t0)/10;
+    if(r.total!==1||r.list[0].title!=='Note 437 passerelle')throw new Error('pas trouvée');
+    t0=performance.now();for(let k=0;k<10;k++)SEARCH.notes('securite systeme');const q2=(performance.now()-t0)/10;
+    if(q>60||q2>120)throw new Error('trop lent : '+q.toFixed(1)+' / '+q2.toFixed(1)+' ms');
+    const d=getLS('noxe-notes');d.notes.s3.body='modifiée aiguille2';d.notes.s3.updated=99999;setLS('noxe-notes',d);
+    const f0=SEARCH.stats.folded;if(SEARCH.notes('aiguille2').total!==1)throw new Error('modif pas vue');
+    if(SEARCH.stats.folded-f0!==1)throw new Error((SEARCH.stats.folded-f0)+' notes recalculées');
+    return 'index '+build.toFixed(0)+' ms (1re fois), recherche '+q.toFixed(1)+' ms, 2 mots fréquents '+q2.toFixed(1)+' ms';
+  }finally{restoreLS(S);SEARCH.reset();}});
+T('Recherche : fiches du mémo (sans accents) + outil Mémo insensible aux accents',async()=>{
+  const r=SEARCH.memo('hote');if(!r.total||!/hôte/.test(r.list[0].title))throw new Error('mémo : '+JSON.stringify(r.list[0]));
+  has(r.list[0].titleHtml,'<mark>hôte</mark>');
+  if(!SEARCH.memo('ssh').list.some(m=>m.value==='22'))throw new Error('ssh → 22');
+  NOXE.open('memo');fill('mq','hote');has(text(),'hôte');NOXE.close();});
+T('Recherche (accueil) : résultats groupés Outils / Notes / Mémo, extraits, clavier ↓ Entrée',async()=>{const S=snap();
+  try{
+    sNotes([{id:'q1',title:'Mémo SSH perso',body:'Pour se connecter : ssh -p 2222 admin@routeur, puis vérifier la clé.'}]);
+    await frame('index.html#/',()=>{try{N=W.eval('NOXE');return !!N.search&&W.SEARCH;}catch(e){return false;}});
+    const q=W.document.getElementById('q');q.value='ssh';q.dispatchEvent(new W.Event('input',{bubbles:true}));
+    const box=W.document.getElementById('results');if(box.hidden)throw new Error('pas de résultats');
+    const g=[...box.querySelectorAll('.res-group')].map(e=>e.textContent.split(' ·')[0]);
+    if(g.join()!=='Outils,Notes,Mémo'&&g.join()!=='Notes,Mémo')throw new Error('groupes : '+g.join());
+    const note=box.querySelector('.res-note');if(!note)throw new Error('note absente');has(note.innerHTML,'<mark>ssh</mark> -p 2222');
+    if(!box.querySelector('.res-memo mark'))throw new Error('mémo sans surlignage');
+    const items=[...box.querySelectorAll('.res-item')],mi=items.findIndex(e=>e.classList.contains('res-memo'));
+    for(let k=0;k<mi;k++)wkey(q,'ArrowDown');
+    if(!box.querySelectorAll('.res-item')[mi].classList.contains('on'))throw new Error('flèche');
+    wkey(q,'Enter');await until(()=>N.current()==='memo');if(W.document.getElementById('mq').value!=='ssh')throw new Error('mémo pas filtré');
+    has(W.document.getElementById('mbody').textContent,'SSH');
+  }finally{F.remove();restoreLS(S);}});
+
+T('Modèles : créer, variables {{date}} {{titre}} {{année}}…, inconnue gardée, supprimer (pierre tombale)',async()=>{const S=snap();
+  try{
+    localStorage.removeItem('averse-tpl');
+    const t=TPL.save({name:'Réunion',title:'Réunion du {{date}}',tags:['réunion'],body:'# {{titre}}\n{{jour}} {{heure}} — {{année}} {{ANNEE}} {{inconnue}}'});
+    if(!t||TPL.list().length!==1)throw new Error('pas enregistré');
+    const when=new Date(2026,9,24,14,5),x=TPL.expand(t,when);
+    if(x.title!=='Réunion du 24/10/2026')throw new Error(x.title);
+    has(x.body,'# Réunion du 24/10/2026','samedi','14:05','2026 2026','{{inconnue}}');if(x.tags[0]!=='réunion')throw new Error('tags');
+    const t2=TPL.save(Object.assign({},t,{name:'Réunion 2'}));if(t2.id!==t.id||t2.updated<=t.updated||TPL.list().length!==1)throw new Error('modifier');
+    TPL.remove(t.id);if(TPL.list().length||!TPL.read().deleted[t.id])throw new Error('supprimer');
+    if(TPL.clean({id:'__proto__',name:'x'})||TPL.clean({id:'a',name:''})||TPL.clean({id:'a b',name:'x'}))throw new Error('modèle invalide accepté');
+    if(TPL.BUILTIN.length!==6||!TPL.builtin('stage'))throw new Error('modèles AVERSE');
+  }finally{restoreLS(S);}});
+T('Modèles : fusion (synchro) — le plus récent gagne, une suppression ne ressuscite pas',async()=>{const S=snap();
+  try{
+    localStorage.removeItem('averse-tpl');const t=TPL.save({name:'A',title:'a',body:'local'});
+    let n=TPL.merge({items:{[t.id]:Object.assign({},t,{body:'vieux',updated:t.updated-1000})},deleted:{}});if(n||TPL.get(t.id).body!=='local')throw new Error('le vieux a gagné');
+    n=TPL.merge({items:{[t.id]:Object.assign({},t,{body:'neuf',updated:t.updated+1000}),zz:{id:'zz',name:'Autre appareil',title:'',body:'z',updated:Date.now()}},deleted:{}});
+    if(n!==2||TPL.get(t.id).body!=='neuf'||!TPL.get('zz'))throw new Error('fusion : '+n);
+    TPL.remove('zz');TPL.merge({items:{zz:{id:'zz',name:'Autre appareil',title:'',body:'z',updated:Date.now()-5000}},deleted:{}});if(TPL.get('zz'))throw new Error('ressuscité');
+    const t3=TPL.save({name:'C',title:'',body:''});await sleep(5);TPL.merge({items:{},deleted:{[t3.id]:Date.now()}});if(TPL.get(t3.id))throw new Error('suppression distante ignorée');
+    TPL.merge({items:{__proto__x:{id:'<script>',name:'x'}},deleted:{'a b':5}});if(Object.keys(TPL.read().items).some(k=>/</.test(k)))throw new Error('id piégé');
+  }finally{restoreLS(S);}});
+T('Modèles : dans la Sauvegarde (aller-retour, modèle piégé refusé)',async()=>{const S=snap();
+  try{
+    localStorage.removeItem('averse-tpl');TPL.save({name:'Journal',title:'J {{date}}',body:'b'});
+    const {data}=BACKUP.build();if(!data.templates||Object.keys(data.templates.items).length!==1)throw new Error('pas exporté');
+    localStorage.removeItem('averse-tpl');
+    data.templates.items.evil={id:'evil',name:'',body:'x'};
+    const v=BACKUP.validate(data);if(!v.rejected)throw new Error('modèle sans nom accepté');
+    const r=BACKUP.apply(v.clean);if(r.templates!==1||TPL.list()[0].name!=='Journal')throw new Error('pas réimporté');
+  }finally{restoreLS(S);}});
+T('Modèles (carnet) : « Modèle » enregistre la note, choix dans « Nouvelle note », variables remplies',async()=>{const S=snap();
+  try{
+    localStorage.removeItem('averse-tpl');const t=Date.now();
+    setLS('noxe-notes',{notes:{m1:{id:'m1',title:'Réunion',body:'Présents :\n- \n\n{{date}}',tags:['pro'],created:t,updated:t}},openId:'m1',deleted:{}});
+    await frame('notes.html',()=>W.notesTpl&&W.document.getElementById('list').children.length);
+    const sel=W.document.getElementById('tplSel');has(sel.textContent,'Note vide','compte-rendu de TP'.replace('compte-rendu','Compte-rendu'),'Gérer mes modèles');
+    W.document.getElementById('tplSaveBtn').click();await until(()=>W.document.getElementById('tplDlg'));
+    const d=W.document.getElementById('tplDlg');if(d.querySelector('#tplName').value!=='Réunion')throw new Error('nom prérempli');
+    d.querySelector('#tplTitle').value='Réunion du ';d.querySelector('#tplTitle').focus();
+    d.querySelector('[data-t="var:{{date}}"]').click();await sleep(20);
+    if(d.querySelector('#tplTitle').value!=='Réunion du {{date}}')throw new Error('variable pas insérée : '+d.querySelector('#tplTitle').value);
+    has(d.querySelector('#tplPrev').textContent,new Date().toLocaleDateString('fr-FR'));
+    d.querySelector('form').requestSubmit();await until(()=>W.TPL.list().length===1);
+    await until(()=>W.document.querySelector('#tplDlg .tpl-list'));has(W.document.getElementById('tplDlg').textContent,'Réunion','Modifier','Supprimer','Modèles AVERSE');
+    W.notesTpl.close();
+    const id=W.TPL.list()[0].id,opt=sel.querySelector('option[value="u:'+id+'"]');if(!opt)throw new Error('pas dans la liste');
+    sel.value='u:'+id;W.document.getElementById('newBtn').click();
+    const today=new Date().toLocaleDateString('fr-FR');
+    await until(()=>W.document.getElementById('titleIn').value==='Réunion du '+today);
+    const n=nd().notes[nd().openId];has(n.body,'Présents',today);if(n.tags[0]!=='pro')throw new Error('tags');
+    sel.value='__manage';sel.dispatchEvent(new W.Event('change'));await until(()=>W.document.getElementById('tplDlg'));W.notesTpl.close();
+    /* synchro : dans le contenu envoyé, et fusionnés à la réception */
+    const p=W.notesApi.payload();if(!p.templates||!p.templates.items[id])throw new Error('pas dans la synchro');
+    const r=W.notesApi.merge({notes:{},deleted:{},templates:{items:{t9:{id:'t9',name:'Du téléphone',title:'T',body:'',updated:Date.now()}},deleted:{}}},null);
+    if(!r.n||!W.TPL.get('t9')||!sel.querySelector('option[value="u:t9"]'))throw new Error('modèle reçu pas fusionné');
+  }finally{if(F)F.remove();restoreLS(S);}});
+
+const shEnc=async(obj,flag)=>{   // fabrique un lien « à la main » (pour tester la réception avec un contenu qui n'est pas passé par SHARE.encode)
+  const b64u=u=>btoa(String.fromCharCode(...u)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const raw=new TextEncoder().encode(typeof obj==='string'?obj:JSON.stringify(obj)),plain=new Uint8Array(raw.length+1);plain[0]=flag||0;plain.set(raw,1);
+  const kb=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+  const k=await crypto.subtle.importKey('raw',kb,'AES-GCM',false,['encrypt']);const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,plain));
+  const all=new Uint8Array(12+ct.length);all.set(iv);all.set(ct,12);return'n1.'+b64u(kb)+'.'+b64u(all);};
+T('Partage : aller-retour lien chiffré (accents, emoji, maths, tags), clé à part, mauvaise clé, lien abîmé',async()=>{
+  const n={title:'Réseau — été 😀',body:'# Titre\n$$E=mc^2$$\n'+'Ligne répétée pour la compression. '.repeat(200),tags:['réseau','tp']};
+  const r=await SHARE.encode(n);if(!/^n1\.[\w-]{22}\.[\w-]+$/.test(r.frag))throw new Error('format : '+r.frag.slice(0,40));
+  if(/R%C3%A9seau|Ligne|r%C3%A9p/.test(r.frag))throw new Error('contenu lisible dans le lien');
+  if(SHARE.hasCS()&&r.frag.length>2000)throw new Error('pas compressé : '+r.frag.length);
+  const d=await SHARE.decode('#'+r.frag);if(d.t!==n.title||d.b!==n.body||d.g.join()!=='réseau,tp')throw new Error('aller-retour');
+  const a=await SHARE.encode(n,true);if(!/^n1\.\.[\w-]+$/.test(a.frag))throw new Error('clé présente');
+  const e=async(f,k)=>{try{await SHARE.decode(f,k);}catch(x){return x.message;}return'ok';};
+  if(await e(a.frag)!=='clé')throw new Error('sans clé');if(await e(a.frag,a.key)!=='ok')throw new Error('avec la clé');
+  if(await e(a.frag,r.key)!=='clé')throw new Error('mauvaise clé acceptée');
+  const p=r.frag.split('.'),mid=p[2].length>>1,t=p[2].slice(0,mid)+(p[2][mid]==='A'?'B':'A')+p[2].slice(mid+1);
+  if(await e(p[0]+'.'+p[1]+'.'+t)!=='clé')throw new Error('lien modifié accepté');
+  if(await e(r.frag.slice(0,r.frag.length-30))==='ok')throw new Error('lien coupé accepté');
+  for(const bad of ['','#','n1.abc','n2.'+p[1]+'.'+p[2],'n1.'+p[1]+'.'+p[2]+'<script>','javascript:alert(1)'])if(await e(bad)!=='format')throw new Error('accepté : '+bad);
+  return 'lien '+r.frag.length+' car. pour '+(n.title.length+n.body.length)+' car.';});
+T('Partage : contenu reçu revérifié (types, tailles, version, bombe de décompression)',async()=>{
+  const d=await SHARE.decode(await shEnc({v:1,t:{x:1},b:['a'],g:'pas une liste'}));if(d.t!=='Note partagée'||d.b!==''||d.g.length)throw new Error(JSON.stringify(d));
+  const e=async f=>{try{await SHARE.decode(f);}catch(x){return x.message;}return'ok';};
+  if(await e(await shEnc({v:2,t:'a',b:'b'}))!=='format')throw new Error('version');
+  if(await e(await shEnc('pas du json'))!=='format')throw new Error('JSON');
+  if(await e(await shEnc({v:1,t:'a',b:'b'},7))!=='format')throw new Error('drapeau');
+  if(!SHARE.hasCS())SKIP('CompressionStream absent');
+  const big=new Uint8Array(await new Response(new Blob([new Uint8Array(3e6)]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+  const b64u=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
+  const plain=new Uint8Array(big.length+1);plain[0]=1;plain.set(big,1);
+  const kb=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+  const k=await crypto.subtle.importKey('raw',kb,'AES-GCM',false,['encrypt']);const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,plain));
+  const all=new Uint8Array(12+ct.length);all.set(iv);all.set(ct,12);
+  if(await e('n1.'+b64u(kb)+'.'+b64u(all))!=='trop gros')throw new Error('bombe acceptée');});
+const XSS=['<img src=x onerror="parent.__xss=1">','<script>parent.__xss=1<\/script>','<svg onload="parent.__xss=1">','[clic](javascript:parent.__xss=1)',
+  '[x](JaVaScRiPt:parent.__xss=1)','[d](data:text/html,<script>parent.__xss=1<\/script>)','<iframe src="javascript:parent.__xss=1">','"><b onmouseover="parent.__xss=1">',
+  '[[<img src=x onerror=parent.__xss=1>]]','`<img src=x onerror=parent.__xss=1>`','| a | b |\n|---|---|\n| <img src=x onerror=parent.__xss=1> | ok |','$<img src=x onerror=parent.__xss=1>$',
+  '[ok](https://exemple.fr" onclick="parent.__xss=1)','- [x] <a href="javascript:parent.__xss=1">t</a>'];
+T('Partage : page de lecture (share.html) — rendu Markdown en lecture seule, XSS neutralisés, CSP stricte',async()=>{const S=snap();
+  try{
+    window.__xss=0;
+    const r=await SHARE.encode({title:'<img src=x onerror="parent.__xss=1"> Titre',body:'# Fiche\n**gras** et [lien](https://exemple.fr) et [[Autre note]]\n- [x] fait\n\n'+XSS.join('\n\n'),tags:['<b>t</b>']});
+    await frame('share.html#'+r.frag,()=>W.shareView&&W.shareView.note);
+    const d=W.document,b=d.getElementById('svBody');await sleep(150);
+    if(window.__xss)throw new Error('XSS exécuté !');
+    /* mise en page (bug vu sur capture) : case « clé » vraiment cachée quand la clé est dans le lien ; barre pas poussée par ascii.css */
+    for(const id of ['svKeyForm','svState','svOpen'])if(W.getComputedStyle(d.getElementById(id)).display!=='none')throw new Error(id+' visible');
+    if(d.querySelector('header.bar').getBoundingClientRect().height>80)throw new Error('barre haute de '+d.querySelector('header.bar').getBoundingClientRect().height+' px');
+    if(d.getElementById('svTitle').textContent!=='<img src=x onerror="parent.__xss=1"> Titre')throw new Error('titre');
+    if(b.querySelector('img,script,svg,iframe,object,embed,style,form,b[onmouseover]'))throw new Error('balise dangereuse : '+b.querySelector('img,script,svg,iframe,object,embed,style,form,b').outerHTML);
+    const onAttr=[...d.querySelectorAll('#svNote *')].find(el=>[...el.attributes].some(a=>/^on/i.test(a.name)));if(onAttr)throw new Error('attribut on* : '+onAttr.outerHTML);
+    const hrefs=[...b.querySelectorAll('a[href]')].map(a=>a.getAttribute('href'));
+    if(hrefs.some(h=>!/^(https?:|#$)/.test(h)))throw new Error('lien dangereux : '+hrefs.join(' '));
+    if(!b.querySelector('h1')||!b.querySelector('strong')||!b.querySelector('a[href="https://exemple.fr"]'))throw new Error('Markdown pas rendu');
+    if(b.querySelector('a.wl')||!b.querySelector('.wl.ro'))throw new Error('[[lien]] pas en texte');
+    const cb=b.querySelector('input[type=checkbox]');if(!cb||!cb.disabled)throw new Error('case modifiable');
+    has(d.getElementById('svTags').textContent,'#<b>t</b>');
+    const csp=d.querySelector('meta[http-equiv="Content-Security-Policy"]').content;has(csp,"script-src 'self'","connect-src 'none'");
+    if([...d.scripts].some(s=>!s.src))throw new Error('script en ligne');
+    /* importer */
+    const n0=Object.keys((getLS('noxe-notes',{notes:{}})||{notes:{}}).notes).length;
+    d.getElementById('svImport').click();const nn=getLS('noxe-notes').notes;
+    if(Object.keys(nn).length!==n0+1)throw new Error('pas importée');const imp=Object.values(nn).find(x=>x.title.endsWith(' Titre'));
+    if(!imp||imp.body.indexOf('# Fiche')!==0||imp.tags[0]!=='<b>t</b>')throw new Error('contenu importé');
+    if(!d.getElementById('svImport').disabled||d.getElementById('svOpen').hidden)throw new Error('bouton');
+    W.shareView.open();await until(()=>W.shareView.note&&!d.getElementById('svImport').disabled);d.getElementById('svImport').click();
+    if(Object.keys(getLS('noxe-notes').notes).length!==n0+1)throw new Error('importée deux fois');has(d.getElementById('svImport').textContent,'Déjà');
+    if(window.__xss)throw new Error('XSS exécuté !');
+  }finally{if(F)F.remove();restoreLS(S);delete window.__xss;}});
+T('Partage : lien sans clé → la page demande la clé ; mauvais lien → message clair',async()=>{
+  const r=await SHARE.encode({title:'Secret',body:'contenu',tags:[]},true);
+  await frame('share.html#'+r.frag,()=>W.document&&W.document.getElementById('svKeyForm')&&!W.document.getElementById('svKeyForm').hidden);
+  const d=W.document;if(d.getElementById('svKey').type!=='password')throw new Error('champ clé visible');
+  d.getElementById('svKey').value='A'.repeat(22);d.getElementById('svKeyForm').requestSubmit();await until(()=>d.getElementById('svState').classList.contains('bad'));
+  has(d.getElementById('svState').textContent,'Clé incorrecte');
+  d.getElementById('svKey').value=r.key;d.getElementById('svKeyForm').requestSubmit();await until(()=>!d.getElementById('svNote').hidden);
+  if(d.getElementById('svTitle').textContent!=='Secret')throw new Error('titre');
+  W.location.hash='#n1.abc';await until(()=>d.getElementById('svState').classList.contains('bad'));has(d.getElementById('svState').textContent,'incomplet');
+  F.remove();});
+T('Partage (carnet) : fenêtre « Partager » — lien, clé à part, limite de taille → fichier .md',async()=>{const S=snap();
+  try{
+    const t=Date.now(),rnd=n=>{let s='';const a='abcdefghijklmnopqrstuvwxyz0123456789 ';for(let o=0;o<n;o+=50000){const u=crypto.getRandomValues(new Uint8Array(Math.min(50000,n-o)));for(const x of u)s+=a[x%a.length];}return s;};
+    setLS('noxe-notes',{notes:{p1:{id:'p1',title:'Petite',body:'Bonjour **toi**',tags:[],created:t,updated:t},
+      p2:{id:'p2',title:'Moyenne',body:rnd(9000),tags:[],created:t,updated:t-1},p3:{id:'p3',title:'Énorme',body:rnd(70000),tags:[],created:t,updated:t-2}},openId:'p1',deleted:{}});
+    await frame('notes.html',()=>W.SHARE&&W.document.getElementById('list').children.length);
+    const d=W.document;d.getElementById('shareBtn').click();await until(()=>d.getElementById('shLink')&&d.getElementById('shLink').value);
+    const link=d.getElementById('shLink').value;has(link,'/share.html#n1.');
+    const dec=await SHARE.decode(link.split('#')[1]);if(dec.b!=='Bonjour **toi**')throw new Error('lien faux');
+    if(W.getComputedStyle(d.getElementById('shKeyRow')).display!=='none')throw new Error('ligne « clé » visible alors que la clé est dans le lien');
+    d.getElementById('shApart').click();await until(()=>/#n1\.\./.test(d.getElementById('shLink').value));if(d.getElementById('shKeyRow').hidden)throw new Error('clé pas affichée');
+    if(W.getComputedStyle(d.getElementById('shKeyRow')).display==='none')throw new Error('ligne « clé » invisible');
+    has(d.getElementById('shareDlg').textContent,'Fichier .md','PDF');W.SHARE.close();
+    d.querySelector('#list [data-id="p2"]').click();await until(()=>d.getElementById('titleIn').value==='Moyenne');
+    d.getElementById('shareBtn').click();await until(()=>d.getElementById('shLink')&&d.getElementById('shLink').value);
+    if(!d.getElementById('shInfo').classList.contains('warn'))throw new Error('pas d\'avertissement (lien '+d.getElementById('shLink').value.length+')');W.SHARE.close();
+    d.querySelector('#list [data-id="p3"]').click();await until(()=>d.getElementById('titleIn').value==='Énorme');
+    d.getElementById('shareBtn').click();await until(()=>d.getElementById('shInfo')&&d.getElementById('shInfo').classList.contains('bad'));
+    has(d.getElementById('shInfo').textContent,'trop longue','.md');if(!d.getElementById('shCopy').disabled)throw new Error('copie possible');W.SHARE.close();
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Carnet : Ctrl+K → recherche globale de l\'accueil ; le graphe suit la couleur d\'accent',async()=>{const S=snap();
+  try{
+    await frame('notes.html',()=>W.notesDebug&&W.ACCENT);
+    W.ACCENT.set('#f5b26b');if(W.notesDebug.acc!=='#f5b26b')throw new Error('graphe : '+W.notesDebug.acc);
+    W.ACCENT.set(W.ACCENT.DEF);if(W.notesDebug.acc!==W.ACCENT.DEF)throw new Error('retour violet');
+    wkey(W.document.body,'k',{ctrlKey:true});await until(()=>{try{return/index\.html#\/$/.test(F.contentWindow.location.href)&&F.contentWindow.document.getElementById('q');}catch(e){return false;}},5000);
+  }finally{if(F)F.remove();restoreLS(S);ACCENT.apply(ACCENT.get());}});
+
+/* ---------- v6 : Signaler / Suggérer (aucun ticket réel : FEEDBACK.opener est remplacé, on ne fait que lire l'adresse) ---------- */
+T('Signaler : adresse GitHub exacte, titre / texte / étiquette bien échappés (& # ? + % emoji <script> retours ligne)',async()=>{
+  await frame('index.html#/',()=>W.FEEDBACK&&W.document.getElementById('q'));
+  const msg='ligne 1 & = ? #ancre + %20 100%\nligne 2 😀 <script>alert(1)<\/script>'   /* <\/ : sinon la balise ferme le script de tests.html */,ti='A & B #1 ? + % <img src=x onerror=alert(1)>\nsuite';
+  const r=W.FEEDBACK.url({type:'idée',title:ti,message:msg,tech:false}),u=new URL(r.url);
+  if(u.origin!=='https://github.com'||u.pathname!=='/GabRealX/averse/issues/new'||u.hash!=='')throw new Error('adresse : '+u.origin+u.pathname+u.hash);
+  if([...u.searchParams.keys()].join()!=='title,body,labels')throw new Error('paramètres : '+[...u.searchParams.keys()]);
+  if(u.searchParams.get('title')!=='[Idée] A & B #1 ? + % <img src=x onerror=alert(1)> suite')throw new Error('titre : '+u.searchParams.get('title'));
+  if(u.searchParams.get('labels')!=='idée')throw new Error('étiquette');
+  const b=u.searchParams.get('body');if(!b.startsWith(msg))throw new Error('texte : '+b.slice(0,80));if(/Infos techniques/.test(b))throw new Error('infos non demandées');
+  if(r.url.slice(19).includes('#')||/[ <>\n]/.test(r.url))throw new Error('caractère non encodé');
+  for(const [t,l] of [['bug','bug'],['demande','demande'],['n_importe','bug']])if(new URL(W.FEEDBACK.url({type:t,title:'x'}).url).searchParams.get('labels')!==l)throw new Error('type '+t);
+  has(new URL(W.FEEDBACK.url({type:'bug',title:'x',message:'plante'}).url).searchParams.get('body'),'Étapes pour reproduire');
+  F.remove();});
+T('Signaler : message énorme → adresse < 6000 car., raccourcie proprement (emoji non coupé) ; infos techniques sans notes ni jeton ni #',async()=>{const S=snap();
+  try{
+    setLS('noxe-notes',{notes:{z1:{id:'z1',title:'SECRETTITRE',body:'SECRETNOTE',tags:[],created:1,updated:1}},openId:'z1',deleted:{}});
+    await frame('index.html#/json',()=>W.FEEDBACK&&W.eval('NOXE.current()')==='json');
+    for(const big of ['😀'.repeat(5000),'é&#'.repeat(4000),'a'.repeat(30000)]){
+      const r=W.FEEDBACK.url({type:'bug',title:'Long',message:big,tech:true});
+      if(r.url.length>6000||!r.cut)throw new Error('longueur '+r.url.length);
+      const b=new URL(r.url).searchParams.get('body');has(b,'message raccourci','Infos techniques');}
+    const sm=W.FEEDBACK.url({type:'bug',title:'Court',message:'ok',tech:true});if(sm.cut)throw new Error('court raccourci');
+    const b=new URL(sm.url).searchParams.get('body'),tl=W.FEEDBACK.tech().map(x=>x.join(':')).join('\n');
+    has(b,'AVERSE v6','index.html · outil : json',navigator.userAgent.slice(0,30));
+    for(const bad of ['SECRETNOTE','SECRETTITRE','ghp_','token','#/','password'])if(b.includes(bad)||tl.includes(bad))throw new Error('fuite : '+bad);
+    W.location.hash='#/json?x=1';if(W.FEEDBACK.tech().some(x=>/[#?]/.test(x[1])&&x[0]==='Page'))throw new Error('page avec # ou ?');
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Signaler : fenêtre depuis le pied de page, la recherche (« signaler ») et le clic droit ; e-mail caché si SITE.feedbackEmail vide',async()=>{
+  await frame('index.html#/',()=>W.FEEDBACK&&W.document.querySelector('#footer [data-feedback-btn], footer [data-feedback-btn]'));
+  const d=W.document,got=[];W.FEEDBACK.opener=u=>{got.push(u);return null;};     // ne JAMAIS ouvrir GitHub pour de vrai
+  d.querySelector('[data-feedback-btn]').click();await until(()=>d.getElementById('fbDlg'));
+  if(d.getElementById('fbMail'))throw new Error('bouton e-mail visible alors que feedbackEmail est vide');
+  if(d.querySelectorAll('#fbDlg input[name=fbType]').length!==3||!d.getElementById('fbTech').checked)throw new Error('formulaire');
+  const f=d.querySelector('#fbDlg form');f.requestSubmit();await sleep(50);if(got.length)throw new Error('envoyé sans titre');
+  d.querySelector('#fbDlg input[value=demande]').click();d.getElementById('fbTitle').value='Mode sombre ?';d.getElementById('fbMsg').value='Merci & bravo';f.requestSubmit();
+  await until(()=>got.length&&!d.getElementById('fbDlg'));
+  const u=new URL(got[0]);if(u.searchParams.get('labels')!=='demande'||u.searchParams.get('title')!=='[Demande] Mode sombre ?')throw new Error(got[0]);has(u.searchParams.get('body'),'Merci & bravo','Infos techniques');
+  /* la recherche */
+  const q=d.getElementById('q');q.value='signaler';q.dispatchEvent(new W.Event('input',{bubbles:true}));
+  await until(()=>d.querySelector('#results .res-cmd'));has(d.querySelector('#results .res-cmd').textContent,'Signaler');
+  d.querySelector('#results .res-cmd').click();await until(()=>d.getElementById('fbDlg'));W.FEEDBACK.close();
+  const S2=W.eval('NOXE').search('bug idée');if(!S2.some(r=>r.cmd==='feedback'))throw new Error('« bug idée »');
+  q.value='';q.dispatchEvent(new W.Event('input',{bubbles:true}));
+  /* le clic droit (dernière entrée de chaque menu) */
+  const card=d.querySelector('a.tool[href="#/json"]');wctx(card);await until(()=>d.getElementById('ctxMenu'));
+  const bs=[...d.querySelectorAll('#ctxMenu button')],last=bs[bs.length-1];if(!/Signaler \/ Suggérer/.test(last.textContent))throw new Error('menu : '+last.textContent);
+  last.click();await until(()=>d.getElementById('fbDlg'));W.FEEDBACK.close();
+  /* e-mail de secours configuré */
+  const SI=W.eval('SITE');SI.feedbackEmail='moi@exemple.fr';
+  try{d.querySelector('[data-feedback-btn]').click();await until(()=>d.getElementById('fbMail'));
+    const m=W.FEEDBACK.mailto({type:'bug',title:'T & U',message:'x',tech:true});if(!m.startsWith('mailto:moi@exemple.fr?subject=AVERSE%20%5BBug%5D%20T%20%26%20U&body='))throw new Error(m.slice(0,90));
+    SI.feedbackEmail='pas une adresse"<x>';if(W.FEEDBACK.mailto({type:'bug',title:'x'})!=='')throw new Error('adresse invalide acceptée');
+  }finally{SI.feedbackEmail='';W.FEEDBACK.close();}
+  if(got.length!==1)throw new Error('ouvertures : '+got.length);
+  F.remove();});
+T('Signaler : aussi dans le carnet (bouton « signaler ») et sur « à propos »',async()=>{
+  for(const pg of ['notes.html','about.html']){
+    await frame(pg,()=>W.FEEDBACK&&W.document.querySelector('[data-feedback-btn]'));const got=[];W.FEEDBACK.opener=u=>{got.push(u);return null;};
+    W.document.querySelector('[data-feedback-btn]').click();await until(()=>W.document.getElementById('fbDlg'));
+    W.document.getElementById('fbTitle').value='Depuis '+pg;W.document.querySelector('#fbDlg form').requestSubmit();await until(()=>got.length);
+    has(new URL(got[0]).searchParams.get('body'),'Page** : '+pg);F.remove();}
+});
 
 (async()=>{
   let ok=0,skip=0,run=0;const box=$('res');

@@ -19,6 +19,8 @@
 <link rel="stylesheet" href="css/ui.css">
 <link rel="stylesheet" href="css/ascii.css">
 <script src="js/core.js"></script>
+<script src="js/accent.js"></script>
+<script src="js/templates.js"></script>
 </head>
 <body>
 <canvas id="rain"></canvas>
@@ -55,7 +57,7 @@
       <p class="search-hint">Entrée ouvre · ↑ ↓ pour choisir · <b>colle</b> du JSON, un JWT, une URL, une image… · <b>glisse</b> un fichier n'importe où · <b>Ctrl+J</b> notes · <b>?</b> raccourcis</p>
     </div>
     <div id="suggest" class="suggest" hidden></div>
-    <div id="results" class="results" hidden></div>
+    <div id="results" class="results" role="listbox" aria-label="Résultats" hidden></div>
     <div id="homeBlocks"></div>
   </section>
 
@@ -73,7 +75,7 @@
 <footer id="contact">
   <div class="wrap">
     <div class="footer-links" id="footerLinks"></div>
-    <div class="footer-copyright">AVERSE © 2026 &nbsp;·&nbsp; <a href="about.html">à propos</a> &nbsp;·&nbsp; <a href="#/sauvegarde">sauvegarde</a> &nbsp;·&nbsp; <a href="#" data-keys-help>raccourcis (?)</a> &nbsp;·&nbsp; <a href="#" id="styleSwitch" data-style-label>style : normal</a> &nbsp;·&nbsp; <a href="#" id="rainSwitch">pluie : off</a></div>
+    <div class="footer-copyright">AVERSE © 2026 &nbsp;·&nbsp; <a href="about.html">à propos</a> &nbsp;·&nbsp; <a href="#/sauvegarde">sauvegarde</a> &nbsp;·&nbsp; <a href="#" data-keys-help>raccourcis (?)</a> &nbsp;·&nbsp; <a href="#" id="styleSwitch" data-style-label>style : normal</a> &nbsp;·&nbsp; <a href="#" id="rainSwitch">pluie : off</a> &nbsp;·&nbsp; <a href="#" data-accent-btn>couleur</a> &nbsp;·&nbsp; <a href="#" data-feedback-btn>signaler / suggérer</a></div>
   </div>
 </footer>
 <div class="drop-veil" aria-hidden="true"><span>Dépose ton fichier : on choisit l'outil ensemble</span></div>
@@ -98,7 +100,9 @@
 <script src="js/keys.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/ctxmenu.js"></script>
+<script src="js/feedback.js"></script>
 <script src="js/panel.js"></script>
+<script src="js/search.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

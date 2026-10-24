@@ -3,12 +3,14 @@
 :root{
   --bg:#06060a;
   --panel:#0b0b11;
+  /* v6 : la teinte vient de --acc-rgb (mêmes valeurs que --fg) : accent.js change ces deux-là, tout le reste suit */
   --fg:#c7bce4;
-  --fg-soft:rgba(199,188,228,.68);
-  --fg-faint:rgba(199,188,228,.36);
-  --line:rgba(199,188,228,.10);
-  --line-2:rgba(199,188,228,.20);
-  --tint:rgba(199,188,228,.05);
+  --acc-rgb:199,188,228;
+  --fg-soft:rgba(var(--acc-rgb),.68);
+  --fg-faint:rgba(var(--acc-rgb),.36);
+  --line:rgba(var(--acc-rgb),.10);
+  --line-2:rgba(var(--acc-rgb),.20);
+  --tint:rgba(var(--acc-rgb),.05);
   --ok:#9fd8b4;
   --bad:#e79898;
   --display:'Big Shoulders Display',sans-serif;

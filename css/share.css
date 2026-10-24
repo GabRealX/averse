@@ -1,0 +1,25 @@
+/* share.css — v6 : page de lecture d'une note partagée (share.html) */
+.share-page{overflow:auto;height:auto;min-height:100%}
+html:has(.share-page){overflow:auto}
+.sv{position:relative;z-index:1;max-width:780px;margin:0 auto;padding:calc(var(--bar) + 34px) 22px 60px}
+.sv-state{font-size:.82rem;color:var(--fg-soft);border:1px solid var(--line);padding:14px 16px;background:rgba(6,6,10,.6)}
+.sv-state.bad{border-color:rgba(242,139,139,.5);color:#f2b8b8}
+.sv-keyf[hidden],.sv-note[hidden],.sv-state[hidden],.sv-actions a.tpl-b[hidden]{display:none}   /* sinon display:flex l'emporte sur [hidden] (la case « clé » restait visible) */
+.sv-keyf{display:flex;flex-direction:column;gap:10px;font-size:.8rem;color:var(--fg-soft)}
+.sv-keyrow{display:flex;gap:8px}
+.sv-keyrow input{flex:1;min-width:0;background:transparent;border:1px solid var(--line-2);color:var(--fg);font-family:var(--mono);padding:9px 10px}
+.sv-note{border:1px solid var(--line);background:rgba(6,6,10,.72);padding:26px 28px}
+.sv-meta{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-faint);margin-bottom:14px}
+.sv-title{font-family:var(--mono);font-weight:500;font-size:1.35rem;color:var(--fg);margin:0 0 8px;word-break:break-word}
+.sv-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.sv-tag{font-size:.66rem;color:var(--fg-soft);border:1px solid var(--line);padding:2px 7px}
+.sv-body{border-top:1px solid var(--line);padding-top:18px;word-break:break-word}
+.rendered .wl.ro{color:var(--fg);border-bottom:1px dotted var(--fg-faint)}
+.sv-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+.sv-actions a.tpl-b{text-decoration:none;display:inline-flex;align-items:center}
+.sv-help{font-size:.7rem;color:var(--fg-faint);margin-top:12px;line-height:1.6}
+@media (max-width:640px){.sv{padding:calc(var(--bar) + 18px) 12px 40px}.sv-note{padding:18px 16px}}
+html[data-theme="ascii"] .sv-note{border-style:dashed}
+html[data-theme="ascii"] .sv-title::before{content:'> ';color:var(--fg-faint)}
+/* ascii.css pousse tout <header> de 130px (titre de l'accueil) : pas la barre fixe de cette page */
+html[data-theme="ascii"] header.bar{padding-top:0;padding-bottom:0}
