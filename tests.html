@@ -12,7 +12,7 @@ try{const old=localStorage.getItem('averse-tests-backup');
   localStorage.setItem('averse-tests-backup',JSON.stringify(o));sessionStorage.setItem('averse-tests','1');
 }catch(e){}
 </script>
-<script src="js/core.js"></script><script src="js/accent.js"></script><script src="js/templates.js"></script></head>
+<script src="js/core.js"></script><script src="js/theme.js"></script><script src="js/accent.js"></script><script src="js/templates.js"></script></head>
 <body>
 <h1>Tests des calculs</h1>
 <div id="sum">en cours…</div><div id="res"></div>
@@ -23,7 +23,7 @@ try{const old=localStorage.getItem('averse-tests-backup');
 <script src="js/tools/dev.js"></script><script src="js/tools/texte.js"></script><script src="js/tools/memo.js"></script>
 <script src="js/tools/encodage.js"></script><script src="js/tools/pdf.js"></script><script src="js/tools/carnet.js"></script><script src="js/tools/image.js"></script><script src="js/tools/editeur.js"></script><script src="js/tools/ocr.js"></script>
 <script src="js/vault.js"></script><script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
-<script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script>
+<script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script><script src="js/glyph.js"></script>
 <link rel="stylesheet" href="css/ui.css">
 <script>
 /* Ouvre chaque outil comme le ferait un clic, remplit les champs, et compare avec des résultats vérifiés à la main.
@@ -158,7 +158,7 @@ T('Ctrl+Entrée (runMain) : UUID régénéré',async()=>{NOXE.open('uuid');const
 /* ---- v3 : sauvegarde complète ---- */
 const snap=()=>{const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}return o;};
 const restoreLS=o=>{localStorage.clear();for(const k in o)localStorage.setItem(k,o[k]);};
-T('Sauvegarde : aller-retour complet, secrets exclus',async()=>{const S=snap(),theme=document.documentElement.dataset.theme;
+T('Sauvegarde : aller-retour complet, secrets exclus',async()=>{const S=snap(),theme=document.documentElement.dataset.style;
   try{
     localStorage.clear();
     setLS('noxe-notes',{notes:{n_a:{id:'n_a',title:'Cours $x$',body:'# Hello',tags:['t'],created:1,updated:1000,pinned:true}},openId:'n_a',deleted:{n_old:5}});
@@ -177,7 +177,7 @@ T('Sauvegarde : aller-retour complet, secrets exclus',async()=>{const S=snap(),t
     if(localStorage.getItem('averse-style')!=='normal'||localStorage.getItem('averse-rain')!=='on')throw new Error('réglages');
     /* 2e import du même fichier : rien en double, la note n'est pas écrasée par plus ancien */
     BACKUP.apply(BACKUP.validate(JSON.parse(txt)).clean);if(getLS('averse-fav').length!==2)throw new Error('favoris en double');
-  }finally{restoreLS(S);if(theme)document.documentElement.dataset.theme=theme;else delete document.documentElement.dataset.theme;}});
+  }finally{restoreLS(S);if(theme)document.documentElement.dataset.style=theme;else delete document.documentElement.dataset.style;}});
 T('Sauvegarde : fichier piégé → entrées refusées',async()=>{
   const v=BACKUP.validate(JSON.parse('{"app":"averse","kind":"sauvegarde","version":1,'+
     '"notes":{"a":{"id":"<img src=x onerror=alert(1)>","title":"t"},"b":{"id":"ok1","title":{}},"c":{"id":"ok2","title":"<b>x</b>","body":5,"tags":[{},"a"],"updated":9e15},"d":{"id":"__proto__","title":"p"}},'+
@@ -992,7 +992,7 @@ T('Signaler : message énorme → adresse < 6000 car., raccourcie proprement (em
       const b=new URL(r.url).searchParams.get('body');has(b,'message raccourci','Infos techniques');}
     const sm=W.FEEDBACK.url({type:'bug',title:'Court',message:'ok',tech:true});if(sm.cut)throw new Error('court raccourci');
     const b=new URL(sm.url).searchParams.get('body'),tl=W.FEEDBACK.tech().map(x=>x.join(':')).join('\n');
-    has(b,'AVERSE v6','index.html · outil : json',navigator.userAgent.slice(0,30));
+    has(b,'AVERSE v8','index.html · outil : json',navigator.userAgent.slice(0,30));
     for(const bad of ['SECRETNOTE','SECRETTITRE','ghp_','token','#/','password'])if(b.includes(bad)||tl.includes(bad))throw new Error('fuite : '+bad);
     W.location.hash='#/json?x=1';if(W.FEEDBACK.tech().some(x=>/[#?]/.test(x[1])&&x[0]==='Page'))throw new Error('page avec # ou ?');
   }finally{if(F)F.remove();restoreLS(S);}});
@@ -1031,6 +1031,448 @@ T('Signaler : aussi dans le carnet (bouton « signaler ») et sur « à propos �
     W.document.getElementById('fbTitle').value='Depuis '+pg;W.document.querySelector('#fbDlg form').requestSubmit();await until(()=>got.length);
     has(new URL(got[0]).searchParams.get('body'),'Page** : '+pg);F.remove();}
 });
+
+/* ---- v7 : thèmes complets, easter eggs, indicateur Glyph, IA (fournisseur et worker SIMULÉS : aucun vrai appel) ---- */
+T('Thèmes : 5 thèmes, data-theme sur <html>, mémorisé, événement, couleurs + theme-color ; Défaut = rien de stocké',async()=>{const S=snap();
+  try{const r=document.documentElement;if(THEME.ids().join()!=='defaut,neon,papier,terminal,orage')throw new Error(THEME.ids().join());
+    const seen=new Set();let ev=null;const f=e=>ev=e.detail;document.addEventListener('averse-theme',f);
+    for(const id of THEME.ids()){THEME.set(id);
+      if(r.dataset.theme!==id)throw new Error('data-theme='+r.dataset.theme+' pour '+id);
+      if(id==='defaut'?localStorage.getItem('averse-theme')!==null:localStorage.getItem('averse-theme')!==id)throw new Error('mémorisation '+id);
+      if(!ev||ev.theme!==id)throw new Error('événement '+id);
+      const cs=getComputedStyle(document.body),k=cs.backgroundColor+'|'+cs.color;
+      if(seen.has(k))throw new Error('même rendu que un autre thème : '+id);seen.add(k);}
+    document.removeEventListener('averse-theme',f);
+    THEME.set('papier');const cs=getComputedStyle(document.body);
+    if(cs.backgroundColor!=='rgb(244, 238, 223)'||!/serif/i.test(cs.fontFamily)||/JetBrains/.test(cs.fontFamily))throw new Error('Papier : '+cs.backgroundColor+' '+cs.fontFamily);
+    THEME.set('terminal');if(!/monospace/.test(getComputedStyle(document.body).fontFamily))throw new Error('Terminal pas monospace');
+    THEME.set('n importe quoi');if(r.dataset.theme!=='terminal'||localStorage.getItem('averse-theme')!=='terminal')throw new Error('thème inconnu accepté');
+    THEME.set('defaut');if(localStorage.getItem('averse-theme')!==null)throw new Error('Défaut stocké');
+  }finally{restoreLS(S);THEME.apply(THEME.get());ACCENT.apply(ACCENT.get());}});
+T('Thèmes : texte lisible (≥ 4,5:1, texte secondaire compris) dans chaque thème × chaque couleur, + noir/blanc/gris',async()=>{const S=snap();
+  try{const out=[],cols=ACCENT.PRESETS.map(p=>p[1]).concat(['#000000','#ffffff','#808080','#ffff00','#0000ff']);let min=99;
+    for(const id of THEME.ids()){THEME.set(id);
+      for(const c of cols){const e=ACCENT.effective(c),k=ACCENT.check(e);min=Math.min(min,k.soft);
+        if(k.soft<4.5||k.fg<4.5)throw new Error(id+' × '+c+' → '+e+' : '+k.fg.toFixed(2)+' / '+k.soft.toFixed(2));}
+      /* le vrai calcul du navigateur : couleur du texte principal sur le fond de la page */
+      ACCENT.set(ACCENT.DEF);const cs=getComputedStyle(document.body),rgb=s=>s.match(/[\d.]+/g).map(Number);
+      const L=([r,g,b])=>{const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);};return .2126*f(r)+.7152*f(g)+.0722*f(b);};
+      const bg=rgb(cs.backgroundColor),fg0=rgb(cs.color),a=fg0[3]==null?1:fg0[3],fg=[0,1,2].map(i=>fg0[i]*a+bg[i]*(1-a));
+      const ratio=(Math.max(L(fg),L(bg))+.05)/(Math.min(L(fg),L(bg))+.05);if(ratio<4.5)throw new Error(id+' : texte '+ratio.toFixed(2));out.push(id+' '+ratio.toFixed(1));}
+    return out.join(' · ')+' · min. secondaire '+min.toFixed(2);
+  }finally{restoreLS(S);THEME.apply(THEME.get());ACCENT.apply(ACCENT.get());}});
+T('Thèmes : Sauvegarde (export, import, valeur piégée refusée) + fenêtre « Apparence » (Annuler remet l\'ancien)',async()=>{const S=snap();
+  try{THEME.set('terminal');ACCENT.set('#8fdca6');const {data}=BACKUP.build();if(data.settings.theme!=='terminal'||data.settings.accent!=='#8fdca6')throw new Error('pas exporté');
+    THEME.set('defaut');ACCENT.set(ACCENT.DEF);BACKUP.apply(BACKUP.validate(data).clean);
+    if(THEME.get()!=='terminal'||document.documentElement.dataset.theme!=='terminal'||ACCENT.get()!=='#8fdca6')throw new Error('pas réimporté');
+    const bad=BACKUP.validate(Object.assign({},data,{settings:{theme:'<img src=x>'}}));if(bad.clean.settings.theme||!bad.rejected)throw new Error('valeur piégée acceptée');
+    THEME.set('defaut');ACCENT.set(ACCENT.DEF);
+    ACCENT.picker();const d=$('accentDlg');if(!d||d.querySelectorAll('[data-th]').length!==5)throw new Error('pas de choix de thème');
+    d.querySelector('[data-th="papier"]').click();if(document.documentElement.dataset.theme!=='papier')throw new Error('aperçu');
+    if(d.querySelector('[data-th="papier"]').getAttribute('aria-checked')!=='true')throw new Error('aria-checked');
+    d.querySelector('[data-x]').click();if(THEME.get()!=='defaut'||document.documentElement.dataset.theme!=='defaut')throw new Error('Annuler');
+  }finally{const d=$('accentDlg');if(d)d.remove();restoreLS(S);THEME.apply(THEME.get());ACCENT.apply(ACCENT.get());}});
+T('Thèmes : vraies pages (accueil, carnet, graphe) en Papier et Terminal ; thème suivi d\'un onglet à l\'autre',async()=>{const S=snap();
+  try{localStorage.setItem('averse-theme','papier');
+    await frame('index.html#/',()=>W.THEME&&W.document.getElementById('q'));const d=W.document;
+    if(d.documentElement.dataset.theme!=='papier')throw new Error('accueil : data-theme');
+    const hb=W.getComputedStyle(d.querySelector('.topbar,header,nav')||d.body).backgroundColor;
+    if(!/244, 238, 223/.test(W.getComputedStyle(d.body).backgroundColor))throw new Error('fond accueil');
+    has(d.querySelector('[data-theme-label]').textContent,'papier');
+    const tc=d.querySelector('meta[name=theme-color]').content;if(parseInt(tc.slice(1,3),16)<0xb0)throw new Error('theme-color pas clair en Papier : '+tc);
+    if(W.rainOn())throw new Error('pluie active en Papier sans réglage');
+    const al=d.querySelector('.ascii-logo');if(al&&al.getClientRects().length&&!/mono/i.test(W.getComputedStyle(al).fontFamily))throw new Error('logo ASCII pas à chasse fixe en Papier');
+    F.remove();
+    sNotes([{id:'t_a',title:'Alpha',body:'voir [[Beta]]'},{id:'t_b',title:'Beta',body:'b'}]);localStorage.setItem('averse-theme','terminal');
+    await frame('notes.html',()=>W.notesDebug&&W.graphStats&&W.document.getElementById('list').children.length);
+    if(W.document.documentElement.dataset.theme!=='terminal')throw new Error('carnet : data-theme');
+    const bar=W.document.querySelector('.bar,.topbar,header');if(bar){const bg=W.getComputedStyle(bar).backgroundColor;if(/6, 6, 10/.test(bg))throw new Error('barre restée au fond par défaut : '+bg);}
+    W.document.querySelector('.seg [data-v="graph"]').click();await until(()=>W.graphStats().nodes===2);
+    const c=W.document.querySelector('#graphView canvas,#graph canvas,canvas#graphCanvas')||W.document.querySelector('canvas');if(!c)throw new Error('pas de canvas');
+    /* autre onglet : l'événement storage suffit */
+    localStorage.setItem('averse-theme','neon');
+    W.dispatchEvent(new W.StorageEvent('storage',{key:'averse-theme',newValue:'neon'}));
+    await until(()=>W.document.documentElement.dataset.theme==='neon');
+    return hb;
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Thèmes : Nuit d\'orage → pluie par défaut, plus dense, éclair discret ; coupée si l\'utilisateur l\'a coupée',async()=>{const S=snap();
+  try{localStorage.removeItem('averse-rain');localStorage.setItem('averse-theme','orage');
+    await frame('index.html#/',()=>W.rainOn&&W.THEME);
+    if(!W.rainOn())throw new Error('pluie pas activée par défaut en orage');if(W.THEME.def().rain<=1)throw new Error('densité');
+    if(!W.matchMedia('(prefers-reduced-motion: reduce)').matches){const n=W.rainFlashes||0;W.rainFlashSoon();await until(()=>(W.rainFlashes||0)>n,3000);
+      const fl=W.document.querySelector('.storm-flash');if(!fl||W.getComputedStyle(fl).pointerEvents!=='none')throw new Error('voile d\'éclair (pointer-events)');}
+    F.remove();localStorage.setItem('averse-rain','off');
+    await frame('index.html#/',()=>W.rainOn&&W.THEME);if(W.rainOn())throw new Error('le choix « pluie coupée » est ignoré');
+  }finally{if(F)F.remove();restoreLS(S);}});
+
+T('Easter egg : code Konami → confettis, puis canvas retiré et boucle arrêtée ; ignoré en tapant du texte',async()=>{
+  await frame('index.html#/',()=>W.EGGS&&W.document.getElementById('q'));const d=W.document;
+  const seq=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+  const ta=d.createElement('textarea');d.body.appendChild(ta);seq.forEach(k=>wkey(ta,k));ta.remove();
+  if(W.EGGS.active()||d.querySelector('.egg-confetti'))throw new Error('déclenché en tapant du texte');
+  seq.slice(0,4).forEach(k=>wkey(d.body,k));wkey(d.body,'x');seq.slice(4).forEach(k=>wkey(d.body,k));if(W.EGGS.active())throw new Error('séquence cassée acceptée');
+  /* dans la recherche de l'accueil (qui a le focus) : marche, et le « ba » tapé est retiré */
+  const q=d.getElementById('q');q.value='ba';seq.forEach(k=>wkey(q,k));if(!W.EGGS.active()||!d.querySelector('canvas.egg-confetti'))throw new Error('pas de confettis');
+  await until(()=>q.value==='');W.EGGS.stop();
+  seq.forEach(k=>wkey(d.body,k));if(!W.EGGS.active())throw new Error('hors champ');
+  const c=d.querySelector('canvas.egg-confetti');if(W.getComputedStyle(c).pointerEvents!=='none')throw new Error('gêne les clics');
+  seq.forEach(k=>wkey(d.body,k));if(d.querySelectorAll('canvas.egg-confetti').length!==1)throw new Error('doublé');
+  await until(()=>!W.EGGS.active(),6000);if(d.querySelector('.egg-confetti')||W.EGGS.raf()!==0)throw new Error('reste un canvas ou une boucle');
+  W.EGGS.confetti();W.EGGS.stop();if(W.EGGS.active()||W.EGGS.raf())throw new Error('stop()');
+  F.remove();});
+T('Easter egg : « pluie » dans la recherche → grosse averse temporaire puis retour à l\'état d\'avant (pluie coupée = arrêtée)',async()=>{const S=snap();
+  try{localStorage.setItem('averse-rain','off');
+    await frame('index.html#/',()=>W.EGGS&&W.rainBurst&&W.document.getElementById('q'));const d=W.document,q=d.getElementById('q');
+    if(W.rainRunning())throw new Error('pluie au départ');
+    q.value='pluie';q.dispatchEvent(new W.Event('input',{bubbles:true}));
+    if(!W.rainBursting())throw new Error('pas d\'averse');await until(()=>W.rainRunning(),2000);
+    await until(()=>d.querySelector('#results').children.length||true);         // la recherche marche toujours
+    W.rainBurst(150);await until(()=>!W.rainBursting(),3000);await until(()=>!W.rainRunning(),2000);
+    if(W.rainOn())throw new Error('le réglage a changé');
+    q.value='pluies';q.dispatchEvent(new W.Event('input',{bubbles:true}));if(W.rainBursting())throw new Error('déclenché par un autre mot');
+    if(W.rainBurst(999999)>12000)throw new Error('durée non bornée');W.rainBurst(10);await until(()=>!W.rainBursting(),2000);
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Easter egg : 5 clics sur le titre AVERSE (grand titre ou logo ASCII) → les lettres coulent une fois, puis le titre revient intact',async()=>{
+  await frame('index.html#/',()=>W.EGGS&&W.document.querySelector('.home-head h1'));const d=W.document,hd=d.querySelector('.home-head');
+  const a=hd.querySelector('.ascii-logo'),t=a&&a.getClientRects().length&&a.getBoundingClientRect().width>2?a:hd.querySelector('h1'),txt=t.textContent;
+  for(let i=0;i<4;i++)t.click();if(t.querySelector('.egg-drip'))throw new Error('déclenché trop tôt');
+  t.click();const red=W.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!red&&t.querySelectorAll('span.egg-drip').length<6)throw new Error('lettres');if(W.EGGS.drips()!==1)throw new Error('compteur');
+  if(!red&&t.textContent!==txt)throw new Error('texte changé pendant l\'effet');
+  await until(()=>!t.querySelector('span')&&t.textContent===txt,4000);F.remove();return t.tagName;});
+T('Glyph : disque de carrés, états (think, search, download %, write, error, done), motif par type',async()=>{
+  const g=GLYPH.create({size:48,kind:'summary'});document.body.appendChild(g.el);
+  try{if(g.el.tagName!=='CANVAS'||g.el.getAttribute('role')!=='img')throw new Error('élément');
+    if(g.cells.length<180||g.cells.length>289)throw new Error(g.cells.length+' cases');      // disque, pas carré
+    for(const s of ['think','search','write','error','done','idle']){g.set(s);if(g.el.dataset.state!==s||g.state()!==s)throw new Error(s);if(!g.el.getAttribute('aria-label'))throw new Error('aria '+s);}
+    const lit=()=>g.cells.filter(k=>k.b>.8).length/g.cells.length;
+    g.progress(.25);const a=lit();g.progress(.75);const b=lit();if(g.state()!=='download'||!(b>a+.3))throw new Error('remplissage '+a.toFixed(2)+' → '+b.toFixed(2));
+    g.progress(1);if(lit()<.6)throw new Error('100 % pas plein');
+    const k1=GLYPH.create({kind:'regex'}),k2=GLYPH.create({kind:'json'});k1.set('idle');k2.set('idle');
+    if(k1.cells.map(c=>c.b>.3?1:0).join('')===k2.cells.map(c=>c.b>.3?1:0).join('')&&k1.cells.length)throw new Error('motifs identiques');
+    g.set('error');g.frame(1);const bar=g.cells.filter(k=>k.i===k.j);if(bar.some(k=>k.b<.2*k.crater&&k.crater===1))throw new Error('barre');
+    g.token(30);if(g.state()!=='write')throw new Error('token → write');
+  }finally{g.destroy();}});
+T('Glyph : UNE seule boucle pour tous, arrêtée quand c\'est fini (done, error), retiré de la page ou idle',async()=>{
+  const red=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const a=GLYPH.create({state:'think'}),b=GLYPH.create({state:'search'});document.body.append(a.el,b.el);
+  try{await sleep(80);if(!GLYPH.running()||GLYPH.count()!==2)throw new Error('boucle : '+GLYPH.running()+' '+GLYPH.count());
+    /* une seule boucle : on compte les requestAnimationFrame demandés pendant 200 ms */
+    let n=0;const R=window.requestAnimationFrame;window.requestAnimationFrame=f=>{n++;return R.call(window,f);};
+    await sleep(200);window.requestAnimationFrame=R;const fr=n;
+    a.el.remove();await until(()=>GLYPH.count()===1,1500);
+    b.set('done');await until(()=>!GLYPH.running()&&GLYPH.count()===0,3000);
+    const c=GLYPH.create({state:'think'});document.body.appendChild(c.el);await until(()=>GLYPH.running());c.set('error');await until(()=>!GLYPH.running(),2000);
+    c.set('think');await until(()=>GLYPH.running());c.set('idle');await until(()=>!GLYPH.running(),1500);c.destroy();
+    if(fr>30)throw new Error(fr+' rAF en 200 ms : plusieurs boucles ?');
+    return fr+' images en 200 ms'+(red?' (mouvement réduit)':'');
+  }finally{a.destroy();b.destroy();}});
+
+/* ---- IA : un faux fournisseur (fetch) et un faux worker d'embeddings, jamais le vrai réseau ---- */
+const AIKEY='AIzaTEST_ONLY_not_a_real_key_0000000000',OAKEY='sk-TESTONLY-000000000000000000000000';
+function aiNet(){                         // remplace W.fetch : enregistre tout, répond en flux SSE
+  const log=[],real=W.fetch;let status=200,parts=['Voici ','un **résumé** ','en trois ','morceaux.'];
+  const sse=(prov)=>{const te=new W.TextEncoder();return new W.ReadableStream({async start(c){
+    for(const t of parts){const j=prov==='openai'?{choices:[{delta:{content:t}}]}:{candidates:[{content:{parts:[{text:t}]}}]};c.enqueue(te.encode('data: '+JSON.stringify(j)+'\n\n'));await sleep(40);}
+    if(prov==='openai')c.enqueue(te.encode('data: [DONE]\n\n'));c.close();}});};
+  W.fetch=async(url,o)=>{url=String(url);const ai=/googleapis|openai|openrouter|mistral|groq|ai\.test/.test(url);
+    if(!ai)return real.call(W,url,o);
+    log.push({url,headers:Object.assign({},o&&o.headers),body:o&&o.body?JSON.parse(o.body):null,cred:o&&o.credentials});
+    if(status!==200)return new W.Response(JSON.stringify({error:{message:'nope'}}),{status});
+    return new W.Response(sse(/googleapis/.test(url)?'gemini':'openai'),{status:200,headers:{'content-type':'text/event-stream'}});};
+  return{log,set status(s){status=s;},set parts(p){parts=p;}};
+}
+function aiWorker(model){                 // faux worker : « sac de mots » → vecteur normé de 64 cases (model : nom annoncé, v8)
+  const log=[],texts=[];const fold=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const vec=t=>{const v=new Array(64).fill(0);(fold(t).match(/[a-z]{4,}/g)||[]).forEach(w=>{let h=0x811c9dc5;for(const ch of w.slice(0,5)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}v[(h>>>0)%64]+=1;});
+    const n=Math.hypot(...v)||1;return v.map(x=>x/n);};
+  const make=()=>{log.push('new');const w={onmessage:null,onerror:null,terminate(){log.push('terminate');},
+    postMessage(m){log.push(m.type);setTimeout(()=>{
+      if(m.type==='load'){w.onmessage({data:{type:'progress',p:.4}});setTimeout(()=>w.onmessage({data:{type:'ready',model}}),60);}
+      if(m.type==='embed'){texts.push(...m.texts);}
+      if(m.type==='embed')w.onmessage({data:{type:'vecs',id:m.id,vecs:m.texts.map(vec)}});},15);}};return w;};
+  return{log,make,texts};
+}
+const aiReq=()=>W.performance.getEntriesByType('resource').map(e=>e.name).filter(u=>/googleapis\.com\/v1|openai|openrouter|mistral|groq|huggingface|hf\.co|jsdelivr|ai-worker|transformers/.test(u));
+T('IA : AUCUNE requête sans action (pages ouvertes, clé enregistrée, notes, recherche, fenêtre IA ouverte)',async()=>{const S=snap();
+  try{sNotes([{id:'ia_a',title:'Cours réseau',body:'Le modèle OSI a sept couches.'}]);
+    await frame('notes.html',()=>W.AI&&W.notesDebug&&W.document.getElementById('list').children.length);await W.AI.ready;
+    const net=aiNet(),wk=aiWorker();W.AI.workerFactory=wk.make;
+    await W.AI.setKey('gemini',AIKEY);W.openNote('ia_a');
+    const s=W.document.getElementById('search');s.value='couches';s.dispatchEvent(new W.Event('input',{bubbles:true}));await sleep(400);
+    W.AI.run('summary',{text:'Le modèle OSI a sept couches.',title:'Cours réseau'});await sleep(300);
+    const dlg=W.document.querySelector('.ai-dlg');if(!dlg)throw new Error('fenêtre');has(dlg.textContent,'part chez Google Gemini','Voir exactement');
+    if(dlg.querySelector('#aiPre').textContent!=='Le modèle OSI a sept couches.')throw new Error('aperçu ≠ texte envoyé');
+    W.document.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));if(W.AI.isOpen())throw new Error('Échap');
+    if(net.log.length||W.AI.stats.calls||wk.log.length)throw new Error('requête partie : '+JSON.stringify(net.log)+' '+wk.log);
+    const r=aiReq();if(r.length)throw new Error('ressource IA chargée : '+r.join(' '));
+    W.document.getElementById('aiBtn').click();await until(()=>W.document.getElementById('ctxMenu'));has(W.document.getElementById('ctxMenu').textContent,'Résumer cette note','Demander à mes notes');
+    W.document.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));if(net.log.length)throw new Error('menu → requête');
+  }finally{if(F){if(F.contentWindow.AI)F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
+T('IA : « Envoyer » → UN appel Gemini (clé en en-tête, sans cookies, texte affiché = texte envoyé), flux affiché, Glyph écrit puis terminé',async()=>{const S=snap();
+  try{await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;const net=aiNet();await W.AI.setKey('gemini',AIKEY);
+    const o=W.AI.run('summary',{text:'Texte à résumer : la pluie tombe.',title:'Pluie'}),d=W.document;
+    const states=[];const g=o.glyph,st0=g.set.bind(g);g.set=(s,x)=>{states.push(s);return st0(s,x);};
+    d.querySelector('[data-ai="send"]').click();
+    await until(()=>d.querySelector('[data-ai="copy"]'),5000);
+    if(net.log.length!==1)throw new Error(net.log.length+' appels');const c=net.log[0];
+    if(!/^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-2\.5-flash:streamGenerateContent\?alt=sse$/.test(c.url))throw new Error(c.url);
+    if(c.headers['x-goog-api-key']!==AIKEY||c.url.includes(AIKEY)||c.cred!=='omit')throw new Error('clé / cookies');
+    if(c.body.contents[0].parts[0].text!=='Texte à résumer : la pluie tombe.')throw new Error('texte envoyé');
+    has(d.getElementById('aiOut').textContent,'Voici un résumé en trois morceaux.');if(!d.querySelector('#aiOut strong'))throw new Error('Markdown');
+    has(states.join(' '),'think','write','done');if(o.glyph.state()!=='done')throw new Error('glyph final');
+    d.querySelector('[data-ai="note"]').click();await until(()=>Object.values(nd().notes).some(n=>/^Résumé — Pluie/.test(n.title)));
+    /* et sans nouveau clic : plus rien */
+    await sleep(200);if(net.log.length!==1||W.AI.stats.calls!==1)throw new Error('appel en trop');
+  }finally{if(F){F.contentWindow.AI&&F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
+T('IA : OpenAI-compatible (Bearer, adresse perso, [DONE]) ; erreurs 401/429 lisibles → Glyph erreur ; adresse non https refusée',async()=>{const S=snap();
+  try{setLS('averse-ai',{provider:'openai',base:'https://ai.test/v1',model:{openai:'mon-modele'}});
+    await frame('index.html#/',()=>W.AI&&W.document.getElementById('q'));await W.AI.ready;const net=aiNet();await W.AI.setKey('openai',OAKEY);const d=W.document;
+    W.AI.run('rewrite',{text:'je suis aller a la plage'});d.querySelector('[data-ai="send"]').click();await until(()=>d.querySelector('[data-ai="copy"]'),5000);
+    const c=net.log[0];if(c.url!=='https://ai.test/v1/chat/completions'||c.headers.authorization!=='Bearer '+OAKEY||c.body.model!=='mon-modele'||!c.body.stream)throw new Error(JSON.stringify(c).slice(0,200));
+    if(c.body.messages[1].content!=='je suis aller a la plage')throw new Error('texte');
+    for(const [code,msg] of [[401,'clé refusée'],[429,'quota']]){net.status=code;const o=W.AI.run('rewrite',{text:'x y z'});d.querySelector('[data-ai="send"]').click();
+      await until(()=>!d.getElementById('aiErr').hidden,4000);has(d.getElementById('aiErr').textContent,msg);if(o.glyph.state()!=='error')throw new Error('glyph '+code);
+      if(d.getElementById('aiErr').textContent.includes(OAKEY))throw new Error('clé affichée');}
+    W.AI.close();W.AI.settings();const b=d.getElementById('aiBase');b.value='http://pirate.example/v1';b.dispatchEvent(new W.Event('change',{bubbles:true}));
+    if(W.AI.cfg().base!=='https://ai.test/v1')throw new Error('adresse http acceptée');
+    if(d.getElementById('aiKey').type!=='password'||d.getElementById('aiKey').value)throw new Error('champ clé');
+  }finally{if(F){F.contentWindow.AI&&F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
+T('IA : clé JAMAIS en clair (localStorage, Sauvegarde, carnet), chiffrée ; relue après rechargement ; effacée',async()=>{const S=snap();
+  try{await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;
+    W.AI.settings();const d=W.document;d.getElementById('aiKey').value=AIKEY;d.querySelector('[data-s="save"]').click();await until(()=>W.AI.hasKey('gemini'));
+    if(d.getElementById('aiKey').value)throw new Error('clé laissée dans le champ');W.AI.close();
+    const all=JSON.stringify(Object.assign({},localStorage));if(all.includes(AIKEY)||all.includes(AIKEY.slice(4,20)))throw new Error('clé en clair dans localStorage');
+    const box=JSON.parse(localStorage.getItem('averse-ai-sec'));if(!box||!box.iv||!box.ct)throw new Error('pas de boîte chiffrée');
+    if(JSON.stringify(BACKUP.build()).includes(AIKEY))throw new Error('clé dans la Sauvegarde');
+    if(localStorage.getItem('noxe-notes')&&localStorage.getItem('noxe-notes').includes(AIKEY))throw new Error('clé dans les notes');
+    F.remove();await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;if(!W.AI.hasKey('gemini'))throw new Error('pas relue');
+    /* boîte abîmée → oubliée proprement (pas d'erreur, pas de clé) */
+    F.remove();localStorage.setItem('averse-ai-sec',JSON.stringify({iv:box.iv,ct:box.ct.slice(0,-4)+'AAAA'}));
+    await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;if(W.AI.hasKey('gemini'))throw new Error('boîte abîmée acceptée');
+    localStorage.setItem('averse-ai-sec',JSON.stringify(box));F.remove();await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;
+    await W.AI.setKey('gemini','');if(W.AI.hasKey('gemini'))throw new Error('pas effacée');
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('IA : clé synchronisée CHIFFRÉE dans le Gist (faux GitHub) et reçue par l\'autre appareil (la plus récente gagne)',async()=>{const S=snap();
+  try{sNotes([{id:'g_a',title:'Sync',body:'s'}]);
+    await frame('notes.html',()=>W.cloudDebug&&W.AI&&W.document.getElementById('list').children.length);await W.AI.ready;
+    const gh=fakeGitHub();cd().setFetch(gh.fetch);cd().setCreds(fakePasskeys());cd().setIter(100000);cd().setTimes(600000,150);
+    const r=await cd().setup(GTOK,GPW,'PC test');const dk=r.dk.slice();
+    await W.AI.setKey('gemini',AIKEY);await W.cloudSync.sync('t');await until(async()=>{const k=await VAULT.dkKey(dk);const x=await VAULT.openData(gh.vault(),k);return x.secrets&&x.secrets.ai;},5000);
+    const raw=JSON.stringify(gh.G);if(raw.includes(AIKEY)||raw.includes('AIzaTEST'))throw new Error('clé en clair dans le Gist');
+    const k=await VAULT.dkKey(dk),v=gh.vault(),x=await VAULT.openData(v,k);if(x.secrets.ai.keys.gemini!==AIKEY)throw new Error('pas dans le coffre');
+    /* l'autre appareil change la clé (plus récente) */
+    x.secrets.ai={at:Date.now()+1000,keys:{gemini:'AIzaTEST_ONLY_second_key_000000000000',openai:OAKEY}};await VAULT.sealData(v,k,x);gh.write(v);
+    await W.cloudSync.sync('t');await until(()=>W.AI.hasKey('openai'),5000);
+    const net=aiNet();W.AI.run('summary',{text:'abc'});W.document.querySelector('[data-ai="send"]').click();await until(()=>net.log.length);
+    if(net.log[0].headers['x-goog-api-key']!=='AIzaTEST_ONLY_second_key_000000000000')throw new Error('clé reçue pas utilisée');W.AI.close();
+    /* plus ancienne → ignorée */
+    W.AI.syncReceive({at:1,keys:{gemini:'AIzaTEST_ONLY_old_key_00000000000000000'}});if(!W.AI.hasKey('openai'))throw new Error('ancienne clé a gagné');
+    if(JSON.stringify(Object.assign({},localStorage)).includes('second_key'))throw new Error('clé reçue en clair');
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('IA locale (worker simulé) : rien avant « Activer », progression, notes liées, recherche par le sens, graphe ≈ sens',async()=>{const S=snap();let ids=[];
+  try{const base=[{id:'e_a',title:'Crêpes',body:'Recette des crêpes : farine, oeufs, lait, beurre fondu.'},{id:'e_b',title:'Pâte à crêpes légère',body:'Farine et lait, oeufs battus, beurre.'},
+      {id:'e_c',title:'Routage IP',body:'Masques de sous-réseau, passerelle, table de routage.'},{id:'e_d',title:'Sous-réseaux',body:'Calcul de masque et passerelle de sous-réseau.'}];ids=base.map(n=>n.id);sNotes(base);
+    const wk=aiWorker();
+    await frame('notes.html',()=>W.AI&&W.AINOTES&&W.document.getElementById('list').children.length);W.AI.workerFactory=wk.make;await W.AI.ready;
+    W.openNote('e_a');await sleep(200);if(wk.log.length||W.document.getElementById('aiRelated'))throw new Error('worker lancé sans activation');
+    if(!W.document.getElementById('graphSem').hidden)throw new Error('bouton ≈ sens visible');
+    W.AI.settings();const d=W.document;has(d.querySelector('.ai-set').textContent,'Désactivée','155 Mo');
+    const states=[];const g=W.AI.isOpen()&&d.querySelector('.ai-set .glyph');
+    W.AI.onState(E=>states.push(E.state+':'+E.p));
+    d.querySelector('[data-s="on"]').click();await until(()=>W.AI.state()==='ready',4000);
+    if(!states.some(s=>s==='download:0.4'))throw new Error('progression : '+states);if(g.dataset.state!=='download'&&g.dataset.state!=='done')throw new Error('glyph '+g.dataset.state);
+    await until(()=>/Prête/.test(d.getElementById('aiLoc').textContent),3000);W.AI.close();
+    if(wk.log.filter(x=>x==='load').length!==1)throw new Error('chargé '+wk.log.filter(x=>x==='load').length+' fois');
+    W.renderAll();W.openNote('e_a');await until(()=>{const b=d.getElementById('aiRelated');return b&&b.querySelector('a[data-id]');},4000);
+    const first=d.querySelector('#aiRelated a[data-id]').dataset.id;if(first!=='e_b')throw new Error('note liée : '+first);
+    const s=d.getElementById('search');s.value='passerelle masque';s.dispatchEvent(new W.Event('input',{bubbles:true}));
+    s.value='réseau passerelle';s.dispatchEvent(new W.Event('input',{bubbles:true}));
+    const top=(await W.AI.search('réseau routage passerelle',2)).map(x=>x.id);if(!top.includes('e_c')&&!top.includes('e_d'))throw new Error('recherche : '+top);
+    s.value='';s.dispatchEvent(new W.Event('input',{bubbles:true}));
+    /* graphe */
+    d.querySelector('.seg [data-v="graph"]').click();const gb=d.getElementById('graphSem');if(gb.hidden)throw new Error('bouton ≈ sens caché');
+    gb.click();await until(()=>(W.notesDebug.G.semIds||[]).length>0,3000);const pr=W.notesDebug.G.semIds.map(p=>[p[0],p[1]].sort().join('-'));
+    if(!pr.includes('e_a-e_b'))throw new Error('paires : '+pr);if(gb.getAttribute('aria-pressed')!=='true')throw new Error('aria-pressed');
+    gb.click();await until(()=>!(W.notesDebug.G.semIds||[]).length);
+    /* une note modifiée est ré-indexée, une note inchangée non */
+    const n0=wk.log.filter(x=>x==='embed').length;await W.AI.indexNotes();if(wk.log.filter(x=>x==='embed').length!==n0)throw new Error('ré-indexé pour rien');
+    return states.length+' états';
+  }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
+T('IA « demander à mes notes » (RAG) : extraits trouvés SUR l\'appareil, puis SEULS les extraits sont envoyés',async()=>{const S=snap();let ids=[];
+  try{const base=[{id:'r_a',title:'Volcans',body:'Un volcan rejette du magma.\n\nLe Piton de la Fournaise est très actif.'},{id:'r_b',title:'SECRET bancaire',body:'Code carte 9999, ne jamais partager.'},
+      {id:'r_c',title:'Liste de courses',body:'pain, lait, tomates'}];ids=base.map(n=>n.id);sNotes(base);
+    const wk=aiWorker();setLS('averse-ai',{local:true,idx:'e5s-1'});
+    await frame('notes.html',()=>W.AI&&W.AINOTES&&W.document.getElementById('list').children.length);W.AI.workerFactory=wk.make;await W.AI.ready;
+    const net=aiNet();await W.AI.setKey('gemini',AIKEY);const d=W.document;
+    const o=W.AI.run('ask',{});if(d.querySelector('[data-ai="send"]'))throw new Error('envoi possible avant la recherche locale');
+    d.getElementById('aiIn').value='Quel volcan est actif ?';d.getElementById('aiIn').dispatchEvent(new W.Event('input',{bubbles:true}));
+    const sts=[];const st0=o.glyph.set.bind(o.glyph);o.glyph.set=(s,x)=>{sts.push(s);return st0(s,x);};
+    d.querySelector('[data-ai="find"]').click();await until(()=>d.querySelector('[data-ai="send"]'),5000);
+    if(net.log.length)throw new Error('envoyé pendant la recherche locale');if(!sts.includes('search'))throw new Error('glyph search');
+    has(d.getElementById('aiCtx').textContent,'Volcans');has(d.getElementById('aiPre').textContent,'Piton de la Fournaise','Quel volcan est actif ?');
+    d.querySelector('[data-ai="send"]').click();await until(()=>d.querySelector('[data-ai="copy"]'),5000);
+    const sent=net.log[0].body.contents[0].parts[0].text;if(/9999|SECRET|tomates/.test(sent))throw new Error('note sans rapport envoyée : '+sent);
+    has(sent,'Piton de la Fournaise');if(sent!==d.getElementById('aiPre').textContent)throw new Error('envoyé ≠ montré');
+    has(d.querySelector('.ai-src').textContent,'[1] Volcans');
+  }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
+T('IA : clic droit (sous-menu IA ✦ : JSON, regex), palette (« ia regex »), outils JSON et Regex ; « Utiliser » remplit la regex',async()=>{const S=snap();
+  try{await frame('index.html#/',()=>W.AI&&W.document.getElementById('q'));await W.AI.ready;const d=W.document,N=W.eval('NOXE'),net=aiNet();
+    const ids=N.search('ia regex').map(r=>r.cmd);if(!ids.includes('ai-regex'))throw new Error('palette : '+ids);
+    if(!N.search('reglages ia').some(r=>r.cmd==='ai-settings'))throw new Error('palette réglages');
+    W.location.hash='#/json';await until(()=>d.getElementById('j_in')&&d.getElementById('j_ai'));
+    fill2(d.getElementById('j_in'),'{"a":[1,2]}');d.getElementById('j_ai').click();await until(()=>W.AI.isOpen());
+    has(d.getElementById('aiT').textContent,'Expliquer le JSON');W.AI.close();
+    const ta=d.getElementById('j_in');ta.focus();ta.setSelectionRange(0,ta.value.length);wctx(ta);await until(()=>d.getElementById('ctxMenu'));
+    const ai=[...d.querySelectorAll('#ctxMenu button')].find(b=>/IA ✦/.test(b.textContent));if(!ai)throw new Error('pas de sous-menu IA');
+    ai.click();await until(()=>[...d.querySelectorAll('#ctxMenu button')].some(b=>/Expliquer ce JSON/.test(b.textContent)),2000);
+    [...d.querySelectorAll('#ctxMenu button')].find(b=>/Expliquer ce JSON/.test(b.textContent)).click();await until(()=>W.AI.isOpen());
+    if(d.getElementById('aiPre')&&d.getElementById('aiPre').textContent!=='{"a":[1,2]}'&&!d.querySelector('[data-ai="cfg"]'))throw new Error('texte');W.AI.close();
+    W.location.hash='#/regex';await until(()=>d.getElementById('r_aiW'));await W.AI.setKey('gemini',AIKEY);
+    net.parts=['/\\d{2}-\\d{2}/g\n','Deux chiffres, un tiret, deux chiffres.'];
+    d.getElementById('r_aiW').click();await until(()=>W.AI.isOpen());fill2(d.getElementById('aiIn'),'des dates jj-mm');
+    d.querySelector('[data-ai="send"]').click();await until(()=>d.querySelector('[data-ai="use"]'),5000);d.querySelector('[data-ai="use"]').click();
+    if(d.getElementById('r_p').value!=='\\d{2}-\\d{2}')throw new Error('regex : '+d.getElementById('r_p').value);
+    if(net.log.length!==1)throw new Error(net.log.length+' appels');
+  }finally{if(F){F.contentWindow.AI&&F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
+const fill2=(el,v)=>{el.value=v;el.dispatchEvent(new W.Event('input',{bubbles:true}));};
+
+/* ---------- v8 : l'IA dans la barre de l'accueil, langue des réponses, modèle multilingue ---------- */
+const qType=(v)=>{const q=W.document.getElementById('q');q.value=v;q.dispatchEvent(new W.Event('input',{bubbles:true}));return q;};
+const resItems=()=>[...W.document.querySelectorAll('#results .res-item')];
+const homeAi=async(pre)=>{await frame('index.html#/',()=>W.AI&&W.AIBAR&&W.document.getElementById('q'));await W.AI.ready;if(pre)await pre();};
+T('Barre IA : option en tête pour une question, « ? », Tab ou bouton ; Entrée garde le 1er outil ; recherche normale intacte ; aucune requête',async()=>{const S=snap();
+  try{await homeAi();const d=W.document,N=W.eval('NOXE'),net=aiNet();await W.AI.setKey('gemini',AIKEY);
+    /* recherche ordinaire : pas d'IA */
+    for(const v of ['json','qr','pdf','couleur','base64']){qType(v);if(d.querySelector('#results .res-ai'))throw new Error('IA proposée pour « '+v+' »');}
+    qType('json');const first=resItems()[0];if(!first||!/JSON/i.test(first.textContent))throw new Error('1er résultat : '+(first&&first.textContent));
+    /* question : option en tête, mais la sélection reste sur le 1er outil → Entrée ouvre l'outil */
+    const q=qType('json ?');const it=resItems();
+    if(!it[0].classList.contains('res-ai-free')||!it[1].classList.contains('res-ai-notes'))throw new Error('options : '+it.slice(0,3).map(x=>x.className));
+    has(it[0].textContent,'Demander à l\'IA','json ?');has(d.querySelector('#results .res-group').textContent,'IA');
+    const on=d.querySelector('#results .res-item.on');if(!on||on.classList.contains('res-ai'))throw new Error('sélection prise par l\'IA');
+    has(on.textContent,'JSON');wkey(q,'Enter');await until(()=>N.current()==='json');N.close();await until(()=>!N.current());
+    /* préfixe « ? » : forcé et sélectionné */
+    qType('? qr');if(!d.querySelector('#results .res-item.on.res-ai-free'))throw new Error('« ? » non sélectionné');
+    qType('?');has(resItems().map(x=>x.textContent).join('|'),'Écris ta question','raccourcis');
+    /* Tab : propose puis choisit l'IA ; un 2e Tab sort normalement */
+    qType('json');if(d.querySelector('#results .res-ai'))throw new Error('IA avant Tab');
+    const t1=wkey(q,'Tab');if(!t1.defaultPrevented||!d.querySelector('#results .res-item.on.res-ai-free'))throw new Error('Tab');
+    const t2=wkey(q,'Tab');if(t2.defaultPrevented)throw new Error('2e Tab bloqué');
+    if(wkey(q,'Tab',{shiftKey:true}).defaultPrevented)throw new Error('Maj+Tab bloqué');
+    /* bouton Glyph */
+    qType('');d.getElementById('qAi').click();if(!/^\?/.test(q.value))throw new Error('bouton vide');
+    qType('bases');d.getElementById('qAi').click();if(!d.querySelector('#results .res-item.on.res-ai-free'))throw new Error('bouton');
+    /* aucune requête, quoi qu'on tape */
+    for(const v of ['pourquoi le ciel est bleu ?','how does a transistor work?','explique les masques réseau','résume ma semaine de stage']){qType(v);await sleep(30);}
+    await sleep(200);if(net.log.length||W.AI.stats.calls)throw new Error('requête partie');if(!W.AIBAR.state()==='rest'||W.AIBAR.open())throw new Error('panneau ouvert sans action');
+    if(W.AIBAR.glyph.state()!=='idle')throw new Error('glyph au repos : '+W.AIBAR.glyph.state());
+    /* détection de question */
+    const iq=W.AIBAR.isQuestion;for(const [v,e] of [['comment ça marche',true],['what is DNS',true],['json',false],['qr code',false],['convertir des images en png',true],['quiche',false],['ip ?',true]])if(iq(v)!==e)throw new Error('isQuestion('+v+')');
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Barre IA : question libre → confirmation (texte exact) → UN appel, flux Markdown, Glyph think/write/done dans la barre ; enregistrer, Échap ; « ne plus demander »',async()=>{const S=snap();
+  try{await homeAi();const d=W.document,net=aiNet();await W.AI.setKey('gemini',AIKEY);
+    const g=W.AIBAR.glyph,sts=[],st0=g.set.bind(g);g.set=(s,x)=>{sts.push(s);return st0(s,x);};
+    if(!d.querySelector('.qbar #qAi canvas.glyph'))throw new Error('glyph pas dans la barre');
+    const q=qType('? Pourquoi la pluie tombe ?');wkey(q,'Enter');await until(()=>W.AIBAR.open());
+    const P=d.getElementById('aiPanel');has(P.textContent,'part chez Google Gemini','Ne plus demander');
+    if(P.querySelector('.ai-pre').textContent!=='Pourquoi la pluie tombe ?')throw new Error('aperçu');if(net.log.length)throw new Error('envoyé avant le clic');
+    if(d.activeElement!==P.querySelector('[data-p="send"]'))throw new Error('focus pas sur Envoyer');
+    net.parts=['Parce que ','la **gravité** ','attire les gouttes.'];
+    P.querySelector('[data-p="send"]').click();await until(()=>P.querySelector('[data-p="note"]'),5000);
+    if(net.log.length!==1)throw new Error(net.log.length+' appels');const c=net.log[0];
+    if(c.body.contents[0].parts[0].text!=='Pourquoi la pluie tombe ?')throw new Error('texte envoyé');
+    has(c.body.systemInstruction.parts[0].text,'langue de la question');
+    has(P.querySelector('.aip-out').textContent,'Parce que la gravité attire les gouttes.');if(!P.querySelector('.aip-out strong'))throw new Error('Markdown');
+    has(sts.join(' '),'think','write','done');
+    P.querySelector('[data-p="note"]').click();await until(()=>Object.values(getLS('noxe-notes').notes).some(n=>/^Réponse IA — Pourquoi la pluie/.test(n.title)&&/gravité/.test(n.body)));
+    /* Échap : ferme le panneau, la recherche reste */
+    const e=wkey(q,'Escape');if(!e.defaultPrevented||W.AIBAR.open())throw new Error('Échap');if(q.value!=='? Pourquoi la pluie tombe ?')throw new Error('recherche effacée par Échap');
+    if(g.state()!=='idle')throw new Error('glyph pas revenu au repos');
+    /* « ne plus demander » : coché puis Envoyer → la fois suivante, Entrée sur l'option envoie (action explicite) */
+    qType('? Et la neige ?');wkey(q,'Enter');await until(()=>W.AIBAR.open());P.querySelector('#aipSkip').checked=true;P.querySelector('[data-p="send"]').click();
+    await until(()=>net.log.length===2&&P.querySelector('[data-p="note"]'),5000);if(!W.AI.cfg().skipFree)throw new Error('préférence');
+    wkey(q,'Escape');qType('? Et la grêle ?');await sleep(100);if(net.log.length!==2)throw new Error('envoyé en tapant');
+    wkey(q,'Enter');await until(()=>net.log.length===3,3000);
+    /* Échap pendant le flux : arrêt */
+    net.parts=Array(30).fill('mot ');qType('? Long ?');wkey(q,'Enter');await until(()=>g.state()==='write',3000);wkey(q,'Escape');
+    if(W.AIBAR.open())throw new Error('pas fermé pendant le flux');await sleep(200);if(g.state()!=='idle')throw new Error('glyph après abandon');
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Barre IA : mes notes → recherche locale (Glyph search) puis confirmation TOUJOURS, seuls les extraits partent ; sans clé → réglages ; sens local sans clé',async()=>{const S=snap();let ids=[];
+  try{const base=[{id:'b_a',title:'Volcans',body:'Un volcan rejette du magma.\n\nLe Piton de la Fournaise est très actif.'},{id:'b_b',title:'SECRET bancaire',body:'Code carte 9999, ne jamais partager.'},
+      {id:'b_c',title:'Liste de courses',body:'pain, lait, tomates'}];ids=base.map(n=>n.id);sNotes(base);
+    setLS('averse-ai',{local:true,idx:'e5s-1',skipFree:true});const wk=aiWorker();
+    await homeAi(()=>{W.AI.workerFactory=wk.make;});const d=W.document,net=aiNet(),P=d.getElementById('aiPanel'),g=W.AIBAR.glyph;
+    if(W.AI.hasKey())throw new Error('clé ?');
+    /* sans clé : une option → réglages ; + recherche par le sens (locale) */
+    const q=qType('? Quel volcan est actif');const it=resItems();
+    if(!it[0].classList.contains('res-ai-setup')||!it.some(x=>x.classList.contains('res-ai-sem')))throw new Error('options sans clé : '+it.map(x=>x.className));
+    wkey(q,'Enter');await until(()=>W.AI.isOpen()).catch(()=>{throw new Error('S1 '+d.querySelector('#results').innerHTML.slice(0,300));});if(!d.querySelector('.ai-set'))throw new Error('pas les réglages');W.AI.close();
+    const sts=[],st0=g.set.bind(g);g.set=(s,x)=>{sts.push(s);return st0(s,x);};
+    qType('? volcan actif magma');d.querySelector('#results .res-ai-sem').click();await until(()=>P.querySelector('.aip-sem a[data-note]'),5000).catch(()=>{throw new Error('S2 '+P.innerHTML.slice(0,400));});
+    has(P.querySelector('.aip-sem').textContent,'Volcans');if(!sts.includes('search'))throw new Error('glyph search');if(net.log.length)throw new Error('réseau (sens)');
+    wkey(q,'Escape');
+    /* avec clé : « mes notes », toujours confirmé même avec « ne plus demander » */
+    await W.AI.setKey('gemini',AIKEY);qType('? Quel volcan est actif');d.querySelector('#results .res-ai-notes').click();
+    await until(()=>P.querySelector('[data-p="send"]'),5000).catch(e=>{throw new Error('U1 '+(W.document.getElementById('aiPanel').innerHTML.slice(0,300)))});if(net.log.length)throw new Error('envoyé sans confirmation');
+    const pre=P.querySelector('.ai-pre').textContent;has(pre,'Piton de la Fournaise','Quel volcan est actif');if(/9999|SECRET|tomates/.test(pre))throw new Error('extrait sans rapport');
+    has(P.textContent,'Extraits retenus','les extraits ci-dessus');
+    P.querySelector('[data-p="send"]').click();await until(()=>P.querySelector('[data-p="note"]'),5000).catch(e=>{throw new Error('U2 '+(W.document.getElementById('aiPanel').innerHTML.slice(0,300)))});
+    const sent=net.log[0].body.contents[0].parts[0].text;if(sent!==pre)throw new Error('envoyé ≠ montré');has(P.querySelector('.ai-src').textContent,'[1] Volcans');
+    /* aucune note qui parle de ça → rien n'est envoyé */
+    wkey(q,'Escape');const r0=W.AI.retrieve;W.AI.retrieve=async()=>[];qType('? zygomatique xylophone');d.querySelector('#results .res-ai-notes').click();await until(()=>P.querySelector('.ai-err'),5000).catch(e=>{throw new Error('U3 '+(W.document.getElementById('aiPanel').innerHTML.slice(0,300)))});
+    if(g.state()!=='error')throw new Error('glyph erreur');W.AI.retrieve=r0;if(net.log.length!==1)throw new Error('envoi sans extrait');has(P.textContent,'Aucune note');
+  }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
+T('Barre IA : réponse piégée (HTML, script, javascript:) affichée comme du texte ; erreur 401 → Glyph erreur ; panneau tient sur mobile',async()=>{const S=snap();
+  try{await homeAi();const d=W.document,net=aiNet(),P=d.getElementById('aiPanel');await W.AI.setKey('gemini',AIKEY);W.AI.setPref('skipFree',true);W.parent.__xss=0;
+    net.parts=['<img src=x onerror="parent.__xss=1">',' <script>parent.__xss=2<\/script>',' [clic](javascript:parent.__xss=3) ','<a href="javascript:parent.__xss=4">x</a> **ok** <iframe src="about:blank"></iframe> <svg onload="parent.__xss=5">'];
+    const q=qType('? piège');wkey(q,'Enter');await until(()=>P.querySelector('[data-p="note"]'),5000);await sleep(100);
+    const o=P.querySelector('.aip-out');
+    if(o.querySelector('img,script,iframe,svg,[onerror],[onload]'))throw new Error('balise active : '+o.innerHTML.slice(0,200));
+    if([...o.querySelectorAll('a')].some(a=>/^\s*javascript:/i.test(a.getAttribute('href')||'')))throw new Error('lien javascript:');
+    has(o.textContent,'<img src=x','<script>');if(!o.querySelector('strong'))throw new Error('Markdown sûr perdu');if(W.parent.__xss)throw new Error('XSS exécuté '+W.parent.__xss);
+    wkey(q,'Escape');net.status=401;qType('? encore');wkey(q,'Enter');await until(()=>{const e=P.querySelector('.ai-err');return e&&!e.hidden;},4000);
+    has(P.querySelector('.ai-err').textContent,'clé refusée');if(W.AIBAR.glyph.state()!=='error')throw new Error('glyph '+W.AIBAR.glyph.state());
+    if(P.textContent.includes(AIKEY))throw new Error('clé affichée');
+    /* étroit (360 px) : rien ne dépasse */
+    F.style.width='360px';await sleep(150);const bar=d.querySelector('.qbar').getBoundingClientRect(),pr=P.getBoundingClientRect(),b=d.getElementById('qAi').getBoundingClientRect();
+    if(pr.right>d.documentElement.clientWidth+1||bar.right>d.documentElement.clientWidth+1||b.right>bar.right+1||b.left<bar.left)throw new Error('débordement '+[bar.right,pr.right,b.left,b.right,d.documentElement.clientWidth]);
+    if(d.documentElement.scrollWidth>d.documentElement.clientWidth+1)throw new Error('défilement horizontal');
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('IA : langue des réponses — Auto (question / note), Français, English ; reformuler ne traduit jamais ; réglage dans la fenêtre',async()=>{const S=snap();
+  try{await homeAi();const A=W.AI,d=W.document;
+    has(A.sysFor('free'),'langue de la question');has(A.sysFor('ask'),'langue de la question');has(A.sysFor('flashcards'),'langue du texte','langue de ce texte');
+    has(A.sysFor('summary'),'langue du texte');has(A.sysFor('json'),'Réponds en français.');has(A.sysFor('rewrite'),'sans changer le sens ni la langue');
+    A.settings();const sel=d.getElementById('aiLang');if(!sel||sel.value!=='auto')throw new Error('sélecteur');
+    sel.value='en';sel.dispatchEvent(new W.Event('change',{bubbles:true}));if(A.cfg().lang!=='en')throw new Error('pas gardé');
+    has(A.sysFor('free'),'Answer in English.');has(A.sysFor('flashcards'),'Answer in English.');if(/English|français\./.test(A.sysFor('rewrite').replace('sans changer le sens ni la langue','')))throw new Error('reformuler traduit');
+    sel.value='fr';sel.dispatchEvent(new W.Event('change',{bubbles:true}));has(A.sysFor('free'),'Réponds en français.');A.close();
+    if(getLS('averse-ai').lang!=='fr')throw new Error('stockage');A.setPref('lang','xx');if(A.cfg().lang!=='auto')throw new Error('valeur invalide acceptée');
+    /* la requête porte bien la consigne */
+    const net=aiNet();await A.setKey('gemini',AIKEY);A.setPref('lang','en');A.run('flashcards',{text:'Le transistor amplifie.',title:'T'});d.querySelector('[data-ai="send"]').click();
+    await until(()=>net.log.length);has(net.log[0].body.systemInstruction.parts[0].text,'Answer in English.','Q:');A.close();
+  }finally{if(F){F.contentWindow.AI&&F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
+T('IA locale v8 : changement de modèle → anciens vecteurs effacés et recalculés, ancien modèle retiré du cache ; préfixes E5 query/passage',async()=>{const S=snap();let ids=[];
+  const OLD='https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/test/onnx/model_quantized.onnx',OTHER='https://huggingface.co/Xenova/autre-modele/resolve/test/x.onnx';
+  try{const base=[{id:'m_a',title:'Transistor',body:'Le transistor amplifie le courant.'},{id:'m_b',title:'Crêpes',body:'Farine, oeufs, lait.'}];ids=base.map(n=>n.id);sNotes(base);
+    const c=await caches.open('transformers-cache');await c.put(OLD,new Response('vieux'));await c.put(OTHER,new Response('autre'));
+    /* un vecteur de l'ANCIEN modèle (3 cases), avec la bonne empreinte : sans migration il serait gardé */
+    const fnv=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return(h>>>0).toString(36);};
+    const txt=n=>((n.title||'')+'\n'+''+'\n'+(n.body||'')).slice(0,1600);
+    await new Promise((res,rej)=>{const r=indexedDB.open('averse-ai',1);r.onupgradeneeded=()=>{r.result.createObjectStore('kv');r.result.createObjectStore('vec');};
+      r.onsuccess=()=>{const t=r.result.transaction('vec','readwrite');t.objectStore('vec').put({h:fnv(txt(base[0])),v:[1,0,0]},'m_a');t.oncomplete=()=>{r.result.close();res();};t.onerror=rej;};r.onerror=rej;});
+    setLS('averse-ai',{local:true});                                  // v7 : pas de version d'index
+    const wk=aiWorker('Xenova/multilingual-e5-small');await homeAi(()=>{W.AI.workerFactory=wk.make;});const A=W.AI;
+    await A.indexNotes();if(A.cfg().idx!==A.IDX)throw new Error('version d\'index');
+    const sim=await A.similarTo('m_b',3);const me=sim.find(x=>x.id==='m_a');if(!me||!isFinite(me.s))throw new Error('vecteur pas recalculé');
+    if(await c.match(OLD))throw new Error('ancien modèle encore en cache');if(!(await c.match(OTHER)))throw new Error('cache voisin supprimé');
+    if(!wk.texts.some(t=>t.startsWith('passage: Transistor')))throw new Error('préfixe passage : '+wk.texts.slice(0,2));
+    await A.search('transistor',2);if(!wk.texts.some(t=>t==='query: transistor'))throw new Error('préfixe query');
+    if(A.rel().min!==.815||A.rel().gap!==.03)throw new Error('seuil E5 : '+JSON.stringify(A.rel()));
+    /* même version : rien n'est recalculé */
+    const n0=wk.texts.length;await A.indexNotes();if(wk.texts.length!==n0)throw new Error('ré-indexé pour rien');
+  }finally{try{(await caches.open('transformers-cache')).delete(OTHER);}catch(e){}
+    if(F){const w=F.contentWindow;try{if(w.AI){await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
 
 (async()=>{
   let ok=0,skip=0,run=0;const box=$('res');

@@ -1,5 +1,5 @@
 /* tools.css — la fenêtre d'outil (modal) et les composants qu'on y trouve */
-.overlay{position:fixed;inset:0;z-index:100;background:rgba(3,3,6,.88);backdrop-filter:blur(5px);
+.overlay{position:fixed;inset:0;z-index:100;background:rgba(var(--bg-rgb),.88);backdrop-filter:blur(5px);
   display:none;align-items:flex-start;justify-content:center;padding:34px 16px;overflow-y:auto}
 .overlay.on{display:flex}
 .modal{width:100%;max-width:760px;background:var(--panel);border:1px solid var(--line-2);padding:30px;position:relative}

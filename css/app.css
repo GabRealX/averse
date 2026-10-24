@@ -74,24 +74,24 @@ button.tool{width:100%;font:inherit;color:inherit}
 
 /* --- dépôt de fichier n'importe où --- */
 .drop-veil{position:fixed;inset:0;z-index:250;display:none;align-items:center;justify-content:center;pointer-events:none;
-  background:rgba(3,3,6,.7);border:2px dashed var(--fg-soft)}
+  background:rgba(var(--bg-rgb),.7);border:2px dashed var(--fg-soft)}
 .drop-veil span{font-size:.9rem;color:var(--fg);background:var(--panel);padding:14px 20px;border:1px solid var(--line-2)}
 body.dropping .drop-veil{display:flex}
 
 /* --- variante ASCII --- */
-html[data-theme="ascii"] .big-search,html[data-theme="ascii"] .results,html[data-theme="ascii"] .suggest,
-html[data-theme="ascii"] .np-title,html[data-theme="ascii"] .np-text,html[data-theme="ascii"] .np-tools input{border:1px dashed var(--line-2)!important}
-html[data-theme="ascii"] .search-hero::before{content:"$ averse --cherche";font-size:.78rem;color:var(--fg-soft);margin-bottom:10px}
-html[data-theme="ascii"] .res-item span::before{content:"> ";color:var(--fg-faint)}
-html[data-theme="ascii"] .res-item.on span::before{color:var(--fg)}
-html[data-theme="ascii"] .npanel{border-left:1px dashed var(--fg-soft);box-shadow:none}
-html[data-theme="ascii"] .np-head b::before{content:"# "}
-html[data-theme="ascii"] .np-item{border-bottom:1px dotted var(--line-2)}
-html[data-theme="ascii"] .np-item b::before{content:"- "}
-html[data-theme="ascii"] .modal-star{border:0;background:transparent}
-html[data-theme="ascii"] .drop-veil span::before{content:"[ ";}
-html[data-theme="ascii"] .drop-veil span::after{content:" ]";}
-html[data-theme="ascii"] .card{background:transparent}
+html[data-style="ascii"] .big-search,html[data-style="ascii"] .results,html[data-style="ascii"] .suggest,
+html[data-style="ascii"] .np-title,html[data-style="ascii"] .np-text,html[data-style="ascii"] .np-tools input{border:1px dashed var(--line-2)!important}
+html[data-style="ascii"] .search-hero::before{content:"$ averse --cherche";font-size:.78rem;color:var(--fg-soft);margin-bottom:10px}
+html[data-style="ascii"] .res-item span::before{content:"> ";color:var(--fg-faint)}
+html[data-style="ascii"] .res-item.on span::before{color:var(--fg)}
+html[data-style="ascii"] .npanel{border-left:1px dashed var(--fg-soft);box-shadow:none}
+html[data-style="ascii"] .np-head b::before{content:"# "}
+html[data-style="ascii"] .np-item{border-bottom:1px dotted var(--line-2)}
+html[data-style="ascii"] .np-item b::before{content:"- "}
+html[data-style="ascii"] .modal-star{border:0;background:transparent}
+html[data-style="ascii"] .drop-veil span::before{content:"[ ";}
+html[data-style="ascii"] .drop-veil span::after{content:" ]";}
+html[data-style="ascii"] .card{background:transparent}
 
 /* liens du pied de page (style, pluie, à propos) : sans ça ils restaient bleus en style normal */
 .footer-copyright a{color:var(--fg-soft);text-decoration:none;border-bottom:1px solid var(--line-2)}
@@ -102,7 +102,7 @@ body.in-tool footer{display:none}
 /* accueil : le grand titre revient au-dessus de la recherche */
 #homeView{padding-top:0}
 .home-head{padding:120px 0 6px}
-html[data-theme="ascii"] .home-head{padding-top:110px}
+html[data-style="ascii"] .home-head{padding-top:110px}
 #homeView .search-hero{min-height:0;padding:26px 0 18px}
 .home-head h1{margin:0}
 body.in-tool .home-head{display:none}

@@ -2,20 +2,40 @@
    Deux couleurs seulement : un noir (--bg) et une teinte (--fg). Le reste = opacités de la teinte. */
 :root{
   --bg:#06060a;
+  --bg-rgb:6,6,10;          /* v7 : le fond en RVB (barres et panneaux semi-transparents) */
   --panel:#0b0b11;
+  --soft-a:.68;--faint-a:.36;--line-a:.10;--line2-a:.20;
   /* v6 : la teinte vient de --acc-rgb (mêmes valeurs que --fg) : accent.js change ces deux-là, tout le reste suit */
   --fg:#c7bce4;
   --acc-rgb:199,188,228;
-  --fg-soft:rgba(var(--acc-rgb),.68);
-  --fg-faint:rgba(var(--acc-rgb),.36);
-  --line:rgba(var(--acc-rgb),.10);
-  --line-2:rgba(var(--acc-rgb),.20);
+  --fg-soft:rgba(var(--acc-rgb),var(--soft-a));
+  --fg-faint:rgba(var(--acc-rgb),var(--faint-a));
+  --line:rgba(var(--acc-rgb),var(--line-a));
+  --line-2:rgba(var(--acc-rgb),var(--line2-a));
+  --code:'JetBrains Mono',ui-monospace,monospace;
   --tint:rgba(var(--acc-rgb),.05);
   --ok:#9fd8b4;
   --bad:#e79898;
   --display:'Big Shoulders Display',sans-serif;
   --mono:'JetBrains Mono',monospace;
 }
+/* ===== v7 : THÈMES (js/theme.js) — uniquement des variables ; la couleur d'accent (--fg, --acc-rgb) est posée par accent.js ===== */
+html[data-theme="neon"]{--bg:#020108;--bg-rgb:2,1,8;--panel:#0a0614;--soft-a:.80;--faint-a:.50;--line-a:.18;--line2-a:.36;--glow:0 0 7px rgba(var(--acc-rgb),.55)}
+html[data-theme="papier"]{--bg:#f4eedf;--bg-rgb:244,238,223;--panel:#ebe3cf;--soft-a:.82;--faint-a:.56;--line-a:.16;--line2-a:.30;
+  --mono:ui-serif,'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;--display:var(--mono);--ok:#2e7046;--bad:#a5302f;color-scheme:light}
+html[data-theme="terminal"]{--bg:#000;--bg-rgb:0,0,0;--panel:#030a05;--soft-a:.74;--faint-a:.44;--line-a:.16;--line2-a:.30;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,'DejaVu Sans Mono','Liberation Mono',monospace;--display:var(--mono);--code:var(--mono)}
+html[data-theme="orage"]{--bg:#04060c;--bg-rgb:4,6,12;--panel:#0a0e18;--soft-a:.70;--faint-a:.38}
+/* touches propres aux thèmes (peu de règles, toutes à base de variables) */
+html[data-theme="neon"] h1,html[data-theme="neon"] h2,html[data-theme="neon"] .logo,html[data-theme="neon"] a:hover{text-shadow:var(--glow)}
+html[data-theme="papier"] body{font-weight:400}
+html[data-theme="papier"] code,html[data-theme="papier"] pre,html[data-theme="papier"] textarea,html[data-theme="papier"] .codebox{font-family:var(--code)}
+html[data-theme="papier"][data-style] .ascii-logo{font-family:var(--code)}   /* le dessin ASCII doit rester à chasse fixe */
+html[data-theme="terminal"] h1,html[data-theme="terminal"] h2,html[data-theme="terminal"] h3{letter-spacing:.02em}
+/* éclair (Nuit d'orage) : voile très léger, jamais devant le contenu cliquable */
+.storm-flash{position:fixed;inset:0;pointer-events:none;z-index:0;background:rgba(var(--acc-rgb),.07);opacity:0}
+.storm-flash.on{animation:flash 1.1s ease-out}
+@keyframes flash{0%{opacity:0}6%{opacity:1}12%{opacity:.2}20%{opacity:.8}100%{opacity:0}}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--fg-soft);font-family:var(--mono);font-weight:300;line-height:1.6;-webkit-font-smoothing:antialiased}
 button{font-family:inherit}

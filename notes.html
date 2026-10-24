@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- v5 : politique de sécurité (CSP). Cette page garde le jeton GitHub de la synchro : aucun script en ligne, aucun eval,
      et elle ne peut parler qu'à elle-même et à l'API GitHub. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://gist.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://gist.githubusercontent.com https://generativelanguage.googleapis.com https://api.openai.com https://openrouter.ai https://api.mistral.ai https://api.groq.com http://localhost:* http://127.0.0.1:* https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>AVERSE — carnet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,8 +18,10 @@
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/notes.css">
 <link rel="stylesheet" href="css/ui.css">
+<link rel="stylesheet" href="css/ai.css">
 <link rel="stylesheet" href="css/ascii.css">
 <script src="js/core.js"></script>
+<script src="js/theme.js"></script>
 <script src="js/accent.js"></script>
 <script src="js/templates.js"></script>
 </head>
@@ -37,7 +39,8 @@
       <button data-v="graph">Graphe</button>
     </div>
     <button class="ico-btn" id="styleBtn" data-style-label >style : normal</button>
-    <button class="ico-btn" data-accent-btn title="Couleur d'accent du site">couleur</button>
+    <button class="ico-btn" data-accent-btn title="Thème et couleur d'accent">apparence</button>
+    <button class="ico-btn" id="aiBtn" title="Assistant IA : résumé, flashcards, demander à mes notes… (désactivé tant que tu ne le configures pas)">IA ✦</button>
       <button class="ico-btn" data-feedback-btn title="Signaler un bug, proposer une idée">signaler</button>
     <button class="ico-btn" id="fileBtn" title="Synchro : lie le carnet à un fichier (ex. dans ton dossier OneDrive / Google Drive)">Fichier</button>
     <span class="sync-state" id="syncState" role="status" aria-live="polite" hidden></span>
@@ -109,6 +112,7 @@
       <div class="graph-tools">
         <select id="graphTag" aria-label="Filtrer par tag"><option value="">tous les tags</option></select>
         <select id="graphLabels" aria-label="Étiquettes" title="Étiquettes des nœuds"><option value="auto">étiquettes : auto</option><option value="all">étiquettes : toutes</option><option value="hover">étiquettes : survol</option></select>
+        <button class="ico-btn" id="graphSem" aria-pressed="false" hidden title="Liens suggérés par le sens (IA locale)">≈ sens</button>
         <span class="graph-zoom"><button class="ico-btn" data-zoom="out" aria-label="Dézoomer">−</button><button class="ico-btn" data-zoom="fit" title="Tout voir" aria-label="Tout voir">⤢</button><button class="ico-btn" data-zoom="in" aria-label="Zoomer">+</button></span>
       </div>
       <div class="graph-edit" id="graphEdit" hidden></div>
@@ -126,6 +130,8 @@
 <script src="js/ctxmenu.js"></script>
 <script src="js/data.js"></script>
 <script src="js/feedback.js"></script>
+<script src="js/eggs.js"></script>
+<script src="js/rain.js"></script>
 <script src="js/notes-graph.js"></script>
 <script src="js/md.js"></script>
 <script src="js/notes.js"></script>
@@ -135,5 +141,8 @@
 <script src="js/vault.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/notes-page.js"></script>
+<script src="js/glyph.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/ai-notes.js"></script>
 </body>
 </html>

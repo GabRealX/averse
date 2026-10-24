@@ -19,6 +19,35 @@ Il faut un petit serveur local (service worker, Worker et crypto ne marchent pas
 - **Autres outils** (`#/autres`) : réseau, électronique, texte & dates, aide-mémoire. Moins utilisés, mais toujours trouvables par la recherche.
 - **Pluie** : désactivée par défaut, lien « pluie : off/on » en bas de page. **Style ASCII** : lien « style » en bas (ou `?style=ascii`).
 
+## Nouveautés v8
+- **L'IA dans la barre de l'accueil.** Tape une question (« comment… », « what is… », « … ? », ou 5 mots et plus) : « Demander à l'IA » et « Demander à mes notes » apparaissent **en tête** des résultats, sans voler la sélection (Entrée ouvre toujours le 1er outil). Pour viser l'IA : préfixe `?`, touche **Tab**, ou le Glyph à droite du champ. Rien ne part tant que tu n'as pas choisi l'option puis cliqué « Envoyer ».
+  - Question libre : confirmation compacte (texte exact visible) avec « ne plus demander pour les questions libres ». Mes notes : la liste des extraits est **toujours** montrée avant l'envoi.
+  - Réponse dans un panneau sous la barre : flux en direct, Markdown rendu sans HTML actif (pas de XSS), Copier / Enregistrer en note / Fermer (Échap arrête aussi le flux).
+  - Le Glyph dans la barre : statique au repos (tamisé si rien n'est configuré), puis search → think → write → done / error.
+  - Sans clé : l'option ouvre les réglages ; « Chercher par le sens » (100 % local) reste là si l'IA locale est active.
+- **IA bilingue FR/EN.** Le modèle local passe à **multilingual-e5-small** (Xenova, quantifié, révision figée) : ≈ 140 Mo téléchargés (≈ 155 Mo en cache) une seule fois, ≈ 11 s sur une bonne connexion. Comparaison mesurée dans Chrome (cosinus) :
+
+  | paire | all-MiniLM-L6-v2 (v7) | paraphrase-multilingual-MiniLM | **multilingual-e5-small** |
+  |---|---|---|---|
+  | crêpes / gâteau | .07 | .60 | .85 |
+  | chat / cat | .31 | .24 | .92 |
+  | bonjour / hello | .31 | .92 | .88 |
+  | transistor EN / FR | .65 | .90 | .90 |
+  | « à quoi sert une passerelle ? » / note routeur | .41 | .04 | .80 |
+
+  e5 a été préféré à paraphrase-multilingual (même taille) car il retrouve bien les passages à partir d'une question. Ses scores sont « serrés » (sans rapport ≈ .70–.81, pertinent ≈ .82–.88) : le seuil du RAG est donc propre au modèle (`min .815`, à moins de `.03` du meilleur), calé sur 8 notes FR/EN et 10 questions (« how do I bake a cake? » → banana bread + gâteau, « quelle est la capitale du Pérou ? » → aucune note).
+  - Migration automatique : à la 1re utilisation, les vecteurs de l'ancien modèle sont effacés et recalculés (version d'index `e5s-1`), l'ancien modèle est retiré du cache.
+- **Langue des réponses** (réglages IA) : Auto (langue de la question ; résumés et flashcards dans la langue de la note), Français ou English. « Reformuler » ne traduit jamais. L'interface reste en français.
+
+## Nouveautés v7
+- **Thèmes complets** (lien « thème » en bas de page / « apparence » dans le carnet), combinables avec la couleur d'accent : **Défaut**, **Néon** (contrastes vifs, léger halo), **Papier** (fond beige, texte sombre, police serif, sans pluie), **Terminal** (vert sur noir, monospace), **Nuit d'orage** (pluie plus dense + éclairs discrets, aucun éclair si « réduire les animations »). Un seul jeu de règles CSS : attribut `data-theme` sur `<html>` + variables. Texte principal ≥ 4,5:1 dans chaque thème (testé). La couleur de la barre du téléphone suit (balise `theme-color`). Gardé dans la sauvegarde et synchronisé entre onglets.
+- **Surprises** : code Konami ↑↑↓↓←→←→BA (confettis), taper « pluie » ou « averse » dans la recherche (grosse averse quelques secondes), cliquer 5 fois sur le titre AVERSE (les lettres dégoulinent), un petit message dans la console. Tout s'arrête seul ; version réduite si « réduire les animations ».
+- **IA (facultative, rien n'est activé par défaut)** — bouton « IA ✦ » du carnet, clic droit → IA ✦, ou la recherche (« résumer », « flashcards », « demander à mes notes »…).
+  - **Locale** : recherche par le sens dans les notes + « notes liées » (sous la note et option « liens par le sens » dans le graphe). Modèle all-MiniLM-L6-v2 quantifié (~23 Mo, Transformers.js) téléchargé **seulement quand tu l'actives** (cdn.jsdelivr.net, huggingface.co, révision figée), puis gardé en cache : hors ligne ensuite. Calcul dans un Web Worker. Rien de tes notes ne sort. Le modèle est surtout entraîné en anglais (remplacé en v8 par un modèle multilingue).
+  - **Avec ta clé** (Google Gemini — offre gratuite — ou n'importe quel service compatible OpenAI) : résumer une note, flashcards, expliquer / écrire une regex (outil Regex), expliquer un JSON (outil JSON), reformuler / corriger, « demander à mes notes » (les extraits les plus proches sont choisis sur l'appareil, et **seuls eux** partent). Avant chaque envoi, la fenêtre dit où part le texte et montre exactement ce qui sera envoyé ; aucun appel sans ton clic.
+  - La clé est **chiffrée** (coffre `vault.js`, clé d'appareil non exportable) dans `localStorage` et dans le Gist chiffré si la synchro est active ; elle n'est envoyée qu'au fournisseur choisi (adresse en https obligatoire, sauf localhost).
+  - **Indicateur « Glyph »** (`js/glyph.js`) : disque de petits carrés à la couleur de l'accent ; il réfléchit, cherche, se remplit pendant le téléchargement, ondule pendant l'écriture, barre en cas d'erreur. Une seule boucle d'animation, arrêtée dès qu'il est caché ou fini.
+
 ## Nouveautés v6
 - **Recherche globale** (accueil, **Ctrl+K** depuis n'importe quelle page) : outils, **texte intégral des notes** (sans accents : « reseau » trouve « réseau », extrait avec le mot surligné) et fiches du **mémo**, en groupes Outils / Notes / Mémo, ↑ ↓ Entrée. Index précalculé (texte « plié » par note, recalculé seulement pour la note modifiée) : quelques ms avec 600 notes. Commandes : « signaler », « couleur ».
 - **Mes modèles de note** : dans le carnet, bouton **Modèle** (« Enregistrer comme modèle » depuis la note ouverte), ou « Gérer mes modèles… » dans la liste des modèles. Créer / modifier / supprimer / copier un modèle intégré. Variables : `{{date}}` `{{heure}}` `{{jour}}` `{{année}}` `{{titre}}` (boutons pour les insérer, aperçu du titre). Ils apparaissent à côté des modèles intégrés, et sont dans la sauvegarde et la synchro (fichier + Gist chiffré).
@@ -176,7 +205,7 @@ Pas de fichier .reg fourni, volontairement :
     sw.js, manifest.json, icon.svg, icons/ (PNG 192/512 normales + maskable, sources SVG)
     css/   base.css (couleurs, texte) · home.css (barre du haut, cartes, pied de page) · tools.css (pages d'outils)
            app.css (recherche, panneau de notes, dépôt) · notes.css (carnet) · ascii.css (style ASCII)
-           ui.css (partagé : bouton Installer, menus Envoyer vers / clic droit, aide des raccourcis, fenêtres v6) · share.css (share.html)
+           ui.css (partagé : bouton Installer, menus Envoyer vers / clic droit, aide des raccourcis, fenêtres v6) · share.css (share.html) · ai.css (IA, Glyph)
     js/
       core.js       petites fonctions communes ($, esc, getLS/setLS, envoi vers le carnet…)
       app.js        l'accueil : recherche, favoris/récents, collage malin, glisser-déposer, routage #/outil
@@ -196,6 +225,9 @@ Pas de fichier .reg fourni, volontairement :
       md.js         le rendu Markdown (partagé par le carnet et share.html, liens nettoyés)
       share.js      lien de partage chiffré + fenêtre « Partager » · share-view.js : la page share.html
       feedback.js   « Signaler / Suggérer » (ticket GitHub prérempli)
+      theme.js      thèmes complets (data-theme) · eggs.js : surprises (Konami, pluie, titre)
+      glyph.js      indicateur de chargement « Glyph » (canvas)
+      ai.js         IA : réglages, clé chiffrée, fournisseurs, fenêtre d'envoi · ai-notes.js : recherche par le sens, notes liées · ai-worker.js : calcul des vecteurs
       vault.js      le coffre chiffré (AES-GCM, PBKDF2, HKDF, enveloppes par appareil) · cloud.js : synchro Gist + assistant
       tools/base.js        le moteur : NOXE.register(), page d'outil, dépôt de fichiers, mémoire des champs, favoris
       tools/image.js       optimiser, convertir, images → PDF
@@ -228,9 +260,9 @@ Options : `image:true` / `multi:true` (outil à fichiers), `accept` et `hint` (t
 Pour le chaînage et Ctrl+Entrée / Ctrl+Maj+C : `data-main` sur le bouton principal, `data-result` sur l'élément résultat, ou `NOXE.setResult({text})` / `NOXE.fileItems({...})` pour un résultat fichier (voir le commentaire en tête de tools/base.js).
 
 ## À savoir
-- Après toute modif de fichier : augmenter `averse-vN` dans sw.js (actuellement `averse-v14` ; penser aussi à `VERSION` en tête de js/feedback.js), sinon le cache garde l'ancienne version. Un nouveau fichier doit aussi être ajouté dans la liste `ASSETS`.
+- Après toute modif de fichier : augmenter `averse-vN` dans sw.js (actuellement `averse-v16` ; penser aussi à `VERSION` en tête de js/feedback.js), sinon le cache garde l'ancienne version. Un nouveau fichier doit aussi être ajouté dans la liste `ASSETS`.
 - Les notes sont dans le localStorage (clé `noxe-notes`) : bouton Sauvegarde (tout) ou Export (notes seules) pour sauvegarder. Une note supprimée laisse une « pierre tombale » (gardée 90 jours) pour qu'un autre onglet ouvert ne la fasse pas revenir.
-- Autres clés : `averse-fav` (favoris), `averse-recent` (récents), `averse-in` (valeurs des champs), `averse-rain` (pluie), `averse-style` (style). `averse-ocr-lang` (langue de l'OCR), `noxe-sync` (état de la dernière synchro par fichier), `averse-graph` (réglages du graphe), `averse-cloud` (synchro chiffrée : jeton, n° du Gist, appareil — jamais exporté), `averse-bar-hint`, `averse-accent` (couleur d'accent, v6), `averse-tpl` (tes modèles de note, v6). IndexedDB `averse` : fichier lié et clé de synchro non exportable. Cache `averse-share` : contenu partagé en attente (vidé dès qu'il est lu). Cache `averse-ocr-1` : fichiers de l'OCR.
+- Autres clés : `averse-fav` (favoris), `averse-recent` (récents), `averse-in` (valeurs des champs), `averse-rain` (pluie), `averse-style` (style). `averse-ocr-lang` (langue de l'OCR), `noxe-sync` (état de la dernière synchro par fichier), `averse-graph` (réglages du graphe), `averse-cloud` (synchro chiffrée : jeton, n° du Gist, appareil — jamais exporté), `averse-bar-hint`, `averse-accent` (couleur d'accent, v6), `averse-tpl` (tes modèles de note, v6), `averse-theme` (thème, v7), `averse-ai` (réglages IA, sans la clé ; v8 : `lang` auto/fr/en, `skipFree`, `idx` version de l'index), `averse-ai-sec` (clé d'API **chiffrée**). IndexedDB `averse` : fichier lié et clé de synchro non exportable. Cache `averse-share` : contenu partagé en attente (vidé dès qu'il est lu). Cache `averse-ocr-1` : fichiers de l'OCR. IndexedDB `averse-ai` : vecteurs des notes (IA locale). Caches `averse-ai-1` (Transformers.js + wasm) et `transformers-cache` (modèle) : vidés par « Supprimer le modèle » dans les réglages IA.
 - Changer de nom : rechercher/remplacer « AVERSE » (index.html, about.html, notes.html, manifest.json, sw.js, data.js).
 - Projets et liens : js/data.js (url vide = « bientôt »).
 
@@ -240,7 +272,7 @@ Tous les chemins sont relatifs (manifeste, service worker, partage, « Ouvrir av
 2. Mets-y **le contenu** de ce dossier, avec `index.html` à la racine du dépôt. Garde le fichier `.nojekyll` (il évite que GitHub retraite le site avec Jekyll) et le dossier `.github/` (modèles de tickets).
    En ligne de commande, depuis ce dossier :
 
-       git init && git add . && git commit -m "AVERSE v6"
+       git init && git add . && git commit -m "AVERSE v8"
        git branch -M main
        git remote add origin https://github.com/ton-pseudo/averse.git
        git push -u origin main
@@ -258,10 +290,14 @@ Tous les chemins sont relatifs (manifeste, service worker, partage, « Ouvrir av
 - Le dossier pèse ~17 Mo, dont 15,6 Mo pour l'OCR. C'est bien sous les limites de GitHub (1 Go par site, 100 Mo par fichier). Le plus gros fichier fait 3,9 Mo.
 
 ## Tests
-- `tests.html` (via le serveur, ou en ligne sur ton site) : **149 tests**. Vert = réussi, rouge = vrai problème, gris = « ignoré : non disponible sur ce navigateur » (API absente, jamais pour cacher un résultat faux). `tests.html?only=Graphe` ne lance que les tests dont le nom contient ce mot.
+- `tests.html` (via le serveur, ou en ligne sur ton site) : **173 tests**. Vert = réussi, rouge = vrai problème, gris = « ignoré : non disponible sur ce navigateur » (API absente, jamais pour cacher un résultat faux). `tests.html?only=Graphe` ne lance que les tests dont le nom contient ce mot.
+  - v7 : thèmes (data-theme, sauvegarde, contraste de chaque thème × accents, vraies pages, orage), surprises (déclenchement, aucune boucle qui traîne), Glyph (états, arrêt), IA (fournisseur et Worker simulés : aucune requête sans clic, Gemini / OpenAI-compatible / erreurs 401-429, clé jamais en clair ni dans la synchro, RAG qui n'envoie que les extraits utiles).
+  - v8 : barre IA (option présente seulement pour une question / `?` / Tab / bouton, aucune requête sans action, confirmation, états du Glyph, Échap, réponse piégée en HTML/script/javascript: rendue inerte, 401, tenue à 360 px), langue des réponses, migration du modèle et préfixes e5.
   - v6 : couleur d'accent (contraste, variables, theme-color, sauvegarde) ; recherche (texte plié de même longueur, accents, extraits échappés, 600 notes, mémo, groupes et clavier) ; modèles (variables, fusion, pierres tombales, sauvegarde, synchro Gist) ; partage (aller-retour, clé à part, mauvaise clé, lien abîmé, bombe de décompression, charges XSS, CSP, import) ; signaler (adresse exacte, échappement `& # ? + %` / emoji / `<script>`, limite 6 000, aucune note ni jeton, e-mail caché par défaut — `window.open` est remplacé : aucun vrai ticket n'est ouvert).
   - Corrigé dans les tests v6 : un test cherchait `k1` dans le coffre chiffré et pouvait tomber dessus par hasard dans le Base64 (faux positif) ; le test CONFLIT échouait parfois (WebKit) parce qu'une synchro de fond envoyait la modif locale pendant que le faux « autre appareil » écrivait à l'aveugle — l'appli avait raison, l'ordre du test est maintenant fixe.
   - v5 : graphe, coffre chiffré, synchro Gist avec un faux GitHub (2 appareils, conflit, ETag/304, écriture concurrente, appareil retiré). v4 : synchro par fichier, OCR, regex en Worker, jours ouvrés, fuites d'URL. Avant : chaînage, sauvegarde, KaTeX, raccourcis, menus clic droit, impression, « Ouvrir avec » et partage simulés.
   - Les tests ne touchent pas à tes notes : copie avant, remise en place après, base et clés à part, aucun accès réseau (faux GitHub).
+- Vérifié pour la v8 : Chrome ordinateur et mobile émulé, Firefox, WebKit iPhone émulé : 173/173 partout. Vrai modèle e5 testé dans Chrome (téléchargement, migration, scores FR/EN, puis hors ligne). Les vrais Gemini / OpenAI n'ont pas été testés (pas de clé).
+- Vérifié pour la v7 : Chrome ordinateur et mobile émulé, Firefox, WebKit iPhone émulé : 167/167 partout. Vrai téléchargement du modèle IA testé dans Chrome (puis hors ligne). Les vrais Gemini / OpenAI n'ont pas été testés (pas de clé).
 - Vérifié pour la v6 : Chrome ordinateur, Chrome mobile émulé, Firefox et WebKit (moteur de Safari) en iPhone émulé : 149/149 partout (WebKit 8 fois de suite). Synchro de bout en bout à 2–3 navigateurs avec faux GitHub : OK.
 - **Non testable automatiquement** : le vrai formulaire GitHub « New issue » (adresse vérifiée, jamais ouverte), la vraie feuille de partage mobile (Web Share), le vrai GitHub avec ton jeton (la configuration réseau d'api.github.com a été vérifiée : en-têtes et ETag autorisés), les vraies passkeys (Windows Hello, Android, iPhone), un vrai téléphone, le vrai « Ouvrir avec » Windows et la vraie feuille de partage. À essayer une fois à la main.
