@@ -1,6 +1,0 @@
-Tesseract.js (OCR) — copie locale pour fonctionner hors-ligne. Chargé seulement quand on ouvre l'outil OCR.
-- tesseract.min.js, worker.min.js : tesseract.js 7.0.0 (Apache-2.0, voir LICENSE-tesseract.js.md)
-- core/*.wasm.js : tesseract.js-core 7.0.0 (Apache-2.0) — le worker choisit tout seul la variante
-  (relaxedsimd / simd / sans simd) selon le navigateur ; un seul fichier (~3,9 Mo) est téléchargé.
-- lang/fra.traineddata.gz, lang/eng.traineddata.gz : modèles « 4.0.0_best_int » (tessdata, Apache-2.0),
-  paquets npm @tesseract.js-data/fra et /eng 1.0.0.
