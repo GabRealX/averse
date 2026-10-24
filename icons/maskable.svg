@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- icône « maskable » : fond plein bord à bord, motif dans la zone sûre (cercle de 80 %) -->
+  <rect width="512" height="512" fill="#06060a"/>
+  <rect x="166" y="166" width="180" height="180" fill="#c7bce4"/>
+</svg>

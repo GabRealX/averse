@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><title>AVERSE — tests</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="css/base.css"><link rel="stylesheet" href="css/tools.css">
+<style>body{padding:30px;font-family:var(--mono);font-size:.82rem}.t{padding:5px 0;border-bottom:1px solid var(--line)}h1{font-size:1.2rem;margin-bottom:6px}#sum{margin:10px 0 18px}</style>
+<script src="js/core.js"></script></head>
+<body>
+<h1>Tests des calculs</h1>
+<div id="sum">en cours…</div><div id="res"></div>
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<script src="js/tools/base.js"></script>
+<script>NOXE.noPersist=true;   /* les tests ne doivent pas écrire dans la mémoire des champs */</script>
+<script src="js/tools/reseau.js"></script><script src="js/tools/electronique.js"></script>
+<script src="js/tools/dev.js"></script><script src="js/tools/texte.js"></script><script src="js/tools/memo.js"></script>
+<script src="js/tools/encodage.js"></script><script src="js/tools/pdf.js"></script><script src="js/tools/carnet.js"></script><script src="js/tools/image.js"></script><script src="js/tools/editeur.js"></script><script src="js/tools/ocr.js"></script>
+<script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
+<script src="js/math.js"></script><script src="js/ctxmenu.js"></script>
+<link rel="stylesheet" href="css/ui.css">
+<script>
+/* Ouvre chaque outil comme le ferait un clic, remplit les champs, et compare avec des résultats vérifiés à la main.
+   Ouvre ce fichier via un serveur local (python3 -m http.server) puis va sur /tests.html */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const text=()=>$('modal').textContent.replace(/\s+/g,' ');
+function fill(id,v){const e=$(id);e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));}
+function tab(k){$('modal').querySelector('.tabs [data-v="'+k+'"]').click();}
+const tests=[];const T=(name,fn)=>tests.push([name,fn]);
+const has=(s,...parts)=>{for(const p of parts)if(!(p instanceof RegExp?p.test(s):s.includes(p)))throw new Error('manque « '+p+' » dans : '+s.slice(0,160));};
+
+T('IPv4 : 192.168.1.130/26',async()=>{NOXE.open('reseau');has(text(),'192.168.1.128/26','192.168.1.191','62');});
+T('IPv4 : masque pointé',async()=>{fill('nin','10.0.0.5 255.255.255.0');has(text(),'10.0.0.0/24','10.0.0.255');});
+T('IPv4 : adresse invalide refusée',async()=>{fill('nin','300.1.1.1/24');if(!$('nin').classList.contains('bad'))throw new Error('pas signalé');});
+T('IPv4 : /31 et /32',async()=>{fill('nin','10.0.0.0/31');has(text(),'pas de broadcast');});
+T('VLSM 50/20/10/2',async()=>{tab('sub');has(text(),'192.168.10.0/26','192.168.10.64/27','192.168.10.96/28','192.168.10.112/30');});
+T('Ohm : I=20 mA, R=100 Ω → U=2 V',async()=>{NOXE.open('ohm');fill('o_I','20m');fill('o_R','100');
+  if(Math.abs(parseFloat($('o_U').value.replace(',','.'))-2)>1e-9)throw new Error('U='+$('o_U').value);});
+T('Diviseur 5 V, 1k / 2k → 3,33 V',async()=>{tab('div');has(text(),/3[.,]33/);});
+T('SHA-256 de « abc »',async()=>{NOXE.open('encodage');fill('h_in','abc');await sleep(400);has(text(),'ba7816bf8f01cfea');});
+T('Aide-mémoire : recherche « ssh »',async()=>{NOXE.open('memo');fill('mq','ssh');has(text(),'22','ssh user@');});
+T('Aide-mémoire : table CIDR /26 = 255.255.255.192',async()=>{fill('mq','/26');has(text(),'255.255.255.192','62 hôtes');});
+T('Export vers le carnet (Markdown)',async()=>{NOXE.open('reseau');const md=NOXE.extract($('toolBody'));has(md,'## Résultat','192.168.1.128/26');});
+T('Bases : 0B en hexadécimal = 11',async()=>{NOXE.open('bases');const e=$('b_hex');e.value='0B';e.oninput();if($('b_dec').value!=='11')throw new Error('dec='+$('b_dec').value);});
+T('Dates : 31/01 → 01/03/2025 = 1 mois, 1 jour',async()=>{NOXE.open('dates');$('a_d').value='2025-01-31';$('a_f').value='2025-03-01';$('a_d').oninput();has(text(),'1 mois, 1 jour','29');});
+T('Mot de passe : symboles présents par défaut',async()=>{NOXE.open('mdp');for(let i=0;i<20;i++){$('g_go').click();const s=$('g_out').textContent;if(!/[^A-Za-z0-9]/.test(s))throw new Error('pas de symbole : '+s);if(/[0O1lI]/.test(s))throw new Error('ambigu : '+s);}});
+/* ---- v2 : encodages, JWT, UUID, QR, regex dans un Worker ---- */
+const JWT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MiIsIm5hbWUiOiLDiWzDqHZlIiwiZXhwIjo0MTAyNDQ0ODAwfQ.c2lnbmF0dXJl';
+T('Base64 : « Bonjour é » → Qm9uam91ciDDqQ==',async()=>{NOXE.open('base64');fill('b_in','Bonjour é');has(text(),'Qm9uam91ciDDqQ==');
+  if(NOXE.b64enc(new TextEncoder().encode('Bonjour é'))!=='Qm9uam91ciDDqQ==')throw new Error('b64enc');
+  if(new TextDecoder().decode(NOXE.b64dec('Qm9uam91ciDDqQ'))!=='Bonjour é')throw new Error('b64dec sans « = »');});
+T('Base64 : décodage + variante URL',async()=>{tab('dec');fill('b_dec','Qm9uam91ciDDqQ==');has(text(),'Bonjour é');
+  tab('enc');$('b_u').checked=true;$('b_u').dispatchEvent(new Event('change'));fill('b_in','??>');has(text(),'Pz8-');});
+T('Base64 : un PNG en data URI est reconnu',async()=>{tab('dec');fill('b_dec','data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+  has(text(),'image/png');if(!$('b_dl'))throw new Error('pas de bouton de téléchargement');});
+T('JWT : en-tête, contenu UTF-8, expiration',async()=>{NOXE.open('jwt');fill('w_in',JWT);has(text(),'HS256','Élève','"sub": "42"','non expiré','2100');});
+T('JWT : jeton invalide signalé',async()=>{fill('w_in','pas.un-jwt');if(!$('w_in').classList.contains('bad'))throw new Error('pas signalé');});
+T('URL : encodage, décodage et paramètres',async()=>{NOXE.open('url');fill('u_in','https://exemple.fr/r?q=café noir&page=2#haut');
+  has(text(),'caf%C3%A9','exemple.fr','page','#haut');fill('u_in','caf%C3%A9%20noir');has(text(),'café noir');});
+T('UUID : 20 v4 uniques au bon format',async()=>{NOXE.open('uuid');$('id_n').value='20';$('id_go').click();
+  const l=[...$('id_out').querySelectorAll('[data-copy]')].map(e=>e.dataset.copy);
+  const re=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  if(l.length!==20)throw new Error(l.length+' lignes');if(new Set(l).size!==20)throw new Error('doublon');
+  for(const u of l)if(!re.test(u))throw new Error('format : '+u);if(!re.test(NOXE.uuid4()))throw new Error('uuid4');});
+T('UUID : vérification',async()=>{fill('id_chk','123e4567-e89b-12d3-a456-426614174000');has($('id_res').textContent,'valide','1');});
+T('QR : dessiné hors-ligne (bibliothèque locale)',async()=>{NOXE.open('qr');fill('q_in','https://averse.example/');
+  for(let i=0;i<40&&!/modules/.test($('q_info').textContent);i++)await sleep(50);has($('q_info').textContent,'modules');
+  const c=$('q_cv');if(c.width<100)throw new Error('canvas '+c.width);});
+T('Regex : correspondances calculées dans le Worker',async()=>{NOXE.open('regex');fill('r_p','(\\w+)@(\\w+)\\.com');fill('r_t','contact: alice@example.com, bob@test.com');
+  for(let i=0;i<40&&!/correspondance/.test($('r_out').textContent);i++)await sleep(50);has($('r_out').textContent,'2 correspondances','« alice »');});
+T('Regex : (a+)+$ arrêtée sans bloquer la page',async()=>{fill('r_p','(a+)+$');fill('r_t','a'.repeat(40)+'!');
+  let ticks=0;const iv=setInterval(()=>ticks++,50);const t0=performance.now();
+  while(!$('r_slow')&&performance.now()-t0<4000)await sleep(50);clearInterval(iv);
+  if(!$('r_slow'))throw new Error('pas de timeout');if(ticks<15)throw new Error('page bloquée ('+ticks+' ticks)');
+  fill('r_p','a+');for(let i=0;i<40&&!/correspondance/.test($('r_out').textContent);i++)await sleep(50);has($('r_out').textContent,'1 correspondance');});
+T('PDF : intervalles de pages',async()=>{const j=x=>JSON.stringify(x);
+  if(j(NOXE.pageRanges('1-3, 5',10))!=='[0,1,2,4]')throw new Error('1-3,5');if(j(NOXE.pageRanges('8-',10))!=='[7,8,9]')throw new Error('8-');
+  if(j(NOXE.pageRanges('',3))!=='[0,1,2]')throw new Error('vide');if(NOXE.pageRanges('0',5)!==null||NOXE.pageRanges('11',10)!==null||NOXE.pageRanges('a',5)!==null)throw new Error('invalide accepté');});
+
+/* ---- v2 : collage intelligent (detect.js) ---- */
+const D=s=>NOXE.detect(s).map(x=>x.key);
+const dt=(s,k,extra)=>T('Collage : '+s.slice(0,34)+' → '+k,async()=>{const r=NOXE.detect(s);if(!r.length||r[0].key!==k)throw new Error('obtenu '+JSON.stringify(D(s)));
+  if(extra)for(const[a,b]of Object.entries(extra))if(r[0][a]!==b)throw new Error(a+'='+r[0][a]);});
+dt('{"a":1,"b":[true,null]}','json');dt(JWT,'jwt');dt('https://exemple.fr/?q=1','url');dt('#ff8800','couleurs',{text:'#ff8800'});
+dt('#f80','couleurs',{text:'#ff8800'});dt('1700000000','dates',{tab:'unix'});dt('1700000000123','dates');dt('192.168.1.10/24','reseau');
+dt('550e8400-e29b-41d4-a716-446655440000','uuid');dt('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad','encodage');
+dt('Qm9uam91ciDDqQ==','base64',{tab:'dec'});dt('data:image/png;base64,iVBORw0KGgo=','base64');dt('caf%C3%A9%20noir','url');
+T('Collage : texte ordinaire → rien proposé',async()=>{for(const s of['Bonjour tout le monde','ceci est une phrase.','password','12345','deadbeef'])
+  if(D(s).length)throw new Error(s+' → '+D(s));});
+
+/* ---- v2 : mémoire des champs ---- */
+T('Les champs se souviennent de leur valeur',async()=>{NOXE.noPersist=false;try{NOXE.open('json');fill('j_in','{"souvenir":1}');NOXE.close();
+  NOXE.open('json');if($('j_in').value!=='{"souvenir":1}')throw new Error('valeur perdue : '+$('j_in').value);}
+  finally{NOXE.noPersist=true;const m=getLS('averse-in',{});delete m.json;setLS('averse-in',m);NOXE.close();}});
+
+/* ---- v2 : vraie page d'accueil dans une iframe (recherche, routage, Échap) ---- */
+let W,F,N;   /* NOXE est une constante globale : pas une propriété de window, on la récupère avec eval */
+const until=async(f,ms=3000)=>{const t0=performance.now();while(!(await f())){if(performance.now()-t0>ms)throw new Error('délai dépassé');await sleep(30);}};
+const key=(k,o={})=>W.document.dispatchEvent(new W.KeyboardEvent('keydown',Object.assign({key:k,bubbles:true,cancelable:true},o)));
+T('Accueil : chargement',async()=>{F=document.createElement('iframe');F.style.cssText='width:900px;height:600px;border:1px solid #333;margin-top:20px';
+  document.body.appendChild(F);await new Promise(r=>{F.onload=r;F.src='index.html#/';});W=F.contentWindow;await until(()=>{try{N=W.eval('NOXE');return !!N.search;}catch(e){return false;}});});
+T('Recherche floue : « jsn » → JSON, « fusion » → PDF',async()=>{if(N.search('jsn')[0].key!=='json')throw new Error(N.search('jsn')[0].key);
+  if(N.search('fusion')[0].key!=='pdfoutils')throw new Error(N.search('fusion')[0].key);});
+T('Recherche + Entrée ouvre l\'outil (#/jwt)',async()=>{const q=W.document.getElementById('q');q.value='jwt';q.dispatchEvent(new W.Event('input',{bubbles:true}));
+  q.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await until(()=>W.location.hash==='#/jwt');
+  has(W.document.querySelector('#modal h2').textContent,'JWT');});
+T('Échap revient à la recherche',async()=>{key('Escape');await until(()=>W.location.hash==='#/'||W.location.hash==='');
+  if(W.document.body.classList.contains('in-tool'))throw new Error('outil encore ouvert');});
+T('Lien direct #/json + bouton Retour',async()=>{W.location.hash='#/json';await until(()=>W.document.querySelector('#modal h2')&&/JSON/.test(W.document.querySelector('#modal h2').textContent)&&W.document.body.classList.contains('in-tool'));
+  W.history.back();await until(()=>!W.document.body.classList.contains('in-tool'));});
+T('Page « Autres outils » : réseau, électronique, texte, mémo',async()=>{W.location.hash='#/autres';await until(()=>!W.document.getElementById('othersView').hidden);
+  has(W.document.getElementById('othersGroups').textContent,'réseau','Ohm','dates','Aide-mémoire');key('Escape');await until(()=>W.document.getElementById('othersView').hidden);});
+T('Ancien lien #outil=uuid redirigé',async()=>{W.location.hash='#outil=uuid';await until(()=>W.location.hash==='#/uuid');key('Escape');await until(()=>!W.document.body.classList.contains('in-tool'));});
+T('Ouverture préremplie (collage d\'un timestamp)',async()=>{N.open('dates',{tab:'unix',text:'1700000000'});await sleep(50);has(W.document.getElementById('modal').textContent,'2023');key('Escape');});
+T('Ctrl+J ouvre et ferme le panneau de notes',async()=>{key('j',{ctrlKey:true});await until(()=>W.notePanel.isOpen());key('j',{ctrlKey:true});await until(()=>!W.notePanel.isOpen());F.remove();});
+
+/* ================= v3 ================= */
+const png=(w=2,h=2,name='img.png')=>new Promise(r=>{const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#c00';x.fillRect(0,0,w,h);
+  c.toBlob(b=>r(new File([b],name,{type:'image/png'})),'image/png');});
+const keys=t=>t.map(x=>x[0]).join(',');
+const ctxAt=(el,o={})=>{const r=el.getBoundingClientRect();const e=new MouseEvent('contextmenu',Object.assign({bubbles:true,cancelable:true,clientX:r.left+5,clientY:r.top+5},o));el.dispatchEvent(e);return e;};
+const ctxLabels=()=>[...document.querySelectorAll('#ctxMenu button')].map(b=>b.textContent.replace('▸','').trim());
+const ctxClick=lab=>{const b=[...document.querySelectorAll('#ctxMenu button')].find(b=>b.textContent.includes(lab));if(!b)throw new Error('pas d\'entrée « '+lab+' » : '+ctxLabels().join(' | '));b.click();};
+const kd=(el,k,o={})=>{const e=new KeyboardEvent('keydown',Object.assign({key:k,bubbles:true,cancelable:true},o));el.dispatchEvent(e);return e;};
+
+/* ---- v3 : chaînage « → Envoyer vers… » ---- */
+T('Chaînage : Base64 → résultat texte → Hash',async()=>{NOXE.open('base64',{tab:'enc'});fill('b_in','Bonjour');
+  const r=await NOXE.result();if(!r||r.text!=='Qm9uam91cg==')throw new Error(JSON.stringify(r));
+  const t=keys(NOXE.chainTargets(r));has(t,'json','url','encodage','regex','qr','carnet');if(t.includes('base64'))throw new Error('vers soi-même : '+t);
+  await NOXE.sendTo('encodage');if(NOXE.current()!=='encodage'||$('h_in').value!=='Qm9uam91cg==')throw new Error('h_in='+$('h_in').value);});
+T('Chaînage : JWT → le résultat est le contenu (payload)',async()=>{NOXE.open('jwt');fill('w_in',JWT);const r=await NOXE.result();has(r.text,'"sub": "42"');if(/HS256/.test(r.text))throw new Error('en-tête pris');});
+T('Chaînage : QR → image PNG → Optimiser',async()=>{NOXE.open('qr');fill('q_in','https://averse.example/');await until(()=>/modules/.test($('q_info').textContent));
+  const r=await NOXE.result();if(!r.files||r.files[0].type!=='image/png')throw new Error('pas une image');
+  const t=keys(NOXE.chainTargets(r));if(t!=='optimiser,convertir,editeur,ocr,pdf')throw new Error(t);
+  await NOXE.sendTo('optimiser',r);await until(()=>$('orows')&&/qrcode/.test($('orows').textContent)&&$('orows').querySelector('[data-i]'));});
+T('Chaînage : images → PDF → outils PDF',async()=>{NOXE.open('pdf',{files:[await png(),await png(3,2,'b.png')]});await until(()=>$('plist'));
+  const r=await NOXE.result();if(!r.files||r.files[0].type!=='application/pdf')throw new Error('pas un PDF');if(keys(NOXE.chainTargets(r))!=='pdfoutils')throw new Error(keys(NOXE.chainTargets(r)));
+  await NOXE.sendTo('pdfoutils',r);await until(()=>$('pd_tabs'),6000);has(text(),'images.pdf','2 p.');});
+T('Chaînage : bouton « → Envoyer vers… » (menu, Échap)',async()=>{NOXE.open('url');fill('u_in','café noir');$('toSend').click();await until(()=>$('sendMenu')&&$('sendMenu').querySelector('[data-send]'));
+  const ks=[...$('sendMenu').querySelectorAll('[data-send]')].map(b=>b.dataset.send).join(',');has(ks,'json','base64','qr');if(ks.includes('url'))throw new Error(ks);
+  kd(document.activeElement,'Escape');if($('sendMenu'))throw new Error('menu encore ouvert');if(NOXE.current()!=='url')throw new Error('outil fermé');
+  $('toSend').click();await until(()=>$('sendMenu')&&$('sendMenu').querySelector('[data-send="base64"]'));$('sendMenu').querySelector('[data-send="base64"]').click();
+  await until(()=>NOXE.current()==='base64');if($('b_in').value!=='caf%C3%A9%20noir')throw new Error('b_in='+$('b_in').value);});
+T('Chaînage : sans résultat → « Pas encore de résultat »',async()=>{NOXE.open('json');$('toSend').click();await until(()=>$('sendMenu')&&/Pas encore/.test($('sendMenu').textContent));$('toSend').click();});
+T('Ctrl+Entrée (runMain) : UUID régénéré',async()=>{NOXE.open('uuid');const a=$('modal').textContent;NOXE.runMain();await sleep(20);if($('modal').textContent===a)throw new Error('rien n\'a changé');});
+
+/* ---- v3 : sauvegarde complète ---- */
+const snap=()=>{const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}return o;};
+const restoreLS=o=>{localStorage.clear();for(const k in o)localStorage.setItem(k,o[k]);};
+T('Sauvegarde : aller-retour complet, secrets exclus',async()=>{const S=snap(),theme=document.documentElement.dataset.theme;
+  try{
+    localStorage.clear();
+    setLS('noxe-notes',{notes:{n_a:{id:'n_a',title:'Cours $x$',body:'# Hello',tags:['t'],created:1,updated:1000,pinned:true}},openId:'n_a',deleted:{n_old:5}});
+    setLS('averse-fav',['json','qr']);setLS('averse-recent',['url']);
+    setLS('averse-in',{json:{j_in:'{"a":1}'},jwt:{w_in:JWT},qr:{q_in:'salut',q_pw:'motdepasse',q_hid:true},encodage:{h_in:JWT}});
+    localStorage.setItem('averse-style','normal');localStorage.setItem('averse-rain','on');
+    const {data,skipped}=BACKUP.build(),txt=JSON.stringify(data);
+    if(skipped!==3)throw new Error('secrets exclus : '+skipped);if(/motdepasse|eyJhbGci/.test(txt))throw new Error('un secret est dans le fichier');
+    if(data.fields.jwt)throw new Error('JWT gardé');
+    localStorage.clear();
+    const v=BACKUP.validate(JSON.parse(txt));if(!v.ok||v.rejected)throw new Error(JSON.stringify(v));
+    BACKUP.apply(v.clean);
+    const nd=getLS('noxe-notes');if(!nd.notes.n_a||nd.notes.n_a.title!=='Cours $x$'||!nd.notes.n_a.pinned)throw new Error('note : '+JSON.stringify(nd));
+    if(getLS('averse-fav').join()!=='json,qr'||getLS('averse-recent').join()!=='url')throw new Error('favoris/récents');
+    const f=getLS('averse-in');if(f.json.j_in!=='{"a":1}'||f.qr.q_in!=='salut'||f.qr.q_hid!==true||f.qr.q_pw)throw new Error(JSON.stringify(f));
+    if(localStorage.getItem('averse-style')!=='normal'||localStorage.getItem('averse-rain')!=='on')throw new Error('réglages');
+    /* 2e import du même fichier : rien en double, la note n'est pas écrasée par plus ancien */
+    BACKUP.apply(BACKUP.validate(JSON.parse(txt)).clean);if(getLS('averse-fav').length!==2)throw new Error('favoris en double');
+  }finally{restoreLS(S);if(theme)document.documentElement.dataset.theme=theme;else delete document.documentElement.dataset.theme;}});
+T('Sauvegarde : fichier piégé → entrées refusées',async()=>{
+  const v=BACKUP.validate(JSON.parse('{"app":"averse","kind":"sauvegarde","version":1,'+
+    '"notes":{"a":{"id":"<img src=x onerror=alert(1)>","title":"t"},"b":{"id":"ok1","title":{}},"c":{"id":"ok2","title":"<b>x</b>","body":5,"tags":[{},"a"],"updated":9e15},"d":{"id":"__proto__","title":"p"}},'+
+    '"deleted":{"__proto__":1,"zz":"x"},"fav":["json","../evil","outil_inconnu",3],"recent":"pas une liste",'+
+    '"fields":{"json":{"j_in":{"x":1},"j_ok":"oui"},"__proto__":{"a":1},"jwt":{"w_in":"x"},"qr":{"q_token":"abc"}},'+
+    '"settings":{"style":"<script>","rain":"on"}}'));
+  if(!v.ok)throw new Error(v.error);
+  const ids=Object.keys(v.clean.notes).join();if(ids!=='ok2')throw new Error('notes : '+ids);
+  const n=v.clean.notes.ok2;if(n.body!=='5'||n.tags.join()!=='a'||n.updated>Date.now()+864e5+1000)throw new Error(JSON.stringify(n));
+  if(v.clean.fav.join()!=='json'||v.clean.recent.length)throw new Error('fav');
+  if(JSON.stringify(v.clean.fields)!=='{"json":{"j_ok":"oui"}}')throw new Error('champs '+JSON.stringify(v.clean.fields));
+  if(JSON.stringify(v.clean.settings)!=='{"rain":"on"}')throw new Error('réglages');
+  if(v.rejected<10)throw new Error('refusés : '+v.rejected);if(({}).a!==undefined)throw new Error('prototype pollué');
+  for(const bad of [null,[],'x',{app:'autre'},{app:'averse',kind:'sauvegarde',version:9}])if(BACKUP.validate(bad).ok)throw new Error('accepté : '+JSON.stringify(bad));
+  if(!BACKUP.validate({notes:{n1:{id:'n1',title:'ancien export du carnet'}}}).ok)throw new Error('export du carnet refusé');});
+
+/* ---- v3 : formules KaTeX ---- */
+const mathHTML=src=>{const m=MATH.extract(src);return MATH.restore(esc(m.src),m.list);};
+T('KaTeX : $…$ et $$…$$ rendus hors-ligne (chargement paresseux)',async()=>{if(window.katex)throw new Error('KaTeX chargé trop tôt');
+  const d=document.createElement('div');d.innerHTML=mathHTML('Aire $\\pi r^2$ et $$\\frac{a}{b}$$ — prix 5 $ et 10 $, code `$x$`');document.body.appendChild(d);
+  const n=await MATH.typeset(d);if(n!==2)throw new Error('formules : '+n);
+  if(!d.querySelector('.katex')||!d.querySelector('.katex-display'))throw new Error('pas de rendu KaTeX');
+  has(d.textContent,'5 $ et 10 $','`$x$`');if(![...document.styleSheets].some(s=>/katex\.min\.css/.test(s.href||'')))throw new Error('CSS absente');d.remove();});
+T('KaTeX : pas d\'XSS (\\href javascript:, HTML, \\htmlData, marqueurs forgés)',async()=>{window.__xss=0;
+  const src=['$\\href{javascript:window.__xss=1}{clic}$','$\\url{javascript:window.__xss=1}$','$<img src=x onerror="window.__xss=1">$','$\\htmlData{x=1}{y}$',
+    '$\\includegraphics{x.png}$','<img src=x onerror="window.__xss=1"> $a$','\uE0000\uE001 $"><svg onload=window.__xss=1>$','$$\\html@mathml{<b>x</b>}{y}$$','$\\def\\a{\\a\\a}\\a$'].join('\n\n');
+  const d=document.createElement('div');d.innerHTML=mathHTML(src);document.body.appendChild(d);await MATH.typeset(d);await sleep(100);
+  if(d.querySelector('img,svg[onload],script,iframe,[onerror],[onload]'))throw new Error('élément dangereux : '+d.innerHTML.slice(0,200));
+  if([...d.querySelectorAll('a')].some(a=>/^\s*javascript:/i.test(a.getAttribute('href')||'')))throw new Error('lien javascript:');
+  if(window.__xss)throw new Error('script exécuté');if(!d.querySelector('.katex'))throw new Error('rien rendu');d.remove();});
+
+/* ---- v3 : clic droit (ctxmenu.js) ---- */
+T('Clic droit : sur un résultat → copier / envoyer / carnet / outil associé',async()=>{NOXE.open('base64',{tab:'enc'});fill('b_in','Bonjour');
+  const cb=$('toolBody').querySelector('.codebox');const e=ctxAt(cb);if(!e.defaultPrevented||!$('ctxMenu'))throw new Error('pas de menu');
+  has(ctxLabels().join('|'),'Copier','Envoyer vers…','Ajouter au carnet','Ouvrir l\'outil associé : Base64');
+  kd(document.activeElement,'ArrowDown');if(document.activeElement!==$('ctxMenu').querySelectorAll('button')[1])throw new Error('↓ ne bouge pas');
+  kd(document.activeElement,'Escape');if($('ctxMenu'))throw new Error('Échap ne ferme pas');if(NOXE.current()!=='base64')throw new Error('Échap a fermé l\'outil');});
+T('Clic droit : « Envoyer vers… » (sous-menu) et « Copier »',async()=>{const cb=$('toolBody').querySelector('.codebox');ctxAt(cb);ctxClick('Envoyer vers');
+  await until(()=>/JSON/.test(ctxLabels().join()));has(ctxLabels().join('|'),'← Retour','URL','Hash');ctxClick('URL');await until(()=>NOXE.current()==='url');
+  if($('u_in').value!=='Qm9uam91cg==')throw new Error('u_in='+$('u_in').value);
+  const old=window.copy;let got=null;window.copy=t=>{got=t;};try{ctxAt($('toolBody').querySelector('.out .line[data-copy]'));ctxClick('Copier');await sleep(20);}finally{window.copy=old;}
+  if(!got)throw new Error('rien copié');});
+T('Clic droit : natif avec Maj, et dans un champ sans sélection',async()=>{const i=$('u_in');
+  if(ctxAt(i).defaultPrevented||$('ctxMenu'))throw new Error('champ sans sélection : menu AVERSE');
+  if(ctxAt($('toolBody').querySelector('.out .line[data-copy]'),{shiftKey:true}).defaultPrevented)throw new Error('Maj ignoré');
+  i.focus();i.setSelectionRange(0,4);if(!ctxAt(i).defaultPrevented)throw new Error('sélection ignorée');has($('ctxMenu').textContent,'Sélection · 4 car.');
+  ctxClick('Ajouter au carnet');});
+T('Clic droit : fichier dans Optimiser → renommer, infos, copier, retirer',async()=>{NOXE.open('optimiser',{files:[await png(2,2,'un.png'),await png(5,3,'deux.png')]});
+  await until(()=>$('orows')&&$('orows').querySelectorAll('[data-i]').length===2);
+  ctxAt($('orows').querySelector('tr[data-fi="0"]'));
+  const L=ctxLabels().join('|');has(L,'Ouvrir dans un autre outil','Renommer pour l\'export…','Télécharger','Copier l\'image','Retirer de la liste','Infos');
+  ctxClick('Renommer');await until(()=>$('ctxIn'));$('ctxIn').value='vacances';$('ctxIn').form.requestSubmit();
+  await until(()=>/vacances\.png/.test($('orows').textContent));
+  ctxAt($('orows').querySelector('tr[data-fi="1"]'));ctxClick('Infos');await until(()=>document.querySelector('.ctx-info'));
+  has(document.querySelector('.ctx-info').textContent,'deux.png','image/png','5 × 3 px');kd(document.querySelector('.ctx-dlg input,.ctx-dlg button')||document.body,'Escape');
+  if(document.querySelector('.ctx-ov'))throw new Error('boîte encore ouverte');if(NOXE.current()!=='optimiser')throw new Error('outil fermé');
+  const cl=navigator.clipboard,orig=cl&&cl.write;let wrote=0;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{write:async a=>{wrote=a.length;}}});
+  try{ctxAt($('orows').querySelector('tr[data-fi="0"]'));ctxClick('Copier l\'image');await until(()=>wrote===1);}finally{Object.defineProperty(navigator,'clipboard',{configurable:true,value:cl});}
+  ctxAt($('orows').querySelector('tr[data-fi="0"]'));ctxClick('Ouvrir dans un autre outil');await until(()=>/Éditer|Éditeur|Mettre en PDF|Images en PDF/.test(ctxLabels().join()));
+  kd(document.activeElement,'ArrowLeft');await until(()=>/Retirer/.test(ctxLabels().join()));ctxClick('Retirer');
+  await until(()=>$('orows').querySelectorAll('tr[data-fi]').length===1);has($('orows').textContent,'deux');});
+T('Clic droit : PDF dans la liste → infos (pages) et renommer',async()=>{await NOXE.lib('js/vendor/pdf-lib.min.js');const {PDFDocument}=PDFLib;
+  const mk=async(n,name)=>{const d=await PDFDocument.create();for(let i=0;i<n;i++)d.addPage();return new File([await d.save()],name,{type:'application/pdf'});};
+  NOXE.open('pdfoutils',{files:[await mk(3,'a.pdf'),await mk(1,'b.pdf')]});await until(()=>$('pd_list'),6000);
+  ctxAt($('pd_list').querySelector('[data-fi="0"]'));ctxClick('Infos');await until(()=>document.querySelector('.ctx-info'));has(document.querySelector('.ctx-info').textContent,'Pages','3');
+  document.querySelector('.ctx-dlg [data-x]').click();
+  ctxAt($('pd_list').querySelector('[data-fi="1"]'));ctxClick('Renommer');await until(()=>$('ctxIn'));$('ctxIn').value='annexe';$('ctxIn').form.requestSubmit();
+  await until(()=>/annexe\.pdf/.test($('pd_list').textContent));
+  ctxAt($('pd_list').querySelector('[data-fi="1"]'));ctxClick('Ouvrir dans un autre outil');await until(()=>/Fusionner/.test(ctxLabels().join()));kd(document.activeElement,'Escape');});
+T('Clic droit : miniature d\'Images en PDF → retirer',async()=>{NOXE.open('pdf',{files:[await png(),await png(4,4,'z.png')]});await until(()=>$('pprev')&&$('pprev').querySelector('[data-fi="1"] img'));
+  ctxAt($('pprev').querySelector('[data-fi="1"] img'));has(ctxLabels().join('|'),'Retirer de la liste','Infos');ctxClick('Retirer');await until(()=>$('plist').querySelectorAll('[data-fi]').length===1);});
+
+
+/* ---- v3 : accueil, raccourcis, « Ouvrir avec », partage, installation (vraie page dans une iframe) ---- */
+let S3;
+const wkey=(el,k,o={})=>{const e=new W.KeyboardEvent('keydown',Object.assign({key:k,bubbles:true,cancelable:true},o));el.dispatchEvent(e);return e;};
+const frame=async(src,test)=>{F=document.createElement('iframe');F.style.cssText='width:1000px;height:700px;border:1px solid #333;margin-top:20px';document.body.appendChild(F);
+  await new Promise(r=>{F.onload=r;F.src=src;});W=F.contentWindow;await until(test,5000);};
+T('Accueil v3 : grand titre AVERSE + liens du pied de page (data.js)',async()=>{S3=snap();
+  await frame('index.html#/',()=>{try{N=W.eval('NOXE');return !!N.search&&W.document.querySelectorAll('#footerLinks a').length;}catch(e){return false;}});
+  const d=W.document;if(!d.querySelector('#homeView .home-head h1')||d.querySelector('.home-head h1').textContent!=='AVERSE')throw new Error('titre');
+  if(!d.querySelector('.home-head pre.ascii-logo'))throw new Error('logo ASCII');
+  const a=[...d.querySelectorAll('#footerLinks a')];if(a.length!==W.eval('SITE').links.length)throw new Error(a.length+' liens');
+  if(a.some(x=>x.target!=='_blank'||!/noopener/.test(x.rel)))throw new Error('target/rel');if(d.getElementById('projectGrid'))throw new Error('projets sur l\'accueil');});
+T('Raccourci « / » : va à la recherche (même depuis un outil)',async()=>{N.open('json');W.document.activeElement.blur();wkey(W.document.body,'/');
+  await until(()=>!N.current()&&W.document.activeElement===W.document.getElementById('q'));});
+T('Raccourci « ? » : aide affichée, Échap la ferme sans quitter l\'outil',async()=>{N.open('uuid');W.document.activeElement.blur();wkey(W.document.body,'?');
+  await until(()=>W.document.getElementById('keysHelp'));has(W.document.getElementById('keysHelp').textContent,'Ctrl','Entrée','copier le résultat','aller à la recherche');
+  wkey(W.document.activeElement,'Escape');await until(()=>!W.document.getElementById('keysHelp'));if(N.current()!=='uuid')throw new Error('outil fermé');});
+T('Raccourcis : « / » et « ? » s\'écrivent normalement dans un champ',async()=>{N.open('json');const j=W.document.getElementById('j_in');j.focus();
+  for(const k of ['/','?']){const e=wkey(j,k);if(e.defaultPrevented)throw new Error(k+' intercepté');}
+  if(W.document.getElementById('keysHelp')||N.current()!=='json'||W.document.activeElement!==j)throw new Error('raccourci déclenché dans le champ');});
+T('Raccourci Ctrl+Entrée : relance l\'outil (UUID)',async()=>{N.open('uuid');await sleep(30);const a=W.document.getElementById('modal').textContent;
+  wkey(W.document.body,'Enter',{ctrlKey:true});await sleep(30);if(W.document.getElementById('modal').textContent===a)throw new Error('pas relancé');});
+T('Raccourci Ctrl+Maj+C : copie le résultat principal',async()=>{N.open('base64',{tab:'enc',text:'Bonjour',input:'b_in'});await sleep(30);
+  let got=null;const old=W.copy;W.copy=t=>{got=t;};try{const e=wkey(W.document.getElementById('b_in'),'C',{ctrlKey:true,shiftKey:true});if(!e.defaultPrevented)throw new Error('non pris');await sleep(30);}finally{W.copy=old;}
+  if(got!=='Qm9uam91cg==')throw new Error('copié : '+got);});
+T('Raccourci Échap : retour à la recherche',async()=>{wkey(W.document.body,'Escape');await until(()=>!N.current());});
+T('« Ouvrir avec » (launchQueue simulé) : PDF, JSON, texte, images',async()=>{
+  const pdf=new File(['%PDF-1.4\n%%EOF'],'x.pdf',{type:'application/pdf'});
+  if(await N.routeFiles([pdf],'open')!=='pdfoutils')throw new Error('pdf');
+  if(await N.routeFiles([new W.File(['{"a":[1,2]}'],'d.json',{type:'application/json'})],'open')!=='json'||!/"a"/.test(W.document.getElementById('j_in').value))throw new Error('json');
+  if(await N.routeFiles([new W.File([JWT],'jeton.txt',{type:'text/plain'})],'open')!=='jwt')throw new Error('txt jwt');
+  if(await N.routeFiles([new W.File(['Penser à acheter du pain'],'courses.txt',{type:'text/plain'})],'open')!=='carnet'||W.document.getElementById('nq_t').value!=='courses')throw new Error('txt → carnet');
+  if(await N.routeFiles([await png()],'open')!=='images')throw new Error('image');
+  await until(()=>!W.document.getElementById('suggest').hidden);has(W.document.getElementById('suggest').textContent,'Ouvert : img.png','Optimiser');
+  if(typeof W.launchQueue==='undefined')console.info('launchQueue absent ici (normal hors appli installée)');});
+T('Partage (share_target simulé : cache « averse-share ») → bon outil',async()=>{const c=await W.caches.open('averse-share');
+  await c.put('./__share/meta',new Response(JSON.stringify({title:'Lien',text:'',url:'https://exemple.fr/?q=café',files:0})));
+  if(await N.takeShare()!=='url')throw new Error('url');if(W.document.getElementById('u_in').value!=='https://exemple.fr/?q=café')throw new Error('u_in');
+  if((await c.keys()).length)throw new Error('cache pas vidé');
+  await c.put('./__share/0',new Response(await png(),{headers:{'content-type':'image/png','x-name':encodeURIComponent('photo partagée.png')}}));
+  await c.put('./__share/meta',new Response(JSON.stringify({files:1})));
+  if(await N.takeShare()!=='images')throw new Error('fichier');has(W.document.getElementById('suggest').textContent,'Partagé : photo partagée.png');
+  if(await N.takeShare()!==null)throw new Error('lu deux fois');});
+T('Installer : bouton caché, affiché sur beforeinstallprompt, prompt() au clic',async()=>{const b=W.document.querySelector('[data-install]');if(!b.hidden)throw new Error('visible trop tôt');
+  const e=new W.Event('beforeinstallprompt',{cancelable:true});let asked=0;e.prompt=()=>{asked++;};e.userChoice=Promise.resolve({outcome:'accepted'});W.dispatchEvent(e);
+  if(b.hidden||!e.defaultPrevented)throw new Error('pas affiché');b.click();await sleep(20);if(asked!==1||!b.hidden)throw new Error('prompt '+asked);});
+T('Clic droit : note du panneau Ctrl+J → épingler, renommer',async()=>{
+  const d=getLS('noxe-notes',{notes:{}})||{notes:{}};d.notes.n_ctx={id:'n_ctx',title:'Note clic droit',body:'x',tags:[],created:1,updated:2};setLS('noxe-notes',d);
+  W.notePanel.open();await until(()=>W.document.querySelector('.np-item[data-id="n_ctx"]'));
+  const it=W.document.querySelector('.np-item[data-id="n_ctx"]'),r=it.getBoundingClientRect();
+  it.dispatchEvent(new W.MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:r.left+4,clientY:r.top+4}));
+  const L=()=>[...W.document.querySelectorAll('#ctxMenu button')].map(b=>b.textContent);await until(()=>L().length);
+  has(L().join('|'),'Ouvrir','Renommer…','Dupliquer','Épingler en haut','Ajouter un tag…','Exporter .md','Exporter PDF','Supprimer…');
+  [...W.document.querySelectorAll('#ctxMenu button')].find(b=>/Épingler/.test(b.textContent)).click();
+  await until(()=>getLS('noxe-notes').notes.n_ctx.pinned===true);await until(()=>/◆ Note clic droit/.test(W.document.querySelector('.np-item').textContent));
+  W.notePanel.close();F.remove();});
+
+/* ---- v3 : le carnet (notes.html) : formules, impression PDF, clic droit sur une note ---- */
+T('Carnet : formules KaTeX dans l\'aperçu, sans XSS',async()=>{
+  setLS('noxe-notes',{notes:{n_m:{id:'n_m',title:'Maths',body:'Énergie $E=mc^2$\n\n$$\n\\int_0^1 x\\,dx=\\frac12\n$$\n\n$<img src=x onerror="parent.__xss=1">$ $\\href{javascript:parent.__xss=1}{x}$\n- [ ] tâche après',tags:['cours'],created:1,updated:Date.now()},
+    n_b:{id:'n_b',title:'Autre',body:'b',tags:[],created:1,updated:1}},openId:'n_m',deleted:{}});
+  window.__xss=0;await frame('notes.html#n_m',()=>W.document.querySelector('#preview .katex'));await until(()=>W.document.querySelector('#preview .katex-display'));
+  const p=W.document.getElementById('preview');if(p.querySelector('img,[onerror]')||[...p.querySelectorAll('a')].some(a=>/javascript:/i.test(a.getAttribute('href')||'')))throw new Error('XSS');
+  if(window.__xss)throw new Error('script exécuté');if(!p.querySelector('input[data-ln="7"]'))throw new Error('ligne de la case décalée');});
+T('Carnet : vue d\'impression (PDF) avec titre, tags et formules',async()=>{let printed=0;W.print=()=>{printed++;};
+  W.document.getElementById('pdfBtn').click();await until(()=>printed===1,5000);const a=W.document.getElementById('printArea');
+  has(a.textContent,'Maths','#cours','Énergie');if(!a.querySelector('.katex'))throw new Error('formule non rendue');
+  if(W.getComputedStyle(a).display!=='none')throw new Error('visible à l\'écran');});
+const wctx=(el,x,y)=>{const r=el.getBoundingClientRect();const e=new W.MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:x!=null?x:r.left+6,clientY:y!=null?y:r.top+6});el.dispatchEvent(e);return e;};
+const wL=()=>[...W.document.querySelectorAll('#ctxMenu button')].map(b=>b.textContent);
+const wClick=lab=>{const b=[...W.document.querySelectorAll('#ctxMenu button')].find(b=>b.textContent.includes(lab));if(!b)throw new Error('pas de « '+lab+' » : '+wL().join('|'));b.click();};
+const wAsk=async v=>{await until(()=>W.document.getElementById('ctxIn'));const i=W.document.getElementById('ctxIn');i.value=v;i.form.requestSubmit();};
+const nd=()=>W.eval('data');
+T('Carnet : clic droit sur une note → les 8 actions',async()=>{const item=()=>W.document.querySelector('#list [data-id="n_b"]');
+  wctx(item());has(wL().join('|'),'Ouvrir','Renommer…','Dupliquer','Épingler en haut','Ajouter un tag…','Exporter .md','Exporter PDF','Supprimer…');
+  wClick('Renommer');await wAsk('Autre renommée');await until(()=>nd().notes.n_b.title==='Autre renommée');
+  wctx(item());wClick('Ajouter un tag');await wAsk('important');await until(()=>nd().notes.n_b.tags.includes('important'));
+  wctx(item());wClick('Épingler');await until(()=>nd().notes.n_b.pinned&&W.document.querySelector('#list .note-item').dataset.id==='n_b');
+  if(!W.document.querySelector('#list .note-item .pin'))throw new Error('pas de marque');
+  const n0=Object.keys(nd().notes).length;wctx(item());wClick('Dupliquer');await until(()=>Object.keys(nd().notes).length===n0+1);
+  if(!Object.values(nd().notes).some(n=>n.title==='Autre renommée (copie)'))throw new Error('copie');
+  wctx(item());wClick('Ouvrir');await until(()=>nd().openId==='n_b'&&W.document.getElementById('titleIn').value==='Autre renommée');
+  let printed=0;W.print=()=>{printed++;};wctx(item());wClick('Exporter PDF');await until(()=>printed===1);has(W.document.getElementById('printArea').textContent,'Autre renommée');
+  wctx(item());wClick('Exporter .md');
+  wctx(item());wClick('Supprimer');await until(()=>W.document.querySelector('.ctx-dlg'));W.document.querySelector('.ctx-dlg [data-x]').click();await sleep(30);if(!nd().notes.n_b)throw new Error('supprimée sans confirmer');
+  wctx(item());wClick('Supprimer');await until(()=>W.document.querySelector('.ctx-dlg'));W.document.querySelector('.ctx-dlg button[type=submit]').click();
+  await until(()=>!nd().notes.n_b&&nd().deleted.n_b);});
+T('Carnet : clic droit sur un nœud du graphe',async()=>{W.document.querySelector('.seg [data-v="graph"]').click();await sleep(300);
+  const G=W.eval('G'),c=W.document.getElementById('graph'),n=G.nodes.find(x=>x.id==='n_m');if(!n)throw new Error('pas de nœud');
+  const r=c.getBoundingClientRect(),Wd=c.width/G.dpr,Hd=c.height/G.dpr;G.alpha=0;
+  const x=r.left+Wd/2+G.off.x+n.x*G.scale,y=r.top+Hd/2+G.off.y+n.y*G.scale;
+  if(!wctx(c,x,y).defaultPrevented)throw new Error('pas de menu sur le nœud');has(W.document.querySelector('#ctxMenu').textContent,'Maths','Épingler');
+  wkey(W.document.activeElement,'Escape');if(W.document.getElementById('ctxMenu'))throw new Error('Échap');
+  if(wctx(c,r.left+2,r.top+2).defaultPrevented)throw new Error('menu sur le vide');F.remove();restoreLS(S3);});
+
+
+/* ---- v4 : dette (échappement, jours ouvrés, regex en Worker, fuites d'URL) ---- */
+T('esc : l\'apostrophe est échappée (attributs entre apostrophes)',async()=>{if(esc("l'a <b>&\"")!=='l&#39;a &lt;b&gt;&amp;&quot;')throw new Error(esc("l'a <b>&\""));});
+T('Jours ouvrés : exacts (contre un calcul jour par jour) et instantanés pour 10 000 000',async()=>{NOXE.open('dates');const W4=NOXE.workdays,D=86400000;
+  const brute=(a,n)=>{let c=0;for(let i=0;i<n;i++){const w=new Date(a.getTime()+i*D).getUTCDay();if(w&&w!==6)c++;}return c;};
+  const bruteAdd=(s,k)=>{let r=new Date(s),n=Math.abs(k),st=k<0?-1:1;while(n>0){r=new Date(r.getTime()+st*D);const w=r.getUTCDay();if(w&&w!==6)n--;}return r;};
+  for(let i=0;i<400;i++){const a=new Date(Date.UTC(2000+i%40,i%12,1+i%28)),n=(i*37)%900,k=((i*53)%700)-350;
+    if(W4.between(a,n)!==brute(a,n))throw new Error('écart '+a.toISOString()+' +'+n);
+    if(W4.add(a,k).getTime()!==bruteAdd(a,k).getTime())throw new Error('ajout '+a.toISOString()+' '+k);}
+  const t0=performance.now();const r=W4.add(new Date(Date.UTC(2026,0,1)),10000000),b=W4.between(new Date(Date.UTC(1900,0,1)),3e6);const ms=performance.now()-t0;
+  if(ms>50)throw new Error(ms+' ms');if(isNaN(r)||b!==Math.floor(3e6/7)*5+brute(new Date(Date.UTC(1900,0,1)+Math.floor(3e6/7)*7*D),3e6%7))throw new Error('grand n');
+  return '+10 000 000 j. ouvrés en '+ms.toFixed(2)+' ms';});
+T('Regex en Worker (rxRunner) : résultat, erreur, arrêt au bout du délai',async()=>{const R=NOXE.rxRunner();
+  const r=await R.run({pat:'é(\\w)',flags:'g',text:'éa éb',count:true});if(r.count!==2||r.ms[1].g[0]!=='b')throw new Error(JSON.stringify(r));
+  let e1=null;try{await R.run({pat:'(',flags:'g',text:'x'});}catch(e){e1=e;}if(!e1||e1.code)throw new Error('erreur de syntaxe');
+  const t0=performance.now();let e2=null;try{await R.run({pat:'(a+)+$',flags:'',text:'a'.repeat(40)+'!'},300);}catch(e){e2=e;}
+  if(!e2||e2.code!=='timeout')throw new Error('pas de timeout');if(performance.now()-t0>1500)throw new Error('trop lent');
+  const r2=await R.run({pat:'a',flags:'g',text:'aaa',count:true});if(r2.count!==3)throw new Error('pas relancé après timeout');R.stop();});
+T('Rechercher / remplacer : regex catastrophique arrêtée, page fluide ; « $ » littéral',async()=>{NOXE.open('texte');tab('repl');
+  fill('r_in','a'.repeat(40)+'!');$('r_re').checked=true;fill('r_a','(a+)+$');
+  let ticks=0;const iv=setInterval(()=>ticks++,50);await until(()=>/arrêtée/.test($('r_info').textContent),4000);clearInterval(iv);
+  if(ticks<8)throw new Error('page figée ('+ticks+' ticks)');
+  $('r_re').checked=false;fill('r_in','prix : 5 €, 7 €');fill('r_a','€');fill('r_b','$&$1');$('r_go').click();await until(()=>$('r_in').value.includes('$'));
+  if($('r_in').value!=='prix : 5 $&$1, 7 $&$1')throw new Error($('r_in').value);
+  $('r_re').checked=true;fill('r_in','2026-10-24');fill('r_a','(\\d+)-(\\d+)-(\\d+)');fill('r_b','$3/$2/$1');$('r_go').click();await until(()=>$('r_in').value==='24/10/2026');});
+T('Images : pas de fuite d\'URL d\'aperçu (relances, fermeture)',async()=>{const fs=[await png(30,20,'a.png'),await png(20,30,'b.png'),await png(10,10,'c.png')];
+  NOXE.open('optimiser',{files:fs});await until(()=>$('orows')&&$('orows').querySelectorAll('img').length===3);
+  const n0=NOXE.liveUrls();
+  for(const q of [60,70,80,90,50]){$('oqr').value=q;$('oqr').dispatchEvent(new Event('input',{bubbles:true}));await sleep(300);await until(()=>$('orows').querySelectorAll('img').length===3);}
+  const n1=NOXE.liveUrls();if(n1>n0+1)throw new Error(n0+' → '+n1+' URL vivantes');
+  NOXE.close();if(NOXE.liveUrls()!==0)throw new Error(NOXE.liveUrls()+' après fermeture');return n0+' URL vivantes, '+n1+' après 5 relances, 0 après fermeture';});
+
+/* ---- v4 : synchro par fichier (fichier OPFS = « dossier OneDrive » simulé ; un autre appareil écrit dedans) ---- */
+let S4,FH;
+const fread=async()=>(await FH.getFile()).text();
+const fwrite=async t=>{await sleep(15);const w=await FH.createWritable();await w.write(typeof t==='string'?t:JSON.stringify(t));await w.close();};   // « l'autre appareil »
+const fjson=async()=>JSON.parse(await fread());
+const sst=()=>W.document.getElementById('syncState');
+T('Synchro : lier un fichier → écrit, état « synchro OK »',async()=>{S4=snap();localStorage.removeItem('noxe-sync');
+  const t=Date.now()-60000;
+  setLS('noxe-notes',{notes:{s_a:{id:'s_a',title:'Alpha',body:'a1',tags:[],created:t,updated:t},s_b:{id:'s_b',title:'Bravo',body:'b1',tags:[],created:t,updated:t}},openId:'s_a',deleted:{}});
+  await frame('notes.html',()=>W.notesSync&&W.document.getElementById('list').children.length);
+  const root=await navigator.storage.getDirectory();try{await root.removeEntry('carnet-test.json');}catch(e){}
+  FH=await root.getFileHandle('carnet-test.json',{create:true});
+  await W.notesSync.attach(FH,false);
+  if(W.notesSync.state()!=='ok')throw new Error(W.notesSync.state());has(sst().textContent,'synchro OK');
+  const d=await fjson();if(d.app!=='averse'||!d.notes.s_a||!d.notes.s_b||d.openId)throw new Error('contenu');
+  const before=(await FH.getFile()).lastModified;await W.notesSync.sync('poll');if((await FH.getFile()).lastModified!==before)throw new Error('réécrit sans raison');});
+T('Synchro : modif sur l\'autre appareil (ajout, modif, suppression) → fusionnée, « modifié ailleurs »',async()=>{
+  const d=await fjson(),t=Date.now();d.notes.s_a.body='a2 (autre PC)';d.notes.s_a.updated=t;
+  d.notes.s_c={id:'s_c',title:'Charlie',body:'c1',tags:[],created:t,updated:t};delete d.notes.s_b;d.deleted.s_b=t;await fwrite(d);
+  await W.notesSync.sync('poll');const n=nd().notes;
+  if(n.s_a.body!=='a2 (autre PC)'||!n.s_c||n.s_b)throw new Error(JSON.stringify(Object.keys(n)));
+  if(W.notesSync.state()!=='ext')throw new Error(W.notesSync.state());has(sst().textContent,'modifié ailleurs');
+  if(!W.document.querySelector('#list [data-id="s_c"]'))throw new Error('liste pas rafraîchie');
+  if(JSON.parse(localStorage.getItem('noxe-notes')).notes.s_c==null)throw new Error('pas enregistré');});
+T('Synchro : détectée toute seule (intervalle) et au retour sur l\'onglet (focus)',async()=>{W.notesSync.setPoll(150);
+  const d=await fjson();d.notes.s_c.body='c2';d.notes.s_c.updated=Date.now();await fwrite(d);
+  await until(()=>nd().notes.s_c.body==='c2',3000);W.notesSync.setPoll(60000);
+  const d2=await fjson();d2.notes.s_c.body='c3';d2.notes.s_c.updated=Date.now();await fwrite(d2);
+  W.dispatchEvent(new W.Event('focus'));await until(()=>nd().notes.s_c.body==='c3',3000);});
+T('Synchro : modif locale → écrite dans le fichier (Ctrl+S implicite)',async()=>{
+  W.document.querySelector('#list [data-id="s_a"]').click();await until(()=>W.document.getElementById('titleIn').value==='Alpha');
+  const b=W.document.getElementById('bodyIn')||W.document.querySelector('textarea');b.value='a3 tapé ici';b.dispatchEvent(new W.Event('input',{bubbles:true}));
+  await until(async()=>(await fjson()).notes.s_a.body==='a3 tapé ici',4000);await until(()=>W.notesSync.state()==='ok',2000);});
+T('Synchro : CONFLIT (modifiée des deux côtés) → les deux versions gardées',async()=>{
+  const t=Date.now(),l=nd().notes.s_c;l.body='version ICI';l.updated=t;            // modif locale pas encore écrite
+  const d=await fjson();d.notes.s_c.body='version LÀ-BAS';d.notes.s_c.updated=t+5;await fwrite(d);
+  await W.notesSync.sync('poll');
+  const all=Object.values(nd().notes),main=nd().notes.s_c,cp=all.find(n=>n.id!=='s_c'&&(n.tags||[]).includes('conflit'));
+  if(main.body!=='version LÀ-BAS')throw new Error('la plus récente doit rester : '+main.body);
+  if(!cp||cp.body!=='version ICI'||!/conflit/.test(cp.title))throw new Error('copie de conflit manquante');
+  const f=await fjson();if(!f.notes[cp.id]||f.notes.s_c.body!=='version LÀ-BAS')throw new Error('fichier');
+  await W.notesSync.sync('poll');if(Object.values(nd().notes).filter(n=>(n.tags||[]).includes('conflit')).length!==1)throw new Error('copie en double');
+  return 'copie : « '+cp.title+' »';});
+T('Synchro : supprimée ici mais modifiée là-bas → gardée en copie',async()=>{
+  const d0=await fjson();d0.notes.s_c.body='c rédigée là-bas';d0.notes.s_c.updated=Date.now();
+  await sleep(5);const td=Date.now()+50;delete nd().notes.s_c;nd().deleted.s_c=td;               // suppression locale, après la modif distante
+  await fwrite(d0);await W.notesSync.sync('poll');
+  if(nd().notes.s_c)throw new Error('ressuscitée');
+  const cp=Object.values(nd().notes).find(n=>n.body==='c rédigée là-bas');if(!cp||!cp.tags.includes('conflit'))throw new Error('modif perdue');
+  const f=await fjson();if(f.notes.s_c||!f.deleted.s_c)throw new Error('pierre tombale pas écrite');});
+T('Synchro : fichier illisible (synchro OneDrive en cours) → erreur, fichier PAS écrasé, puis reprise',async()=>{
+  const ok=await fread(),bad=ok.slice(0,Math.floor(ok.length/2));await fwrite(bad);
+  await W.notesSync.sync('poll');if(W.notesSync.state()!=='err')throw new Error(W.notesSync.state());has(sst().textContent,'erreur','illisible');
+  if(await fread()!==bad)throw new Error('fichier écrasé');if(!nd().notes.s_a)throw new Error('notes perdues');
+  const d=JSON.parse(ok);d.notes.s_a.title='Alpha bis';d.notes.s_a.updated=Date.now();await fwrite(d);
+  await W.notesSync.sync('poll');if(!/^(ok|ext)$/.test(W.notesSync.state())||nd().notes.s_a.title!=='Alpha bis')throw new Error('pas repris : '+W.notesSync.state());});
+T('Synchro : fichier supprimé → erreur claire',async()=>{const root=await navigator.storage.getDirectory();await root.removeEntry('carnet-test.json');
+  await W.notesSync.sync('poll');if(W.notesSync.state()!=='err')throw new Error(W.notesSync.state());has(sst().textContent,'introuvable');});
+T('Synchro : navigateur sans l\'API (Firefox / Safari) → message Sauvegarde / Restaurer',async()=>{W.notesSync.unlink();W.eval('FS').ok=false;
+  W.document.getElementById('fileBtn').click();await until(()=>W.document.querySelector('.ctx-dlg'));
+  has(W.document.querySelector('.ctx-dlg').textContent,'Firefox','Sauvegarde','Restaurer','OneDrive');W.document.querySelector('.ctx-dlg [data-x]').click();
+  F.remove();restoreLS(S4);localStorage.removeItem('noxe-sync');});
+
+/* ---- v4 : graphe à 500 notes (s'arrête quand c'est stable) ---- */
+T('Graphe : 500 notes, se stabilise puis s\'arrête (plus de calcul)',async()=>{S4=snap();const notes={},t=Date.now();
+  for(let i=0;i<500;i++)notes['g'+i]={id:'g'+i,title:'N'+i,body:'voir [[N'+((i*7+3)%500)+']] et [[N'+Math.floor(i/2)+']]',tags:[],created:t,updated:t-i};
+  setLS('noxe-notes',{notes,openId:'g0',deleted:{}});
+  await frame('notes.html',()=>W.graphStats&&W.document.getElementById('list').children.length>=500);
+  let t0=performance.now();W.document.querySelector('.seg [data-v="graph"]').click();const open=performance.now()-t0;
+  await until(()=>!W.graphStats().running,20000);const settle=performance.now()-t0,s=W.graphStats();
+  await sleep(500);if(W.graphStats().steps!==s.steps)throw new Error('continue de calculer après stabilisation');
+  if(s.nodes!==500||s.edges<900)throw new Error(JSON.stringify(s));
+  const step=W.eval('step');t0=performance.now();for(let i=0;i<30;i++)step();const per=(performance.now()-t0)/30;
+  if(per>16)throw new Error('pas trop lent : '+per.toFixed(1)+' ms');
+  window.__graph={open:Math.round(open),settle:Math.round(settle),step:+per.toFixed(2),steps:s.steps,edges:s.edges};
+  return 'ouverture '+Math.round(open)+' ms, stable en '+Math.round(settle)+' ms ('+s.steps+' pas), 1 pas = '+per.toFixed(2)+' ms';});
+T('Graphe : glisser un nœud relance, puis ça se rearrête',async()=>{const G=W.eval('G'),c=W.document.getElementById('graph');
+  const n=G.nodes[0],r=c.getBoundingClientRect(),Wd=c.width/G.dpr,Hd=c.height/G.dpr,x=r.left+Wd/2+G.off.x+n.x*G.scale,y=r.top+Hd/2+G.off.y+n.y*G.scale;
+  const pe=(type,X,Y)=>c.dispatchEvent(new W.PointerEvent(type,{bubbles:true,clientX:X,clientY:Y,button:0,buttons:type==='pointerup'?0:1,pointerId:1,isPrimary:true}));
+  pe('pointerdown',x,y);pe('pointermove',x+30,y+20);pe('pointermove',x+60,y+40);
+  if(!W.graphStats().running)throw new Error('pas relancé');pe('pointerup',x+60,y+40);
+  await until(()=>!W.graphStats().running,15000);F.remove();restoreLS(S4);});
+
+/* ---- v4 : OCR (Tesseract.js local, chargé à l'ouverture de l'outil) ---- */
+const lev=(a,b)=>{const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];};
+const OCR_TXT=['Le château de Noël était déjà fermé.','Où est passée la clé ? À côté du cœur,','une élève française a reçu 12,50 € — août 2026.','Ça ira : naïve, maïs, hôpital, garçon, fenêtre.'];
+const ocrImage=()=>new Promise(r=>{const c=document.createElement('canvas');c.width=1300;c.height=60+OCR_TXT.length*56;const x=c.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle='#111';x.font='34px "DejaVu Sans", Arial, sans-serif';x.textBaseline='top';
+  OCR_TXT.forEach((l,i)=>x.fillText(l,30,30+i*56));c.toBlob(b=>r(new File([b],'texte-accents.png',{type:'image/png'})),'image/png');});
+T('OCR : pas chargé avant d\'ouvrir l\'outil',async()=>{if(window.Tesseract||document.querySelector('script[src*="tesseract"]'))throw new Error('chargé trop tôt');
+  if(!NOXE.tools.find(t=>t.key==='ocr').image)throw new Error('outil');if(!NOXE.chainTargets({files:[await png()]}).some(x=>x[0]==='ocr'))throw new Error('chaînage image → OCR');});
+T('OCR : texte français avec accents lu sur une image générée',async()=>{const f=await ocrImage();const t0=performance.now();
+  NOXE.open('ocr',{files:[f]});await until(()=>$('ocr_out')&&$('ocr_out').value,90000);const ms=performance.now()-t0;
+  const norm=s=>s.normalize('NFC').replace(/\s+/g,' ').trim(),ref=norm(OCR_TXT.join(' ')),got=norm($('ocr_out').value);
+  const acc=1-lev(ref,got)/ref.length,words=ref.split(' '),okW=words.filter(w=>got.split(' ').includes(w)).length;
+  window.__ocr={acc,got,ms,words:okW+'/'+words.length,status:$('ocr_st').textContent};
+  if(acc<0.9)throw new Error('précision '+(acc*100).toFixed(1)+' % : '+got);
+  if(!/é|è|à|ç|ô|ë|œ/.test(got))throw new Error('accents perdus');
+  if((await NOXE.result()).text!==$('ocr_out').value)throw new Error('résultat principal');
+  return 'précision '+(acc*100).toFixed(1)+' % (caractères), '+okW+'/'+words.length+' mots exacts, '+(ms/1000).toFixed(1)+' s';});
+T('OCR : → Carnet et chaînage du texte',async()=>{const n0=Object.keys((getLS('noxe-notes',{notes:{}})||{notes:{}}).notes).length,S=snap();
+  $('ocr_nb').click();const d=getLS('noxe-notes');if(Object.keys(d.notes).length!==n0+1||!Object.values(d.notes).some(n=>/château/.test(n.body)&&n.tags.includes('ocr')))throw new Error('carnet');
+  restoreLS(S);const r=await NOXE.result();has(NOXE.chainTargets(r).map(x=>x[0]).join(','),'carnet','base64');
+  let got=null;const old=window.copy;window.copy=t=>{got=t;};try{$('ocr_cp').click();}finally{window.copy=old;}if(!got||!/château/.test(got))throw new Error('copie');});
+T('OCR : changer de langue relance la lecture (anglais)',async()=>{$('ocr_lang').querySelector('[data-v="eng"]').click();
+  await until(()=>/eng|Anglais/.test(localStorage.getItem('averse-ocr-lang')||'')&&$('ocr_out').value,60000);NOXE.close();localStorage.removeItem('averse-ocr-lang');});
+
+T('ZIP : signature PK',async()=>{const b=await NOXE.zip([{name:'a.txt',blob:new Blob(['salut'])}]);const u=new Uint8Array(await b.slice(0,2).arrayBuffer());if(u[0]!==0x50||u[1]!==0x4b)throw new Error('pas un zip');});
+
+(async()=>{
+  let ok=0;const box=$('res');
+  for(const [name,fn] of tests){
+    let msg='',info='';try{const r=await fn();if(typeof r==='string')info=r;ok++;}catch(e){msg=e.message||String(e);}   // un test peut renvoyer une mesure
+    box.insertAdjacentHTML('beforeend','<div class="t '+(msg?'bad':'ok')+'">'+(msg?'✕ ':'✓ ')+esc(name)+(msg?' — '+esc(msg):info?' — '+esc(info):'')+'</div>');
+    await sleep(30);
+  }
+  NOXE.close();
+  $('sum').innerHTML='<b class="'+(ok===tests.length?'ok':'bad')+'">'+ok+' / '+tests.length+' réussis</b>';
+  document.title=(ok===tests.length?'OK':'ECHEC')+' — tests';
+})();
+</script></body></html>

@@ -1,0 +1,110 @@
+/* app.css — la v2 : accueil = recherche, pages d'outils, panneau de notes (Ctrl+J), dépôt de fichiers */
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#rain{display:none}                                       /* la pluie est en option (rain.js l'affiche) */
+main.wrap{min-height:calc(100vh - 140px)}
+.view{padding:110px 0 30px}
+body.in-tool main{display:none}
+
+/* --- la grande barre de recherche --- */
+.search-hero{min-height:30vh;display:flex;flex-direction:column;justify-content:center;padding:4vh 0 18px}
+.big-search{width:100%;padding:20px 22px;border:1px solid var(--line-2);background:var(--panel);color:var(--fg);
+  font-family:var(--mono);font-size:clamp(1rem,2.6vw,1.35rem);outline:none}
+.big-search:focus{border-color:var(--fg-soft)}
+.big-search::placeholder{color:var(--fg-faint)}
+.search-hint{margin-top:12px;font-size:.7rem;color:var(--fg-faint);line-height:1.7}
+.search-hint b{color:var(--fg-soft);font-weight:500}
+.hint-line{font-size:.74rem;color:var(--fg-faint);margin:-6px 0 22px}
+
+.results{border:1px solid var(--line-2);background:var(--panel);margin-bottom:26px}
+.res-item{display:flex;justify-content:space-between;gap:12px;padding:13px 18px;font-size:.86rem;color:var(--fg-soft);text-decoration:none;border-bottom:1px solid var(--line)}
+.res-item:last-child{border-bottom:0}
+.res-item em{font-style:normal;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-faint);align-self:center}
+.res-item.on,.res-item:hover{background:var(--tint);color:var(--fg)}
+.res-none{padding:16px 18px;font-size:.8rem;color:var(--fg-faint)}
+
+.suggest{border:1px solid var(--fg-soft);background:var(--panel);padding:16px 18px;margin-bottom:26px}
+.sug-title{font-size:.8rem;color:var(--fg);margin-bottom:10px;word-break:break-word}
+.sug-list{display:flex;flex-wrap:wrap;gap:8px}
+.sug-hint{margin-top:10px;font-size:.66rem;color:var(--fg-faint)}
+
+/* --- cartes avec étoile « favori » --- */
+.card{position:relative;background:var(--bg)}
+.card .tool{height:100%;padding-right:46px}
+button.tool{width:100%;font:inherit;color:inherit}
+.star{position:absolute;top:12px;right:10px;width:30px;height:30px;border:0;background:transparent;color:var(--fg-faint);font-size:1rem;cursor:pointer}
+.star:hover,.star.on{color:var(--fg)}
+.more-link{display:inline-block;margin-top:4px;font-size:.78rem;color:var(--fg-soft)}
+.more-link:hover{color:var(--fg)}
+
+/* --- page d'outil --- */
+.tool-view{display:none;position:relative;z-index:2;padding:86px 16px 50px}
+.tool-view.on{display:block}
+.tool-view .modal{margin:0 auto;max-width:880px}
+@media(max-width:560px){
+  .view{padding-top:84px}
+  .tool-view{padding:70px 0 30px}
+  .tool-view .modal{padding:18px 14px;border-left:0;border-right:0}
+  .modal-top{flex-direction:column-reverse;align-items:stretch}
+  .modal-actions{margin-left:0;justify-content:flex-end}
+}
+
+/* --- panneau de notes (Ctrl+J) --- */
+.npanel{position:fixed;top:0;right:0;bottom:0;width:min(430px,100vw);z-index:150;background:var(--panel);border-left:1px solid var(--line-2);
+  display:flex;flex-direction:column;box-shadow:-20px 0 40px rgba(0,0,0,.4)}
+.npanel[hidden]{display:none}
+.np-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line-2)}
+.np-head b{font-family:var(--display);font-size:1.1rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--fg)}
+.np-keys{font-size:.62rem;color:var(--fg-faint);margin-right:auto}
+.np-x{width:30px;height:30px;border:1px solid var(--line-2);background:transparent;color:var(--fg-soft);cursor:pointer}
+.np-x:hover{background:var(--fg);color:var(--bg)}
+.np-body{flex:1;display:flex;flex-direction:column;gap:10px;padding:14px 16px;overflow:auto}
+.np-tools{display:flex;gap:8px;flex-wrap:wrap}
+.np-tools input{flex:1;min-width:0;padding:9px 11px;border:1px solid var(--line-2);background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:.8rem;outline:none}
+.np-list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.np-item{display:block;text-align:left;padding:10px 4px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--fg-soft);cursor:pointer;font:inherit}
+.np-item b{display:block;font-weight:500;color:var(--fg);font-size:.84rem}
+.np-item small{display:block;font-size:.7rem;color:var(--fg-faint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-item:hover{background:var(--tint)}
+.np-none{font-size:.76rem;color:var(--fg-faint);padding:12px 0}
+.np-link{font-size:.74rem;color:var(--fg-soft)}
+.np-title{width:100%;padding:10px 12px;border:1px solid var(--line-2);background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:1rem;outline:none}
+.np-text{flex:1;min-height:240px;width:100%;padding:11px 12px;border:1px solid var(--line-2);background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:.82rem;line-height:1.6;resize:none;outline:none}
+.np-title:focus,.np-text:focus,.np-tools input:focus{border-color:var(--fg-soft)}
+.np-st{font-size:.64rem;color:var(--fg-faint)}
+
+/* --- dépôt de fichier n'importe où --- */
+.drop-veil{position:fixed;inset:0;z-index:250;display:none;align-items:center;justify-content:center;pointer-events:none;
+  background:rgba(3,3,6,.7);border:2px dashed var(--fg-soft)}
+.drop-veil span{font-size:.9rem;color:var(--fg);background:var(--panel);padding:14px 20px;border:1px solid var(--line-2)}
+body.dropping .drop-veil{display:flex}
+
+/* --- variante ASCII --- */
+html[data-theme="ascii"] .big-search,html[data-theme="ascii"] .results,html[data-theme="ascii"] .suggest,
+html[data-theme="ascii"] .np-title,html[data-theme="ascii"] .np-text,html[data-theme="ascii"] .np-tools input{border:1px dashed var(--line-2)!important}
+html[data-theme="ascii"] .search-hero::before{content:"$ averse --cherche";font-size:.78rem;color:var(--fg-soft);margin-bottom:10px}
+html[data-theme="ascii"] .res-item span::before{content:"> ";color:var(--fg-faint)}
+html[data-theme="ascii"] .res-item.on span::before{color:var(--fg)}
+html[data-theme="ascii"] .npanel{border-left:1px dashed var(--fg-soft);box-shadow:none}
+html[data-theme="ascii"] .np-head b::before{content:"# "}
+html[data-theme="ascii"] .np-item{border-bottom:1px dotted var(--line-2)}
+html[data-theme="ascii"] .np-item b::before{content:"- "}
+html[data-theme="ascii"] .modal-star{border:0;background:transparent}
+html[data-theme="ascii"] .drop-veil span::before{content:"[ ";}
+html[data-theme="ascii"] .drop-veil span::after{content:" ]";}
+html[data-theme="ascii"] .card{background:transparent}
+
+/* liens du pied de page (style, pluie, à propos) : sans ça ils restaient bleus en style normal */
+.footer-copyright a{color:var(--fg-soft);text-decoration:none;border-bottom:1px solid var(--line-2)}
+.footer-copyright a:hover{color:var(--fg)}
+body.in-tool footer{display:none}
+
+/* ===================== v3 ===================== */
+/* accueil : le grand titre revient au-dessus de la recherche */
+#homeView{padding-top:0}
+.home-head{padding:120px 0 6px}
+html[data-theme="ascii"] .home-head{padding-top:110px}
+#homeView .search-hero{min-height:0;padding:26px 0 18px}
+.home-head h1{margin:0}
+body.in-tool .home-head{display:none}
+footer .footer-links{margin-bottom:14px}
+
