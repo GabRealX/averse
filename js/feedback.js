@@ -7,7 +7,7 @@
    Ouvert par : liens [data-feedback-btn] (pied de page, carnet), la recherche (« signaler », « bug », « idée »…),
    le clic droit (dernière entrée de chaque menu AVERSE). */
 const FEEDBACK=(function(){
-const VERSION='v8 (cache averse-v16)';   // à mettre à jour avec sw.js
+const VERSION='v9 (cache averse-v17)';   // à mettre à jour avec sw.js
 const MAXURL=6000;
 const TYPES=[['bug','Bug','Quelque chose ne marche pas'],['idée','Idée','Une amélioration, un nouvel outil'],['demande','Demande','Une question, un besoin']];
 const S=()=>typeof SITE!=='undefined'?SITE:{};

@@ -156,10 +156,11 @@ function suggest(title,list){
   sugBox.innerHTML='<div class="sug-title">'+esc(title)+'</div><div class="sug-list">'+
     list.map((s,i)=>'<button class="btn'+(i?' ghost':' primary')+'" data-sug="'+i+'">'+esc(s.label)+'</button>').join('')+
     '<button class="btn ghost" data-sug="x" aria-label="Ignorer">✕</button></div><div class="sug-hint">Entrée = '+esc(list[0].label)+'</div>';
-  sugBox.hidden=false;
+  sugBox.hidden=false;if(NOXE.homeOpen)NOXE.homeOpen();   // v9 : la barre s'ouvre sous le Glyph
 }
 function useSuggest(i){
   const s=pending[i];if(!s)return;clearSuggest();
+  if(s.run){s.run();return;}                                 // v9 : choix qui n'est pas un outil (Photo → note)
   NOXE.open(s.key,s.files?{files:s.files}:{tab:s.tab,text:s.text,input:s.input});
 }
 sugBox.addEventListener('click',e=>{const b=e.target.closest('[data-sug]');if(!b)return;if(b.dataset.sug==='x'){clearSuggest();q.focus();}else useSuggest(+b.dataset.sug);});
@@ -171,6 +172,7 @@ NOXE.fileChoices=files=>{
     const l=[{key:'optimiser',label:'Optimiser'},{key:'convertir',label:'Convertir (PNG / JPG / WEBP)'}];
     if(files.length===1)l.push({key:'editeur',label:'Éditer (recadrer, retoucher…)'},{key:'ocr',label:'Lire le texte (OCR)'});
     l.push({key:'pdf',label:'Mettre en PDF'});
+    if(files.length===1&&window.PHOTO)l.push({key:'photo',label:'Photo → note (lire le texte)',run:()=>PHOTO.open(files[0])});
     return l;
   }
   return[{key:'encodage',label:'Calculer le hash'},{key:'base64',label:'Convertir en Base64'}];
@@ -208,6 +210,7 @@ addEventListener('drop',e=>{
   const cur=NOXE.current(),t=cur&&toolOf(cur);
   if(t&&(t.image||t.multi)&&files.some(f=>NOXE.accepts(t,f))){NOXE.open(cur,{files});return;}   // l'outil ouvert les accepte
   if(t&&NOXE.wantsFiles()){NOXE.open(cur,{files});return;}
+  if(!t){NOXE.routeFiles(files,'drop');return;}               // v9 : sur l'accueil, la détection choisit l'outil (PDF, JSON, texte…)
   offerFiles(files,'drop');
 });
 
@@ -277,7 +280,7 @@ let routing=false;
 function show(v){
   homeV.hidden=v!=='home';othersV.hidden=v!=='autres';
   document.title=v==='autres'?'Autres outils — AVERSE':'AVERSE';
-  if(v==='home'){if(q.value)drawResults();else renderHome();setTimeout(()=>{if(!NOXE.current())q.focus({preventScroll:true});},0);}
+  if(v==='home'){if(q.value)drawResults();else renderHome();setTimeout(()=>{if(NOXE.current())return;if(q.value||!NOXE.homeIdle)q.focus({preventScroll:true});else NOXE.homeIdle();},0);}   // v9 : au repos, le Glyph seul (home.js)
   if(v==='autres')renderOthers();
 }
 function route(){
@@ -306,7 +309,7 @@ addEventListener('keydown',e=>{
   if(e.key==='Escape'&&!othersV.hidden){e.preventDefault();location.hash='#/';return;}
   /* sur l'accueil, taper n'importe où écrit dans la recherche */
   const a=document.activeElement;
-  if(!homeV.hidden&&e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&(!a||a===document.body||a.classList.contains('tool')))q.focus();
+  if(!homeV.hidden&&e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&(!a||a===document.body||a.id==='homeGlyph'||a.classList.contains('tool')))q.focus();
 });
 
 /* liens du pied de page (data.js) — uniquement des adresses http(s) */

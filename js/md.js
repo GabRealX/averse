@@ -1,21 +1,25 @@
 /* md.js — v6 : le rendu Markdown léger d'AVERSE, partagé par le carnet (notes.js) et share.html.
    SÉCURITÉ : tout le texte passe par esc() AVANT d'être transformé ; seules quelques balises sûres sont produites
    (p, h1-3, strong, em, code, pre, ul/ol/li, table, blockquote, hr, a). Liens : http/https/mailto/ancre/relatif uniquement.
+   v9 : ![nom](att:ID) → <img data-att> (pièce jointe, remplie ensuite par attach.js) si l'option att est donnée ;
+        sinon (note partagée) un simple texte « pièce jointe non partagée ». Aucune autre image n'est chargée.
    Options : exists(titre) → la note liée existe ? · nowiki : [[liens]] en simple texte (lecture d'une note partagée)
              readonly : cases à cocher désactivées · empty : texte d'une note vide.
    Utilise esc() de core.js. */
 const MD=(function(){
-const DEF={exists:()=>false,nowiki:false,readonly:false,empty:'Note vide — commence à écrire à gauche.'};
+const DEF={exists:()=>false,nowiki:false,readonly:false,att:false,empty:'Note vide — commence à écrire à gauche.'};
 let O=DEF;
 // N'autorise que des schémas sûrs (http/https/mailto/ancre/relatif). Bloque javascript:, data:, vbscript:…
 function safeUrl(u){const s=String(u==null?'':u).trim();
   return /^(https?:|mailto:|#|\/|\.|[^:]*$)/i.test(s)?s:'#';}
 function inline(text,opt){
-  if(opt)O=Object.assign({},DEF,opt);
+  if(opt&&typeof opt==='object')O=Object.assign({},DEF,opt);   // v9 : pas l'index de .map(inline) (remettait les options à zéro dès la 2e ligne : [[liens]] « absents », images jointes)
   return esc(text).replace(
-    /(`[^`]+`)|(\[\[[^\]]+\]\])|(\[[^\]]+\]\([^)]+\))|(\bhttps?:\/\/[^\s<]+)|(\*\*[^*]+\*\*)|(\*[^*]+\*)/g,
-    (m,code,wiki,link,url,bold,ital)=>{
+    /(`[^`]+`)|(!\[[^\]]*\]\(att:[\w-]{1,48}\))|(\[\[[^\]]+\]\])|(\[[^\]]+\]\([^)]+\))|(\bhttps?:\/\/[^\s<]+)|(\*\*[^*]+\*\*)|(\*[^*]+\*)/g,
+    (m,code,att,wiki,link,url,bold,ital)=>{
       if(code)return'<code>'+code.slice(1,-1)+'</code>';
+      if(att){const mm=/^!\[([^\]]*)\]\(att:([\w-]+)\)$/.exec(att);
+        return O.att?'<img class="att-img" data-att="'+mm[2]+'" alt="'+mm[1]+'">':'<span class="att-miss">[pièce jointe'+(mm[1]?' « '+mm[1]+' »':'')+' — non partagée]</span>';}
       if(wiki){const t=wiki.slice(2,-2).trim().replace(/&(lt|gt|quot|amp);/g,(_,k)=>({lt:'<',gt:'>',quot:'"',amp:'&'}[k])),exist=O.exists(t);   // le texte a déjà été échappé : on le remet à l'état brut
         return O.nowiki?'<span class="wl ro" title="Lien vers une autre note (non partagée)">'+esc(t)+'</span>':'<a class="wl'+(exist?'':' missing')+'" data-title="'+esc(t)+'">'+esc(t)+'</a>';}
       if(link){const mm=/\[([^\]]+)\]\(([^)]+)\)/.exec(link);

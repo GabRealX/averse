@@ -49,3 +49,44 @@ footer{padding:50px 0 44px;border-top:1px solid var(--line);margin-top:30px}
 .pal-item em{font-style:normal;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-faint)}
 .pal-item.on,.pal-item:hover{background:var(--tint);color:var(--fg)}
 .pal-none{padding:16px 18px;font-size:.78rem;color:var(--fg-faint)}
+
+/* ---------- v9 : l'accueil = le grand Glyph (home.js) ----------
+   repos : titre + Glyph + liens du pied de page, AUCUNE liste d'outils ;
+   ouvert : le Glyph se réduit au-dessus de la barre, résultats (ou liste des outils si la barre est vide) dessous. */
+#homeView .home-head{padding:104px 0 6px;transition:padding .45s ease}
+#homeView .hero-subtitle{margin-top:12px}
+.home-stage{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 0 8px}
+.home-glyph{--gz:min(260px,58vw,40vh);background:none;border:0;padding:6px;border-radius:50%;cursor:pointer;line-height:0;
+  transition:transform .3s ease;-webkit-tap-highlight-color:transparent}
+.home-glyph canvas{width:var(--gz)!important;height:var(--gz)!important;transition:width .45s cubic-bezier(.3,.7,.2,1),height .45s cubic-bezier(.3,.7,.2,1),transform .3s ease}
+.home-glyph:hover canvas{transform:scale(1.025)}
+.home-glyph:focus-visible{outline:2px solid var(--fg);outline-offset:6px}
+.home-hint{font-size:.7rem;letter-spacing:.06em;color:var(--fg-faint);text-align:center;transition:opacity .3s}
+.linklike{background:none;border:0;padding:0;font:inherit;color:var(--fg-soft);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.linklike:hover{color:var(--fg)}
+/* la barre : repliée au repos mais toujours atteignable au clavier (Tab → elle s'ouvre) */
+#homeView .search-hero{transition:max-height .45s ease,opacity .35s ease,transform .45s ease}
+#homeView[data-home="rest"] .search-hero{max-height:0;opacity:0;overflow:hidden;transform:translateY(-14px);margin:0;padding:0}
+#homeView .search-hero{min-height:0}
+#homeView[data-home="open"] .search-hero{max-height:900px;opacity:1;transform:none;padding:0 0 18px}
+#homeView[data-home="rest"] #results,#homeView[data-home="rest"] #homeBlocks,#homeView[data-home="rest"] #aiPanel{display:none!important}
+#homeView[data-home="open"] .home-head{padding-top:84px}
+#homeView[data-home="open"] .home-glyph{--gz:72px}
+#homeView[data-home="open"] .home-hint{display:none}
+#homeView[data-home="open"] .home-stage{padding:4px 0 10px}
+/* un fichier survole l'accueil : le Glyph l'aspire (plus besoin du voile) */
+#homeView.h-drag .home-glyph canvas{transform:scale(1.08)}
+#homeView.h-drag .home-hint{color:var(--fg)}
+body:has(#homeView.h-drag) .drop-veil{display:none}
+@media(max-width:560px){
+  #homeView .home-head{padding:78px 0 0}
+  #homeView .home-head h1{font-size:2.6rem}
+  #homeView .hero-subtitle{font-size:.74rem;line-height:1.6}
+  .home-glyph{--gz:min(210px,58vw,33vh)}
+  .home-stage{padding:10px 0 0}
+  footer{padding:26px 0 28px;margin-top:8px}
+  #homeView[data-home="open"] .home-head{padding-top:66px}
+  #homeView[data-home="open"] .hero-subtitle{display:none}
+  #homeView[data-home="open"] .home-glyph{--gz:56px}
+}
+@media(prefers-reduced-motion:reduce){.home-glyph canvas,#homeView .search-hero,#homeView .home-head{transition-duration:.01s}}

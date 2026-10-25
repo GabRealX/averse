@@ -1,0 +1,7 @@
+# Choix proposé sur « New issue ». blank_issues_enabled: true est NÉCESSAIRE :
+# le bouton « Signaler / Suggérer » d'AVERSE ouvre un ticket libre prérempli (?title=…&body=…&labels=…).
+blank_issues_enabled: true
+contact_links:
+  - name: AVERSE (le site)
+    url: https://gabrealx.github.io/averse/
+    about: Le bouton « Signaler / Suggérer » du site préremplit le ticket (et peut joindre les infos techniques).

@@ -1,6 +1,6 @@
 /* backup.js — la sauvegarde COMPLÈTE d'AVERSE dans un seul fichier JSON :
    notes (+ pierres tombales), favoris, récents, champs mémorisés des outils, réglages (style, pluie, couleur d'accent v6, thème v7),
-   et (v6) tes modèles de note (templates.js).
+   et (v6) tes modèles de note (templates.js), et (v9) les pièces jointes des notes (attach.js : fichiers en base64).
    Jamais dedans : les secrets (outil JWT, champs mot de passe / clé / jeton, valeurs qui ressemblent à un JWT).
    À l'import, TOUT est revérifié (on ne fait pas confiance au fichier) puis fusionné — rien n'est écrasé à l'aveugle.
    Utilisé par l'outil « Sauvegarde » (tools/sauvegarde.js) et par le carnet (notes.html). */
@@ -43,8 +43,9 @@ function build(){
   if(typeof TPL!=='undefined'){const t=TPL.payload();if(Object.keys(t.items).length||Object.keys(t.deleted).length)data.templates=t;}
   return{data,skipped};
 }
-function download(){
+async function download(){
   const {data,skipped}=build();
+  if(typeof ATT!=='undefined'){try{const a=await ATT.exportAll();if(a)data.attachments=a;}catch(e){}}   // v9
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const name='averse-sauvegarde-'+data.date.slice(0,10)+'.json';
   if(typeof NOXE!=='undefined'&&NOXE.download)NOXE.download(blob,name);
@@ -92,6 +93,8 @@ function validate(d){
         if(/^[\w-]{1,48}$/.test(k)&&!/^(__proto__|constructor|prototype)$/.test(k)&&isFinite(v)&&v>0)clean.templates.deleted[k]=Math.min(v,Date.now());else rejected++;});
     }else if(tp!=null&&typeof TPL!=='undefined')rejected++;
   }
+  /* v9 : pièces jointes — liste et fichiers revérifiés (types, tailles, identifiants) par attach.js */
+  if(d.attachments!=null&&typeof ATT!=='undefined'){const a=ATT.validate(d.attachments);if(a){clean.attachments=a;rejected+=a.rejected;}else rejected++;}
   return{ok:true,full,clean,rejected};
 }
 
@@ -141,8 +144,9 @@ async function importFile(file){
   const v=validate(d);
   if(!v.ok){toast(v.error);return v;}
   const r=apply(v.clean);
+  if(v.clean.attachments&&typeof ATT!=='undefined')r.attachments=await ATT.importAll(v.clean.attachments);
   const res=Object.assign({ok:true,full:v.full,rejected:v.rejected},r);
-  toast(r.notes+' note(s) fusionnée(s)'+(v.full?', '+r.fav+' favori(s), '+r.fields+' champ(s)':'')+(r.templates?', '+r.templates+' modèle(s)':'')+(v.rejected?' · '+v.rejected+' entrée(s) refusée(s)':''));
+  toast(r.notes+' note(s) fusionnée(s)'+(r.attachments?', '+r.attachments+' pièce(s) jointe(s)':'')+(v.full?', '+r.fav+' favori(s), '+r.fields+' champ(s)':'')+(r.templates?', '+r.templates+' modèle(s)':'')+(v.rejected?' · '+v.rejected+' entrée(s) refusée(s)':''));
   return res;
 }
 return{build,download,validate,apply,importFile,isSecret};

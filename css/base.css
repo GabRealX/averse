@@ -52,3 +52,18 @@ html{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
   max-width:80vw;text-align:center;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
 .toast.on{transform:translate(-50%,0);opacity:1}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ===== v9 : appli installée en « window-controls-overlay » =====
+   Les boutons de fenêtre (─ ☐ ✕) se posent sur le haut de la page : les barres du haut gardent une marge
+   à leur place (--tb-r à droite sous Windows, --tb-l à gauche sous macOS), et on peut déplacer la fenêtre
+   en tirant la barre (drag), sauf sur ce qui se clique (no-drag). js/wco.js met les mêmes valeurs via l'API JS. */
+:root{--tb-l:0px;--tb-r:0px;--tb-h:0px}
+@media (display-mode: window-controls-overlay){
+  :root{--tb-l:env(titlebar-area-x,0px);--tb-r:calc(100vw - env(titlebar-area-x,0px) - env(titlebar-area-width,100vw));--tb-h:env(titlebar-area-height,0px)}
+  nav,.bar{-webkit-app-region:drag;app-region:drag}
+  nav a,nav button,nav input,.bar a,.bar button,.bar input,.bar select,.bar label,.bar .more-menu,.bar .sync-state{-webkit-app-region:no-drag;app-region:no-drag}
+}
+html.wco nav,html.wco .bar{-webkit-app-region:drag;app-region:drag}
+html.wco nav a,html.wco nav button,html.wco nav input,html.wco .bar a,html.wco .bar button,html.wco .bar input,html.wco .bar select,
+html.wco .bar label,html.wco .bar .more-menu,html.wco .bar .sync-state{-webkit-app-region:no-drag;app-region:no-drag}
+nav{padding-left:var(--tb-l);padding-right:var(--tb-r)}         /* accueil, outils, à propos : la barre de liens se pousse à côté des boutons */

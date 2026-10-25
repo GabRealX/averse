@@ -1,0 +1,16 @@
+name: Idée
+description: Une amélioration ou un nouvel outil pour AVERSE.
+title: "[Idée] "
+labels: ["idée"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: L'idée
+      placeholder: Qu'aimerais-tu voir dans AVERSE ?
+    validations:
+      required: true
+  - type: textarea
+    id: pourquoi
+    attributes:
+      label: Pourquoi / pour quel usage

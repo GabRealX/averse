@@ -22,7 +22,7 @@ try{const old=localStorage.getItem('averse-tests-backup');
 <script src="js/tools/reseau.js"></script><script src="js/tools/electronique.js"></script>
 <script src="js/tools/dev.js"></script><script src="js/tools/texte.js"></script><script src="js/tools/memo.js"></script>
 <script src="js/tools/encodage.js"></script><script src="js/tools/pdf.js"></script><script src="js/tools/carnet.js"></script><script src="js/tools/image.js"></script><script src="js/tools/editeur.js"></script><script src="js/tools/ocr.js"></script>
-<script src="js/vault.js"></script><script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
+<script src="js/vault.js"></script><script src="js/attach.js"></script><script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
 <script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script><script src="js/glyph.js"></script>
 <link rel="stylesheet" href="css/ui.css">
 <script>
@@ -554,21 +554,24 @@ function fakeGitHub(){
     for(const n in r.files)files[n]={filename:n,raw_url:'mock://raw/'+g.id+'/'+r.version+'/'+n,truncated:false,content:r.files[n]};
     return{id:g.id,public:g.public,description:g.desc,files,updated_at:r.at,history:g.hist.map(h=>({version:h.version,committed_at:h.at}))};};
   const R=(st,o,h)=>new Response(st===304?null:JSON.stringify(o),{status:st,headers:Object.assign({'Content-Type':'application/json'},h||{})});
-  const commit=(g,files)=>{g.hist.unshift({version:sha(),at:new Date().toISOString(),files:Object.assign({},g.hist[0]?g.hist[0].files:{},files)});};
+  /* v9 : plusieurs fichiers par PATCH, et null = fichier supprimé (comme l'API GitHub) */
+  const commit=(g,files)=>{const nf=Object.assign({},g.hist[0]?g.hist[0].files:{});for(const n in files){if(files[n]==null)delete nf[n];else nf[n]=files[n];}
+    g.hist.unshift({version:sha(),at:new Date().toISOString(),files:nf});};
+  const filesOf=b=>{const o={};for(const n in b.files)o[n]=b.files[n]==null?null:b.files[n].content;return o;};
   async function f(url,o){
     const u=new URL(url),p=u.pathname.split('/').filter(Boolean),a=(o.headers||{}).Authorization||'',ok=a==='Bearer '+GTOK;
-    log.push({m:o.method,p:u.pathname,inm:(o.headers||{})['If-None-Match']||null,auth:!!a});
+    log.push({m:o.method,p:u.pathname,inm:(o.headers||{})['If-None-Match']||null,auth:!!a,ka:!!o.keepalive});
     if(u.host!=='api.github.com')return R(404,{});
     if(a&&!ok)return R(401,{message:'Bad credentials'});
     if(p[0]!=='gists')return R(404,{});
     if(p.length===1&&o.method==='GET')return ok?R(200,Object.values(G).map(g=>view(g))):R(401,{});
     if(p.length===1&&o.method==='POST'){if(!ok)return R(401,{});const b=JSON.parse(o.body),id=sha().slice(0,32),g={id,public:b.public,desc:b.description,hist:[]};
-      commit(g,{[Object.keys(b.files)[0]]:Object.values(b.files)[0].content});G[id]=g;return R(201,view(g));}
+      commit(g,filesOf(b));G[id]=g;return R(201,view(g));}
     const g=G[p[1]];if(!g)return R(404,{message:'Not Found'});
     if(o.method==='GET'){if(p[2]){const v=view(g,p[2]);return v?R(200,v):R(404,{});}
       const et='W/"'+g.hist[0].version+'"';return(o.headers||{})['If-None-Match']===et?R(304,null,{ETag:et}):R(200,view(g),{ETag:et});}
     if(o.method==='PATCH'){if(!ok)return R(401,{});if(before){const fn=before;before=null;await fn();}
-      const b=JSON.parse(o.body);commit(g,{[Object.keys(b.files)[0]]:Object.values(b.files)[0].content});return R(200,view(g));}
+      const b=JSON.parse(o.body);commit(g,filesOf(b));return R(200,view(g));}
     return R(405,{});
   }
   return{fetch:f,G,log,one:()=>Object.values(G)[0],vault:()=>JSON.parse(Object.values(Object.values(G)[0].hist[0].files)[0]),
@@ -663,6 +666,114 @@ T('Synchro Gist (v6) : un modèle de note part chiffré avec les notes ; rien de
   const n=GH.log.length;await W.cloudSync.sync('t');const l=GH.log.slice(n);if(l.length!==1||!l[0].inm)throw new Error('pas 304 : '+JSON.stringify(l));
   await otherDevice(d=>{d.templates.items.tel={id:'tel',name:'Du téléphone',title:'',body:'',updated:Date.now()};});
   await W.cloudSync.sync('t');if(!W.TPL.get('tel'))throw new Error('modèle distant pas reçu');});
+/* ---- v9 : synchro moins fréquente, avant de partir, pièces jointes chiffrées, conflit à la même milliseconde ---- */
+const idle=async()=>{const CM=W.cloudDebug.M;clearTimeout(CM.t);for(let i=0;i<12;i++){await W.cloudSync.sync('t');await sleep(120);if(!CM.busy&&!CM.again&&!W.cloudSync.pending())return;}throw new Error('synchro jamais au repos ('+W.cloudSync.status()+')');};
+T('Synchro Gist (v9) : rien n\'a changé → AUCUNE requête (ouvrir/relire des notes) ; coup d\'œil = lecture conditionnelle (304)',async()=>{await idle();
+  const n=GH.log.length;
+  for(const id of ['k_a','k_b','k_a']){W.document.querySelector('#list [data-id="'+id+'"]').click();await sleep(60);}
+  W.cloudLater();await sleep(700);                            // envoi différé = 150 ms ici : rien ne doit partir
+  if(GH.log.length!==n)throw new Error('requête(s) inutile(s) : '+JSON.stringify(GH.log.slice(n)));
+  if(W.cloudSync.pending())throw new Error('« à envoyer » alors que rien n\'a changé');
+  cd().M.checked=0;cd().setTimes(250,150);await until(()=>GH.log.length>n,3000);await sleep(150);cd().setTimes(600000,150);
+  const l=GH.log.slice(n);if(!l.length||l.some(x=>x.m!=='GET'||!x.inm))throw new Error('coup d\'œil : '+JSON.stringify(l));
+  has(W.document.getElementById('cloudState').title,'Dernière synchro');return l.length+' GET conditionnel(s), 0 PATCH';});
+T('Synchro Gist (v9) : envoi groupé (debounce) — 5 frappes → 1 seul PATCH',async()=>{await idle();cd().setTimes(600000,400);
+  W.document.querySelector('#list [data-id="k_b"]').click();await until(()=>W.document.getElementById('titleIn').value==='Lima');
+  const n=GH.log.length,b=W.document.getElementById('bodyIn');
+  for(let i=0;i<5;i++){b.value='l4 frappe '+i;b.dispatchEvent(new W.Event('input',{bubbles:true}));await sleep(120);}
+  if(GH.log.slice(n).some(x=>x.m==='PATCH'))throw new Error('envoyé pendant la frappe');
+  const k=await VAULT.dkKey(DKT);await until(async()=>(await VAULT.openData(GH.vault(),k)).notes.k_b.body==='l4 frappe 4',4000);
+  const p=GH.log.slice(n).filter(x=>x.m==='PATCH').length;cd().setTimes(600000,150);if(p!==1)throw new Error(p+' PATCH');});
+T('Avant de partir (v9) : confirmation SEULEMENT si des modifs ne sont pas synchronisées ; pagehide → dernier envoi keepalive',async()=>{await idle();
+  const bu=()=>{const e=new W.Event('beforeunload',{cancelable:true});W.dispatchEvent(e);return e.defaultPrevented;};
+  if(bu())throw new Error('demande alors que tout est synchronisé');
+  cd().setTimes(600000,600000);                               // l'envoi différé n'arrivera pas pendant le test
+  const b=W.document.getElementById('bodyIn');b.value='l5 pas encore envoyé';b.dispatchEvent(new W.Event('input',{bubbles:true}));await sleep(350);
+  if(!W.cloudSync.pending())throw new Error('pas « en attente »');if(!bu())throw new Error('pas de confirmation alors que ce n\'est pas synchronisé');
+  await until(()=>!!cd().M.pre,3000).catch(()=>{throw new Error('dernier envoi pas préparé');});
+  const n=GH.log.length;W.dispatchEvent(new W.Event('pagehide'));await until(()=>GH.log.length>n,2000);
+  const l=GH.log.slice(n);if(l.length!==1||l[0].m!=='PATCH'||!l[0].ka)throw new Error('pagehide : '+JSON.stringify(l));
+  const k=await VAULT.dkKey(DKT);if((await VAULT.openData(GH.vault(),k)).notes.k_b.body!=='l5 pas encore envoyé')throw new Error('keepalive pas écrit');
+  cd().setTimes(600000,150);await idle();if(bu())throw new Error('demande encore après la synchro');});
+T('Conflit (v9) : modifiées à la MÊME milliseconde, textes différents → une copie, les deux appareils convergent',async()=>{await idle();
+  const t=Date.now()-1000;
+  await otherDevice(d=>{d.notes.k_c.body='Même ms LÀ-BAS';d.notes.k_c.updated=t;});
+  const l=nd().notes.k_c;l.body='Même ms ICI';l.updated=t;
+  await idle();
+  const k=await VAULT.dkKey(DKT),d=await VAULT.openData(GH.vault(),k);
+  const win=W.notesApi.cmp({updated:t,title:l.title,body:'Même ms LÀ-BAS',tags:l.tags},{updated:t,title:l.title,body:'Même ms ICI',tags:l.tags})>0?'Même ms LÀ-BAS':'Même ms ICI';
+  if(nd().notes.k_c.body!==win||d.notes.k_c.body!==win)throw new Error('pas convergé : ici='+nd().notes.k_c.body+' gist='+d.notes.k_c.body);
+  const cps=Object.values(nd().notes).filter(n=>(n.tags||[]).includes('conflit')&&/Même ms/.test(n.body));
+  if(cps.length!==1||cps[0].body===win)throw new Error('copies : '+JSON.stringify(cps.map(c=>c.body)));
+  if(!d.notes[cps[0].id])throw new Error('copie pas envoyée');});
+T('Conflit (v9) : vue côte à côte — diff ligne par ligne, Garder l\'autre → copie supprimée (pierre tombale synchronisée)',async()=>{
+  const D=W.CONFLICT.diff('a\nb\nc\nd','a\nB\nc\nd\ne').map(o=>o.t).join('');if(D!=='=-+=='+'+'&&D!=='=+-==+')throw new Error('diff '+D);
+  const R=W.CONFLICT.rows(W.CONFLICT.diff('a\nb\nc','a\nB\nc'));if(R.length!==3||R[1].t!=='~'||R[1].a!=='b'||R[1].b!=='B')throw new Error('lignes '+JSON.stringify(R));
+  const mt=W.CONFLICT.mergeText('x\ny','x\nz');if(!W.CONFLICT.hasMarkers(mt)||!/<<<<<<< la mienne\ny\n=======\nz\n>>>>>>> l'autre/.test(mt))throw new Error('fusion '+mt);
+  const t=Date.now()-500;
+  await otherDevice(d=>{d.notes.k_a.body='ligne 1\nligne 2 LÀ-BAS\nligne 3';d.notes.k_a.updated=t+5;});
+  const l=nd().notes.k_a;l.body='ligne 1\nligne 2 ici\nligne 3';l.updated=t;await idle();
+  const cp=Object.values(nd().notes).find(n=>(n.tags||[]).includes('conflit')&&/ligne 2 ici/.test(n.body));if(!cp)throw new Error('pas de copie');
+  W.notesApi.open(cp.id);await until(()=>!W.document.getElementById('cfBar').hidden);has(W.document.getElementById('cfBar').textContent,'Copie de conflit');
+  W.document.getElementById('cfOpen').click();await until(()=>W.document.getElementById('cfDlg'));
+  const g=W.document.querySelector('#cfDlg .cf-grid');
+  if(g.querySelector('.cf-del').textContent!=='ligne 2 ici'||g.querySelector('.cf-add').textContent!=='ligne 2 LÀ-BAS')throw new Error('surlignage : '+g.querySelector('.cf-del').textContent+' / '+g.querySelector('.cf-add').textContent);
+  if(g.querySelectorAll('.cf-c.cf-a').length!==3)throw new Error('colonnes pas alignées');
+  /* fusion : marqueurs laissés → avertissement d'abord */
+  W.document.querySelector('#cfDlg [data-cf="merge"]').click();const ta=W.document.getElementById('cfTxt');has(ta.value,'<<<<<<< la mienne');
+  W.document.querySelector('#cfDlg [data-cf="save"]').click();if(W.document.getElementById('cfWarn').hidden)throw new Error('pas d\'avertissement');
+  ta.value='ligne 1\nligne 2 fusionnée\nligne 3';W.document.querySelector('#cfDlg [data-cf="save"]').click();
+  await until(()=>!W.document.getElementById('cfDlg'));
+  if(nd().notes.k_a.body!=='ligne 1\nligne 2 fusionnée\nligne 3')throw new Error('fusion pas enregistrée');
+  if(nd().notes[cp.id]||!nd().deleted[cp.id])throw new Error('copie pas supprimée proprement');
+  await idle();const k=await VAULT.dkKey(DKT),d=await VAULT.openData(GH.vault(),k);
+  if(d.notes[cp.id]||!d.deleted[cp.id]||d.notes.k_a.body!=='ligne 1\nligne 2 fusionnée\nligne 3')throw new Error('pas synchronisé');
+  /* « Garder l'autre » sur la copie du test précédent */
+  const c2=Object.values(nd().notes).find(n=>(n.tags||[]).includes('conflit')&&/Même ms/.test(n.body));
+  if(c2){W.CONFLICT.open(c2.id);await until(()=>W.document.getElementById('cfDlg'));W.document.querySelector('#cfDlg [data-cf="other"]').click();
+    await until(()=>!W.document.getElementById('cfDlg'));if(nd().notes[c2.id])throw new Error('copie 2 restée');}});
+T('Pièces jointes (v9) : chiffrées dans un 2e Gist secret, JAMAIS en clair ; reçues ailleurs ; suppression synchronisée',async()=>{await idle();
+  const MARK='MARQUEUR-EN-CLAIR-AVERSE-'+Math.random().toString(36).slice(2,8);
+  const base=new Uint8Array(await(await png(8,8)).arrayBuffer()),file=new W.File([base,MARK],'plan-secret-'+MARK+'.png',{type:'image/png'});
+  W.notesApi.open('k_a');const m=await W.ATT.add('k_a',file,{compress:false});
+  if(!W.ATT.list('k_a').length)throw new Error('pas ajoutée');
+  await idle();
+  const gs=Object.values(GH.G);if(gs.length!==2)throw new Error(gs.length+' Gist(s)');const ag=gs.find(g=>g!==GH.one());
+  if(ag.public!==false)throw new Error('Gist des pièces public !');
+  const files=ag.hist[0].files,fn='a-'+m.id+'.bin';if(!files[fn]||!/^AVATT1\./.test(files[fn]))throw new Error('fichier chiffré absent : '+Object.keys(files));
+  const all=JSON.stringify(gs.map(g=>g.hist.map(h=>h.files)))+JSON.stringify(gs.map(g=>g.desc));
+  const b64m=btoa(MARK),raw=btoa(String.fromCharCode(...base)).slice(0,24);
+  for(const bad of [MARK,b64m.slice(0,20),'plan-secret',raw])if(all.includes(bad))throw new Error('EN CLAIR dans le Gist : '+bad);
+  const k=await VAULT.dkKey(DKT),d=await VAULT.openData(GH.vault(),k);if(!d.att||!d.att.items[m.id]||d.att.items[m.id].name!==m.name)throw new Error('liste pas dans le coffre chiffré');
+  const back=await W.ATT._unseal(k,m.id,files[fn]);if(new TextDecoder().decode(back.slice(-MARK.length))!==MARK)throw new Error('déchiffrement');
+  let e=null;try{await W.ATT._unseal(k,'aautreid1234',files[fn]);}catch(x){e=x;}if(!e)throw new Error('AAD : fichier recopié sous un autre id accepté');
+  /* « autre appareil » : le fichier n'est pas là → téléchargé et déchiffré */
+  await W.ATT._dropBlob(m.id);setLS('averse-att-sync',{});if((await W.ATT.haveIds()).has(m.id))throw new Error('drop');
+  await idle();if(!(await W.ATT.haveIds()).has(m.id))throw new Error('pas reçue');
+  const got=new Uint8Array(await(await W.ATT.getBlob(m.id)).arrayBuffer());if(got.length!==m.size)throw new Error('taille reçue');
+  /* rien de neuf → aucune requête pour les pièces */
+  const n=GH.log.length;await W.cloudSync.sync('t');const l=GH.log.slice(n);if(l.length!==1||!l[0].inm)throw new Error('requêtes en trop : '+JSON.stringify(l));
+  /* suppression : pierre tombale dans le coffre + fichier retiré du Gist */
+  await W.ATT.remove(m.id);await idle();
+  if(ag.hist[0].files[fn])throw new Error('fichier resté dans le Gist');
+  const d2=await VAULT.openData(GH.vault(),k);if(d2.att.items[m.id]||!d2.att.deleted[m.id])throw new Error('pierre tombale');});
+T('Pièces jointes (v9) : limites refusées proprement (5 Mo, type), sauvegarde avec les fichiers, partage sans',async()=>{
+  let e=null;try{await W.ATT.add('k_a',new W.File([new Uint8Array(5*1048576+10)],'gros.pdf',{type:'application/pdf'}));}catch(x){e=x;}
+  if(!(e instanceof W.ATT.AttError)||!/5 Mo/.test(e.message))throw new Error('5 Mo : '+(e&&e.message));
+  e=null;try{await W.ATT.add('k_a',new W.File(['<svg/>'],'x.svg',{type:'image/svg+xml'}));}catch(x){e=x;}if(!(e instanceof W.ATT.AttError))throw new Error('SVG accepté');
+  e=null;try{await W.ATT.add('k_a',new W.File(['x'],'x.txt',{type:'text/plain'}));}catch(x){e=x;}if(!(e instanceof W.ATT.AttError))throw new Error('texte accepté');
+  const pdf=new W.File(['%PDF-1.4 test v9'],'doc.pdf',{type:'application/pdf'}),m=await W.ATT.add('k_b',pdf);
+  const ex=await W.ATT.exportAll();if(!ex||!ex.blobs[m.id])throw new Error('export sans le fichier');
+  const v=W.ATT.validate(JSON.parse(JSON.stringify(ex)));await W.ATT._dropBlob(m.id);const k=await W.ATT.importAll(v);
+  if(k!==1||!(await W.ATT.haveIds()).has(m.id))throw new Error('restauration');
+  const bad=W.ATT.validate({items:{x:{id:'<img>',name:'a',type:'text/html',size:1}},blobs:{'<img>':'@@'}});if(Object.keys(bad.items).length||!bad.rejected)throw new Error('sauvegarde piégée acceptée');
+  /* aperçu : ![](att:ID) → image ; partage : texte « non partagée » */
+  const h=W.MD.render('![doc](att:'+m.id+')',{att:true}),hs=W.MD.render('![doc](att:'+m.id+')',{});
+  if(!/<img class="att-img" data-att="/.test(h)||/<img/.test(hs)||!/non partagée/.test(hs))throw new Error('rendu '+h+' / '+hs);
+  W.notesApi.open('k_b');W.document.getElementById('shareBtn').click();await until(()=>W.document.getElementById('shAtt'));
+  has(W.document.getElementById('shAtt').textContent,'pas incluses');W.document.querySelector('#shareDlg [data-a="close"],#shareDlg .tpl-b:not(.primary)');
+  W.document.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(50);
+  await W.ATT.remove(m.id);await idle();});
 T('Synchro Gist : code de secours sur un appareil « neuf » → tout récupéré',async()=>{
   const code=await cd().addRecoveryNow(DKT.slice());await cd().reset();if(W.cloudSync.configured())throw new Error('pas désactivé');
   delete nd().notes.k_c;
@@ -992,7 +1103,7 @@ T('Signaler : message énorme → adresse < 6000 car., raccourcie proprement (em
       const b=new URL(r.url).searchParams.get('body');has(b,'message raccourci','Infos techniques');}
     const sm=W.FEEDBACK.url({type:'bug',title:'Court',message:'ok',tech:true});if(sm.cut)throw new Error('court raccourci');
     const b=new URL(sm.url).searchParams.get('body'),tl=W.FEEDBACK.tech().map(x=>x.join(':')).join('\n');
-    has(b,'AVERSE v8','index.html · outil : json',navigator.userAgent.slice(0,30));
+    has(b,'AVERSE v9','index.html · outil : json',navigator.userAgent.slice(0,30));
     for(const bad of ['SECRETNOTE','SECRETTITRE','ghp_','token','#/','password'])if(b.includes(bad)||tl.includes(bad))throw new Error('fuite : '+bad);
     W.location.hash='#/json?x=1';if(W.FEEDBACK.tech().some(x=>/[#?]/.test(x[1])&&x[0]==='Page'))throw new Error('page avec # ou ?');
   }finally{if(F)F.remove();restoreLS(S);}});
@@ -1338,7 +1449,8 @@ T('IA : clic droit (sous-menu IA ✦ : JSON, regex), palette (« ia regex »), o
 const fill2=(el,v)=>{el.value=v;el.dispatchEvent(new W.Event('input',{bubbles:true}));};
 
 /* ---------- v8 : l'IA dans la barre de l'accueil, langue des réponses, modèle multilingue ---------- */
-const qType=(v)=>{const q=W.document.getElementById('q');q.value=v;q.dispatchEvent(new W.Event('input',{bubbles:true}));return q;};
+const qType=(v)=>{const q=W.document.getElementById('q');if(W.document.activeElement!==q)q.focus();q.value=v;   // v9 : comme un vrai utilisateur, on tape DANS la barre (elle s'ouvre au focus)
+  q.dispatchEvent(new W.Event('input',{bubbles:true}));return q;};
 const resItems=()=>[...W.document.querySelectorAll('#results .res-item')];
 const homeAi=async(pre)=>{await frame('index.html#/',()=>W.AI&&W.AIBAR&&W.document.getElementById('q'));await W.AI.ready;if(pre)await pre();};
 T('Barre IA : option en tête pour une question, « ? », Tab ou bouton ; Entrée garde le 1er outil ; recherche normale intacte ; aucune requête',async()=>{const S=snap();
@@ -1474,10 +1586,144 @@ T('IA locale v8 : changement de modèle → anciens vecteurs effacés et recalcu
   }finally{try{(await caches.open('transformers-cache')).delete(OTHER);}catch(e){}
     if(F){const w=F.contentWindow;try{if(w.AI){await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
 
+/* ---- v9 : Photo → note, menu ⋯, Glyph agrandi, progression de l'indexation ---- */
+const wpng=async(w,h)=>{const b=await(await png(w||40,h||20)).arrayBuffer();return new W.File([b],'photo-test.png',{type:'image/png'});};
+T('Photo → note (v9) : OCR (simulé) → note + photo jointe ; « Mettre au propre » : aperçu, AUCUN envoi sans clic, puis note Markdown',async()=>{const S=snap();const made=[];
+  try{sNotes([{id:'ph_a',title:'Existante',body:'x'}]);await frame('notes.html',()=>W.PHOTO&&W.notesApi&&W.AI);await W.AI.ready;const d=W.document,net=aiNet();
+    const OCRT='Chapitre 1 : énergie\n\nE = mc2\n- la masse\n- la lumière';let calls=0;
+    W.PHOTO.setEngine(async(f,prog)=>{calls++;prog('lecture du texte',.5,.5);await sleep(60);return '  '+OCRT+'  \n\n\n';});
+    const pb=d.getElementById('photoBtn');if(!pb||pb.hidden)throw new Error('bouton 📷 du carnet');pb.click();await until(()=>d.getElementById('photoDlg'));
+    const cam=d.getElementById('phCam');if(cam.getAttribute('capture')!=='environment'||cam.accept!=='image/*')throw new Error('entrée caméra');
+    W.document.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await until(()=>!d.getElementById('photoDlg'));
+    W.PHOTO.open(await wpng());await until(()=>d.getElementById('phTxt')&&d.getElementById('phTxt').value);
+    if(d.getElementById('phTxt').value!==OCRT)throw new Error('texte lu : '+JSON.stringify(d.getElementById('phTxt').value));
+    if(!d.getElementById('phKeep').checked)throw new Error('photo jointe par défaut');
+    d.querySelector('#photoDlg [data-ph="make"]').click();
+    await until(()=>Object.values(nd().notes).some(n=>n.title==='Chapitre 1 : énergie'&&/\(att:a/.test(n.body)),3000);
+    const n1=Object.values(nd().notes).find(n=>n.title==='Chapitre 1 : énergie');made.push(n1.id);
+    if(!(n1.tags||[]).includes('photo')||W.ATT.list(n1.id).length!==1)throw new Error('tag / pièce jointe');
+    /* IA : sans clé → rien n'est envoyé ; avec clé → aperçu exact, envoi seulement au clic */
+    await W.AI.setKey('gemini',AIKEY);
+    W.PHOTO.open(await wpng());await until(()=>d.querySelector('#photoDlg [data-ph="ai"]'));d.getElementById('phKeep').checked=false;
+    d.querySelector('#photoDlg [data-ph="ai"]').click();await until(()=>d.querySelector('.ai-dlg #aiPre'));
+    if(d.querySelector('.ai-dlg #aiPre').textContent!==OCRT)throw new Error('aperçu ≠ texte lu');await sleep(250);
+    if(net.log.length)throw new Error('envoyé sans clic');
+    net.parts=['# Chapitre 1 : énergie\n\n','$$E=mc^2$$\n\n','- la masse\n- la lumière'];
+    d.querySelector('[data-ai="send"]').click();await until(()=>d.querySelector('[data-ai="use"]'),5000);
+    if(net.log.length!==1)throw new Error(net.log.length+' appels');const c=net.log[0];
+    if(c.body.contents[0].parts.length!==1||c.body.contents[0].parts[0].text!==OCRT)throw new Error('envoyé ≠ texte lu (image envoyée ?)');
+    has(c.body.systemInstruction.parts[0].text,'KaTeX','SANS rien inventer');
+    d.querySelector('[data-ai="use"]').click();
+    await until(()=>Object.values(nd().notes).some(n=>/\$\$E=mc\^2\$\$/.test(n.body)),3000);
+    const n2=Object.values(nd().notes).find(n=>/\$\$E=mc\^2\$\$/.test(n.body));made.push(n2.id);
+    if(W.ATT.list(n2.id).length)throw new Error('photo jointe alors que décoché');if(!d.getElementById('preview').querySelector('.katex,.math'))return'(rendu KaTeX non vérifié ici)';
+  }finally{if(F){const w=F.contentWindow;for(const id of made)try{await w.ATT.removeNote(id);}catch(e){}w.AI&&w.AI.close();w.PHOTO&&w.PHOTO.close();F.remove();}restoreLS(S);}});
+T('Carnet (v9) : menu « ⋯ » (actions secondaires) au clavier ; pièces jointes : panneau + glisser-déposer',async()=>{const S=snap();
+  try{sNotes([{id:'mn_a',title:'Menu',body:'x'}]);await frame('notes.html',()=>W.barMore&&W.notesAtt);const d=W.document;
+    const mb=d.getElementById('moreBtn'),mm=d.getElementById('moreMenu');
+    for(const id of ['exportBtn','importBtn','bakOut','bakIn','styleBtn'])if(!mm.querySelector('#'+id))throw new Error(id+' pas dans ⋯');
+    mb.click();if(!W.barMore.isOpen()||mb.getAttribute('aria-expanded')!=='true')throw new Error('ouverture');
+    d.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));if(W.barMore.isOpen())throw new Error('Échap');
+    await until(()=>/\+ Joindre/.test(d.getElementById('attBox').textContent)).catch(()=>{throw new Error('panneau : '+d.getElementById('attBox').outerHTML.slice(0,200));});has(d.getElementById('attBox').textContent,'n\'incluent pas');
+    const dt=new W.DataTransfer();dt.items.add(await wpng(30,30));const ed=d.querySelector('#main .editor');
+    ed.dispatchEvent(new W.DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));if(!ed.classList.contains('att-drop'))throw new Error('survol');
+    ed.dispatchEvent(new W.DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+    await until(()=>W.ATT.list('mn_a').length===1).catch(()=>{throw new Error('ajout');});await until(()=>/\(att:a/.test(nd().notes.mn_a.body)).catch(()=>{throw new Error('référence : '+nd().notes.mn_a.body);});
+    await until(()=>d.querySelector('#preview img.att-img[src^="blob:"]'),3000).catch(()=>{throw new Error('aperçu de l\'image');});
+    if(!d.querySelector('#attBox .att-it'))throw new Error('liste');
+    /* supprimer la note → ses pièces jointes aussi (pierre tombale) */
+    const id=W.ATT.list('mn_a')[0].id;d.getElementById('delBtn').click();await until(()=>d.querySelector('.modal-overlay [data-ok]')).catch(()=>{throw new Error('confirmation');});
+    d.querySelector('.modal-overlay [data-ok]').click();
+    await until(()=>!nd().notes.mn_a).catch(()=>{throw new Error('suppression note');});await until(()=>!W.ATT.get(id)).catch(()=>{throw new Error('suppression PJ');});
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Markdown (v9) : options gardées sur toutes les lignes d\'un paragraphe ([[lien]] existant, image jointe en 2e ligne)',async()=>{
+  const h=MD.render('ligne 1\n[[Cible]] et ![x](att:abc123def)',{exists:()=>true,att:true});
+  if(/missing/.test(h))throw new Error('lien marqué absent en 2e ligne');if(!/<img class="att-img" data-att="abc123def"/.test(h))throw new Error('image en 2e ligne : '+h);});
+/* ---- v9 : l'accueil = le grand Glyph ---- */
+const homeV9=async()=>{await frame('index.html#/',()=>{try{return W.eval('NOXE').homeState&&W.document.querySelectorAll('#footerLinks a').length;}catch(e){return false;}});N=W.eval('NOXE');return W.document;};
+const visible=el=>!!el&&el.getClientRects().length>0&&W.getComputedStyle(el).visibility!=='hidden'&&+W.getComputedStyle(el).opacity>0;
+const gW=d=>d.querySelector('#homeGlyph canvas').getBoundingClientRect().width;
+T('Accueil (v9) : au repos, AUCUN outil affiché — titre AVERSE, grand Glyph (bouton avec label), liens réseaux',async()=>{const S=snap();
+  try{const d=await homeV9();const hv=d.getElementById('homeView');
+    if(hv.dataset.home!=='rest')throw new Error('état '+hv.dataset.home);
+    const shown=[...d.querySelectorAll('.tool,.res-item,.card')].filter(visible);if(shown.length)throw new Error(shown.length+' outil(s) visible(s) au repos');
+    if(d.querySelectorAll('#homeBlocks .tool').length<5)throw new Error('la liste des outils doit rester dans la page (repliée)');
+    if(d.querySelector('.home-head h1').textContent!=='AVERSE'||!visible(d.querySelector('.home-head')))throw new Error('titre');
+    if(![...d.querySelectorAll('#footerLinks a')].every(visible))throw new Error('liens réseaux');
+    const b=d.getElementById('homeGlyph');if(b.tagName!=='BUTTON'||!/Assistant/.test(b.getAttribute('aria-label')||'')||b.getAttribute('aria-expanded')!=='false')throw new Error('bouton / label');
+    if(gW(d)<200)throw new Error('Glyph pas assez grand : '+gW(d));
+    await sleep(400);if(!W.GLYPH.running()||N.homeState().motif!=='alive')throw new Error('Glyph immobile au repos ('+N.homeState().motif+')');
+    const c=d.querySelector('#homeGlyph canvas');const a=c.toDataURL();await sleep(500);if(c.toDataURL()===a)throw new Error('aucune image ne bouge (idle vivant)');
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Accueil (v9) : clic sur le Glyph, « / », Ctrl+K, taper au clavier ou Tab → la barre ; Échap / barre vide quittée → le Glyph seul',async()=>{const S=snap();
+  try{const d=await homeV9();const hv=d.getElementById('homeView'),q=d.getElementById('q'),b=d.getElementById('homeGlyph');
+    const isOpen=()=>hv.dataset.home==='open'&&visible(q);
+    b.focus();b.click();await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('clic');});if(b.getAttribute('aria-expanded')!=='true')throw new Error('aria-expanded');
+    await until(()=>gW(d)<100,4000).catch(()=>{throw new Error('le Glyph ne se réduit pas : '+gW(d)+' '+hv.dataset.home+' '+W.getComputedStyle(d.querySelector('#homeGlyph canvas')).width+' '+W.getComputedStyle(d.getElementById('homeGlyph')).getPropertyValue('--gz')+' vw='+W.innerWidth);});
+    if(![...d.querySelectorAll('#homeBlocks .tool')].some(visible)||!visible(d.querySelector('#homeBlocks .more-link')))throw new Error('barre vide : la liste complète des outils doit apparaître');
+    wkey(q,'Escape');await until(()=>hv.dataset.home==='rest'&&d.activeElement===b).catch(()=>{throw new Error('Échap → repos + focus sur le Glyph');});
+    await until(()=>gW(d)>200,4000);
+    wkey(d.body,'/');await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('« / »');});
+    q.blur();await until(()=>hv.dataset.home==='rest').catch(()=>{throw new Error('barre vide quittée → repos');});
+    wkey(d.body,'k',{ctrlKey:true});await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('Ctrl+K');});wkey(q,'Escape');await until(()=>hv.dataset.home==='rest');
+    b.focus();wkey(b,'j');await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('taper au clavier');});wkey(q,'Escape');await until(()=>hv.dataset.home==='rest');
+    q.focus();await until(()=>isOpen()).catch(()=>{throw new Error('Tab jusqu\'à la barre');});
+    /* avec du texte : résultats sous la barre ; Échap vide ET referme */
+    qType('json');await until(()=>visible(d.querySelector('#results .res-item')));if([...d.querySelectorAll('#homeBlocks .tool')].some(visible))throw new Error('liste + résultats');
+    wkey(q,'Escape');await until(()=>hv.dataset.home==='rest'&&!q.value);
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Accueil (v9) : le motif du Glyph suit l\'intention pendant la frappe (PDF, image, code, note, synchro, IA…)',async()=>{const S=snap();
+  try{const d=await homeV9();d.getElementById('homeGlyph').click();
+    const want={'fusionner pdf':'pdf','convertir image':'image','json':'code','regex':'code','photo':'ocr','note':'note','synchro':'sync','conflit':'conflict','? pourquoi le ciel est bleu':'think','zzqx':'search','':'alive'};
+    const got=[];for(const [v,m] of Object.entries(want)){qType(v);await sleep(30);const st=N.homeState().motif;got.push(v+'→'+st);if(st!==m)throw new Error('« '+v+' » → '+st+' (attendu '+m+')');}
+    if(!W.GLYPH.MOTIFS.includes('absorb'))throw new Error('motifs');
+    /* chaque motif dessine autre chose */
+    const g=N.homeGlyph,img={};for(const m of ['pdf','image','code','note','sync','conflict','ocr','search']){g.set(m);for(let i=0;i<40;i++)g.frame(.05);img[m]=g.cells.map(c=>c.b.toFixed(1)).join('');}
+    const u=new Set(Object.values(img));if(u.size!==8)throw new Error('motifs identiques');
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Accueil (v9) : glisser un fichier → le Glyph aspire ; déposer → le bon outil (JSON → JSON, PDF → outils PDF, image → OCR / Photo → note)',async()=>{const S=snap();
+  try{const d=await homeV9();const hv=d.getElementById('homeView');
+    const drag=async f=>{const dt=new W.DataTransfer();dt.items.add(f);
+      d.body.dispatchEvent(new W.DragEvent('dragenter',{bubbles:true,cancelable:true,dataTransfer:dt}));d.body.dispatchEvent(new W.DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));
+      if(N.homeState().motif!=='absorb'||!hv.classList.contains('h-drag'))throw new Error('survol : '+N.homeState().motif);
+      d.body.dispatchEvent(new W.DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));return dt;};
+    await drag(new W.File(['{"depose":42}'],'d.json',{type:'application/json'}));
+    await until(()=>W.location.hash==='#/json'&&d.getElementById('j_in')&&/depose/.test(d.getElementById('j_in').value)).catch(()=>{throw new Error('JSON → '+W.location.hash);});
+    if(hv.classList.contains('h-drag'))throw new Error('état survol resté');
+    key('Escape');await until(()=>!N.current());
+    await drag(new W.File(['%PDF-1.4\n%%EOF'],'doc.pdf',{type:'application/pdf'}));await until(()=>W.location.hash==='#/pdfoutils').catch(()=>{throw new Error('PDF → '+W.location.hash);});
+    key('Escape');await until(()=>!N.current());
+    await drag(await wpng(30,30));const sg=d.getElementById('suggest');await until(()=>!sg.hidden);
+    if(hv.dataset.home!=='open')throw new Error('la barre doit s\'ouvrir avec les propositions');if(N.homeState().motif!=='image')throw new Error('motif '+N.homeState().motif);
+    has(sg.textContent,'Lire le texte (OCR)','Photo → note','Optimiser');
+    [...sg.querySelectorAll('[data-sug]')].find(x=>/Photo → note/.test(x.textContent)).click();await until(()=>d.getElementById('photoDlg'));W.PHOTO.close();
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Accueil (v9) : une seule boucle d\'animation, arrêtée quand l\'onglet est caché ou qu\'un outil couvre l\'accueil',async()=>{const S=snap();
+  try{const d=await homeV9();await sleep(300);if(!W.GLYPH.running())throw new Error('pas animé au repos');
+    let n=0;const raf0=W.requestAnimationFrame;W.requestAnimationFrame=f=>{n++;return raf0.call(W,f);};
+    await sleep(300);const perFrame=n;if(!perFrame)throw new Error('aucune image');
+    Object.defineProperty(d,'hidden',{configurable:true,get:()=>true});d.dispatchEvent(new W.Event('visibilitychange'));n=0;await sleep(400);
+    if(n||W.GLYPH.running())throw new Error('onglet caché : '+n+' rAF');
+    delete d.hidden;d.dispatchEvent(new W.Event('visibilitychange'));await until(()=>W.GLYPH.running()).catch(()=>{throw new Error('ne repart pas');});
+    N.open('uuid');await sleep(400);n=0;await sleep(400);if(n)throw new Error('outil ouvert : l\'accueil anime encore ('+n+' rAF)');
+    key('Escape');await until(()=>!N.current());await until(()=>W.GLYPH.running(),3000).catch(()=>{throw new Error('retour accueil : ne repart pas');});
+    W.requestAnimationFrame=raf0;
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('Glyph (v9) : plus grand (barre 46 px, réponse 64, fenêtres 64) avec une grille plus fine ; progression de l\'indexation visible',async()=>{const S=snap();
+  try{sNotes([{id:'gx_a',title:'Un',body:'transistor courant'},{id:'gx_b',title:'Deux',body:'farine lait'},{id:'gx_c',title:'Trois',body:'réseau couches'}]);
+    const g=GLYPH.create({size:64});if(g.el.style.width!=='64px')throw new Error('taille');g.destroy();
+    setLS('averse-ai',{local:true});const wk=aiWorker('Xenova/multilingual-e5-small');await homeAi(()=>{W.AI.workerFactory=wk.make;});
+    const b=W.document.querySelector('#qAi canvas');if(!b||parseInt(b.style.width)<46)throw new Error('Glyph de la barre : '+(b&&b.style.width));
+    const seen=[];W.AI.settings();await until(()=>W.document.querySelector('[data-s="on"]'));W.document.querySelector('[data-s="on"]').click();const st=()=>W.document.getElementById('aiLoc').textContent;
+    await until(()=>{seen.push(st());return /indexée/.test(st());},8000).catch(()=>{throw new Error('états : '+[...new Set(seen)].join(' | '));});
+    if(seen.some(s=>/\b0 note/.test(s)))throw new Error('« 0 note indexée » affiché : '+seen.join(' | '));
+    has(st(),'3 notes indexées');W.AI.close();
+  }finally{if(F){const w=F.contentWindow;try{await w.AI.forget(['gx_a','gx_b','gx_c']);}catch(e){}F.remove();}restoreLS(S);}});
+
 (async()=>{
   let ok=0,skip=0,run=0;const box=$('res');
   const only=new URLSearchParams(location.search).get('only');      // tests.html?only=Graphe : ne lance que les tests dont le nom contient ce mot
-  for(const [name,fn] of tests){if(only&&!name.includes(only))continue;
+  for(const [name,fn] of tests){if(only&&!only.split('|').some(o=>name.includes(o)))continue;
     run++;let msg='',info='',sk=false;
     try{const r=await fn();if(typeof r==='string')info=r;ok++;}catch(e){if(e&&e.skip){sk=true;skip++;info=e.message;}else msg=e&&e.message||String(e);}   // un test peut renvoyer une mesure
     box.insertAdjacentHTML('beforeend',sk?'<div class="t skip">– '+esc(name)+' — ignoré : '+esc(info)+'</div>':

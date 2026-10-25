@@ -21,6 +21,7 @@
 <link rel="stylesheet" href="css/ai.css">
 <link rel="stylesheet" href="css/ascii.css">
 <script src="js/core.js"></script>
+<script src="js/wco.js"></script>
 <script src="js/theme.js"></script>
 <script src="js/accent.js"></script>
 <script src="js/templates.js"></script>
@@ -38,21 +39,28 @@
       <button class="active" data-v="editor">Éditeur</button>
       <button data-v="graph">Graphe</button>
     </div>
-    <button class="ico-btn" id="styleBtn" data-style-label >style : normal</button>
-    <button class="ico-btn" data-accent-btn title="Thème et couleur d'accent">apparence</button>
     <button class="ico-btn" id="aiBtn" title="Assistant IA : résumé, flashcards, demander à mes notes… (désactivé tant que tu ne le configures pas)">IA ✦</button>
-      <button class="ico-btn" data-feedback-btn title="Signaler un bug, proposer une idée">signaler</button>
-    <button class="ico-btn" id="fileBtn" title="Synchro : lie le carnet à un fichier (ex. dans ton dossier OneDrive / Google Drive)">Fichier</button>
     <span class="sync-state" id="syncState" role="status" aria-live="polite" hidden></span>
     <button class="ico-btn" id="cloudBtn" title="Synchro chiffrée entre tes appareils (PC + téléphone) via un Gist GitHub secret">Synchro</button>
     <span class="sync-state" id="cloudState" role="status" aria-live="polite" hidden></span>
-    <button class="ico-btn" id="exportBtn">Export</button>
-    <button class="ico-btn" id="importBtn">Import</button>
-    <input type="file" id="importFile" accept="application/json" style="display:none">
-    <button class="ico-btn" id="bakOut" title="Tout AVERSE dans un fichier : notes, favoris, réglages (sans secrets)">Sauvegarde</button>
-    <button class="ico-btn" id="bakIn" title="Restaurer une sauvegarde complète (fusion)">Restaurer</button>
-    <input type="file" id="bakFile" accept=".json,application/json" style="display:none">
     <button class="ico-btn install-btn" data-install hidden>Installer</button>
+    <!-- v9 : actions secondaires regroupées dans « ⋯ » sur ordinateur (la barre tient à toutes les largeurs, même en appli
+         installée sous les boutons de fenêtre). Sur mobile, le menu s'efface et ses boutons défilent avec les autres. -->
+    <div class="more" id="barMore">
+      <button class="ico-btn more-btn" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="Plus d'actions : fichier, export, sauvegarde, apparence…">⋯</button>
+      <div class="more-menu" id="moreMenu" role="menu" aria-label="Plus d'actions">
+        <button class="ico-btn" id="fileBtn" role="menuitem" title="Synchro : lie le carnet à un fichier (ex. dans ton dossier OneDrive / Google Drive)">Fichier</button>
+        <button class="ico-btn" id="exportBtn" role="menuitem">Export</button>
+        <button class="ico-btn" id="importBtn" role="menuitem">Import</button>
+        <button class="ico-btn" id="bakOut" role="menuitem" title="Tout AVERSE dans un fichier : notes, favoris, réglages (sans secrets)">Sauvegarde</button>
+        <button class="ico-btn" id="bakIn" role="menuitem" title="Restaurer une sauvegarde complète (fusion)">Restaurer</button>
+        <button class="ico-btn" id="styleBtn" role="menuitem" data-style-label >style : normal</button>
+        <button class="ico-btn" role="menuitem" data-accent-btn title="Thème et couleur d'accent">apparence</button>
+        <button class="ico-btn" role="menuitem" data-feedback-btn title="Signaler un bug, proposer une idée">signaler</button>
+      </div>
+    </div>
+    <input type="file" id="importFile" accept="application/json" style="display:none">
+    <input type="file" id="bakFile" accept=".json,application/json" style="display:none">
   </div>
   <!-- v5 : sur mobile, la barre de boutons défile au doigt : flèches + fondus aux bords + petite barre de position -->
   <button class="bar-arrow l" id="barL" aria-label="Boutons précédents" hidden>‹</button>
@@ -65,7 +73,7 @@
   <aside class="side" id="side">
     <div class="side-top">
       <input class="search" id="search" placeholder="Rechercher…">
-      <button class="btn primary" id="newBtn">+ Nouvelle note</button>
+      <div class="new-row"><button class="btn primary" id="newBtn">+ Nouvelle note</button><button class="btn ph-btn" id="photoBtn" type="button" title="Photo → note : prendre une photo ou choisir une image, le texte est lu sur ton appareil" aria-label="Photo vers note">📷</button></div>
       <select class="tpl" id="tplSel" aria-label="Modèle de note"><option value="">Note vide</option><option value="tp">Modèle : compte-rendu de TP</option><option value="cours">Modèle : fiche de cours</option><option value="stage">Modèle : journal de stage</option><option value="adressage">Modèle : plan d'adressage</option><option value="incident">Modèle : dépannage</option><option value="taches">Modèle : liste de tâches</option></select>
       <div class="tagbar" id="tagbar"></div>
     </div>
@@ -93,6 +101,7 @@
           <button class="del" id="delBtn" style="margin-left:0">Supprimer</button>
         </div>
       </div>
+      <div class="cf-bar" id="cfBar" hidden role="status"></div>
       <div class="panes-tabs">
         <button class="active" data-p="write">Écrire</button>
         <button data-p="prev">Aperçu</button>
@@ -103,6 +112,7 @@
         </div>
         <div class="pane" id="panePrev"><div id="preview"></div></div>
       </div>
+      <div class="att-box" id="attBox" aria-label="Pièces jointes"></div>
       <div class="backlinks" id="backlinks"></div>
     </div>
 
@@ -134,6 +144,7 @@
 <script src="js/rain.js"></script>
 <script src="js/notes-graph.js"></script>
 <script src="js/md.js"></script>
+<script src="js/attach.js"></script>
 <script src="js/notes.js"></script>
 <script src="js/notes-tpl.js"></script>
 <script src="js/share.js"></script>
@@ -144,5 +155,8 @@
 <script src="js/glyph.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/ai-notes.js"></script>
+<script src="js/notes-att.js"></script>
+<script src="js/conflict.js"></script>
+<script src="js/photo.js"></script>
 </body>
 </html>

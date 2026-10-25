@@ -154,7 +154,7 @@ const fnv=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=
 const notes=()=>{const d=getLS(NKEY,null);return d&&d.notes?Object.values(d.notes).filter(n=>n&&n.id):[];};
 const noteText=n=>((n.title||'')+'\n'+(n.tags||[]).join(', ')+'\n'+(n.body||'')).slice(0,1600);
 const dot=(a,b)=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;};
-let indexing=null;
+let indexing=null;const IXP={done:0,total:0};          // v9 : progression de l'indexation (affichée dans les réglages)
 async function indexNotes(onP){
   if(indexing)return indexing;
   indexing=(async()=>{
@@ -164,14 +164,16 @@ async function indexNotes(onP){
     const ns=notes(),live=new Set(ns.map(n=>n.id));
     for(const k of [...VEC.keys()])if(!live.has(k))VEC.delete(k);
     const todo=ns.filter(n=>{const v=VEC.get(n.id);return!v||v.h!==fnv(noteText(n));});
+    IXP.done=0;IXP.total=todo.length;if(todo.length)emit();
     for(let i=0;i<todo.length;i+=16){
       const part=todo.slice(i,i+16),vs=await embed(part.map(noteText),'p');
       for(let k=0;k<part.length;k++){const o={h:fnv(noteText(part[k])),v:vs[k]};VEC.set(part[k].id,o);idb('vec','readwrite',s=>s.put(o,part[k].id)).catch(()=>{});}
+      IXP.done=i+part.length;emit();
       if(onP)onP((i+part.length)/todo.length);
     }
     return VEC;
   })();
-  try{return await indexing;}finally{indexing=null;}
+  try{return await indexing;}finally{indexing=null;IXP.total=0;emit();}
 }
 async function similarTo(id,k){await indexNotes();const me=VEC.get(id);if(!me)return[];
   return[...VEC].filter(([x])=>x!==id).map(([x,o])=>({id:x,s:dot(me.v,o.v)})).sort((a,b)=>b.s-a.s).slice(0,k||5);}
@@ -229,6 +231,7 @@ const TASKS={
   json:{label:'Expliquer le JSON',kind:'json',lang:'ui',sys:'Explique ce JSON en Markdown : à quoi il sert probablement, la structure, les champs importants et leurs types, les anomalies éventuelles. Sois concis.'},
   rewrite:{label:'Reformuler / corriger',kind:'rewrite',lang:'keep',sys:'Corrige l\'orthographe, la grammaire et la ponctuation du texte fourni et reformule-le pour qu\'il soit clair, sans changer le sens ni la langue (un texte anglais reste en anglais, un texte français reste en français). Réponds UNIQUEMENT avec le texte corrigé.'},
   ask:{label:'Demander à mes notes',kind:'ask',lang:'q',input:'Ta question',sys:'Réponds à la question UNIQUEMENT à partir des extraits de notes fournis, en Markdown. Cite les sources sous la forme [1], [2]. Si les extraits ne suffisent pas, dis-le clairement.'},
+  ocrclean:{label:'Mettre au propre (photo)',kind:'photo',lang:'keep',sys:'Le texte fourni vient d\'une photo lue par OCR (il peut contenir des erreurs de lecture, des coupures de ligne au mauvais endroit, des caractères parasites). Remets-le au propre en Markdown, SANS le traduire (garde sa langue) et SANS rien inventer : titres (#, ##) si le document en a, listes à puces ou numérotées, tableaux simples si c\'est un tableau, et formules mathématiques en KaTeX ($…$ en ligne, $$…$$ en bloc) s\'il y a des maths. Corrige seulement les erreurs de lecture évidentes. Si un passage est illisible, écris [illisible]. Réponds UNIQUEMENT avec la note en Markdown.'},
   free:{label:'Question libre',kind:'ask',lang:'q',sys:'Tu es l\'assistant d\'AVERSE, une boîte à outils. Réponds en Markdown, de façon concise et exacte. Si tu ne sais pas, dis-le.'}
 };
 
@@ -259,7 +262,7 @@ function run(task,o){
     '<div class="ai-err" id="aiErr" role="alert" hidden></div>'+
     '<div class="ctx-db" id="aiBtns"></div></form>';
   document.body.appendChild(ov);
-  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=GLYPH.create({size:46,kind:T.kind});f.querySelector('.ai-gl').appendChild(g.el);
+  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=GLYPH.create({size:64,kind:T.kind});f.querySelector('.ai-gl').appendChild(g.el);
   let ctl=null,result='',extracts=null,closed=false;
   const prev=document.activeElement;
   const close=()=>{if(closed)return;closed=true;if(ctl)ctl.abort();g.destroy();ov.remove();OPEN=null;document.removeEventListener('keydown',onKey,true);if(prev&&prev.focus)try{prev.focus();}catch(e){}};
@@ -379,7 +382,7 @@ function settings(){
     '<a id="aiGet" target="_blank" rel="noopener noreferrer">Obtenir une clé</a>. Sur le carnet, la page n\'autorise que Gemini, OpenAI, OpenRouter, Mistral, Groq et localhost (CSP).</p>'+
     '<div class="ctx-db"><button type="button" class="btn primary" data-s="x">Fermer</button></div></form>';
   document.body.appendChild(ov);
-  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=GLYPH.create({size:46,kind:'model'});f.querySelector('.ai-gl').appendChild(g.el);
+  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=GLYPH.create({size:64,kind:'model'});f.querySelector('.ai-gl').appendChild(g.el);
   let closed=false;
   const close=()=>{closed=true;E.subs.delete(loc);g.destroy();ov.remove();OPEN=null;document.removeEventListener('keydown',onKey,true);};
   const onKey=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}};
@@ -390,7 +393,11 @@ function settings(){
     if(!cfg.local){st.textContent='Désactivée';bt.innerHTML='<button type="button" class="btn primary" data-s="on">Activer (≈ 155 Mo)</button>';g.set('idle');return;}
     if(s==='download'){st.textContent='Téléchargement / chargement… '+Math.round(E.p*100)+' %';g.progress(E.p);bt.innerHTML='';return;}
     if(s==='error'){st.textContent='Erreur : '+E.err;g.set('error');}
-    else if(s==='ready'){st.textContent=indexing?'Prête ✓ — indexation de tes notes…':'Prête ✓ ('+VEC.size+' note(s) indexée(s))';if(g.state()!=='done')g.set('done');}
+    else if(s==='ready'){
+      /* v9 : plus de « 0 note(s) indexée(s) » trompeur : on lance l'indexation et on montre où elle en est */
+      if(!indexing&&!vecLoaded)indexNotes().catch(()=>{});
+      if(indexing||!vecLoaded){st.textContent='Prête ✓ — indexation de tes notes'+(IXP.total?' : '+IXP.done+' / '+IXP.total:'…');if(IXP.total)g.progress(IXP.done/IXP.total);}
+      else{const n=VEC.size;st.textContent='Prête ✓ ('+n+' note'+(n>1?'s':'')+' indexée'+(n>1?'s':'')+')';if(g.state()!=='done')g.set('done');}}
     else st.textContent='Activée (modèle chargé à la première utilisation)';
     bt.innerHTML=(s!=='ready'?'<button type="button" class="btn ghost" data-s="on">Charger</button> ':'')+'<button type="button" class="btn ghost" data-s="off">Désactiver et supprimer le modèle</button>';
   }

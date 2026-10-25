@@ -19,7 +19,11 @@ const isQuestion=v=>{v=String(v||'').trim();if(!v)return false;
 const cut=s=>s.length>60?s.slice(0,59)+'…':s;
 
 /* ---------- le Glyph de la barre ---------- */
-const g=GLYPH.create({size:26,kind:'ask',dim:true});btn.appendChild(g.el);btn.hidden=false;
+/* v9 : plus grand (46 px, 15 × 15 points ; 38 px sur mobile) + un 2e Glyph, plus grand, dans le panneau de réponse, qui suit le même état */
+const small=matchMedia('(max-width:560px)').matches;
+const g=GLYPH.create({size:small?38:46,kind:'ask',dim:true});btn.appendChild(g.el);btn.hidden=false;
+const gp=GLYPH.create({size:small?48:64,kind:'ask'});gp.el.classList.add('aip-gl');
+{const s0=g.set,t0=g.token;g.set=(s,o)=>{gp.set(s,o);return s0(s,o);};g.token=n=>{gp.token(n);return t0(n);};}
 let cur=null;                                     // la demande en cours : {mode, q, phase, ctl, result, extracts}
 function rest(){if(cur&&cur.phase==='busy')return;g.set('idle',{dim:!(AI.hasKey()||AI.local()),kind:'ask'});}
 rest();
@@ -45,9 +49,10 @@ NOXE.isQuestion=isQuestion;
 /* ---------- le panneau sous la barre ---------- */
 const B=(act,label,cls)=>'<button type="button" class="btn '+(cls||'ghost')+'" data-p="'+act+'">'+esc(label)+'</button>';
 function show(title,sub,body,btns){
-  P.innerHTML='<div class="aip-h"><b>'+esc(title)+'</b><span class="aip-sub">'+esc(sub)+'</span>'+
+  P.innerHTML='<div class="aip-h"><span class="aip-glw"></span><b>'+esc(title)+'</b><span class="aip-sub">'+esc(sub)+'</span>'+
     '<button type="button" class="aip-x" data-p="x" aria-label="Fermer (Échap)" title="Fermer (Échap)">✕</button></div>'+
     '<div class="aip-b">'+body+'</div><div class="aip-a">'+btns+'</div>';
+  P.querySelector('.aip-glw').appendChild(gp.el);gp.frame(0);
   P.hidden=false;
 }
 const btns=h=>{const a=P.querySelector('.aip-a');if(a)a.innerHTML=h;};
@@ -161,5 +166,5 @@ btn.addEventListener('click',()=>{
   if(!q.value.trim()){q.value='? ';q.focus();q.dispatchEvent(new Event('input',{bubbles:true}));return;}
   q.focus();NOXE.forceLead();
 });
-window.AIBAR={isQuestion,close,glyph:g,state:()=>cur?cur.phase:'rest',open:()=>!P.hidden,ask};
+window.AIBAR={isQuestion,close,glyph:g,panelGlyph:gp,state:()=>cur?cur.phase:'rest',open:()=>!P.hidden,ask};
 })();

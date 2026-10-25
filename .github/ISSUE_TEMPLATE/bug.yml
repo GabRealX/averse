@@ -1,0 +1,29 @@
+name: Bug
+description: Quelque chose ne marche pas dans AVERSE.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Merci ! Ne colle jamais de jeton, de mot de passe ni le contenu de notes privées."
+  - type: textarea
+    id: description
+    attributes:
+      label: Ce qui s'est passé
+      placeholder: Décris le problème.
+    validations:
+      required: true
+  - type: textarea
+    id: etapes
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: "1. Ouvrir l'outil…\n2. Cliquer sur…"
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce qui était attendu
+  - type: input
+    id: navigateur
+    attributes:
+      label: Navigateur et appareil
+      placeholder: "ex. Firefox 131, Android"

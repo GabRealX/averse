@@ -187,13 +187,13 @@ body{overflow:hidden}
 .sync-state[data-state="err"],.sync-state[data-state="re"]{color:var(--bad)}
 .sync-state[data-state="busy"]{opacity:.7}
 /* v4 : la barre ne se tasse plus (logo et liens sur une ligne ; c'est l'état de synchro qui raccourcit) */
-@media (min-width:901px){
+@media (min-width:800px){
   .bar-left{flex:none}
   .logo,.back{white-space:nowrap}
   .bar-right{min-width:0;margin-left:12px}
 }
-/* v4 : sur mobile, les boutons de la barre défilent au doigt (Sauvegarde / Restaurer restent accessibles) */
-@media (max-width:900px){
+/* v4 : sur mobile, les boutons de la barre défilent au doigt (Sauvegarde / Restaurer restent accessibles) — v9 : < 800 px */
+@media (max-width:799px){
   .bar{gap:10px;padding:0 12px}
   .bar-left{gap:12px;flex:none}
   .logo{display:none}            /* on garde « ← accueil », seul lien de retour */
@@ -216,7 +216,7 @@ body{overflow:hidden}
 .bar-nav{position:absolute;bottom:4px;height:3px;background:var(--line);border-radius:2px;cursor:pointer}
 .bar-nav::before{content:'';position:absolute;left:0;right:0;top:-8px;bottom:-6px}   /* zone de doigt plus grande */
 .bar-nav span{position:absolute;left:0;top:0;bottom:0;background:var(--fg-soft);border-radius:2px;transition:transform .08s linear}
-@media (max-width:900px){.bar{padding-bottom:6px}}
+@media (max-width:799px){.bar{padding-bottom:6px}}
 
 /* ===== v5 : graphe — légende, outils, édition de groupe, carte de focus ===== */
 #graph{touch-action:none}                                    /* pincement / glisser au doigt gérés par le graphe */
@@ -308,3 +308,93 @@ body{overflow:hidden}
 #cloudState[data-state="ok"],#cloudState[data-state="ext"]{color:var(--ok)}
 #cloudState[data-state="lock"]{color:var(--fg-soft)}
 #cloudBtn.on{border-color:var(--ok);color:var(--ok)}
+
+/* ===== v9 : la barre tient à toutes les largeurs d'ordinateur (≥ 800 px), même sous les boutons de fenêtre ===== */
+.bar{padding-left:calc(22px + var(--tb-l));padding-right:calc(22px + var(--tb-r))}
+.sync-state{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.more{position:relative;display:flex;align-items:center}
+.more-btn{font-size:.9rem;line-height:1;padding:5px 10px;letter-spacing:0}
+.more-btn[aria-expanded="true"]{border-color:var(--fg-soft);color:var(--fg)}
+@media (min-width:800px){
+  .bar-right{overflow:visible;min-width:0}                       /* plus de défilement : le menu doit pouvoir déborder vers le bas */
+  .bar-right>.sync-state{flex:0 1 auto;min-width:0;max-width:220px}
+  .more-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:40;min-width:190px;display:none;flex-direction:column;gap:4px;
+    padding:6px;background:var(--panel,var(--bg));border:1px solid var(--line-2);box-shadow:0 12px 30px rgba(0,0,0,.45)}
+  .more-menu.open{display:flex}
+  .more-menu .ico-btn{width:100%;text-align:left;border-color:transparent;padding:8px 10px}
+  .more-menu .ico-btn:hover,.more-menu .ico-btn:focus-visible{border-color:var(--line-2);color:var(--fg)}
+}
+@media (min-width:800px) and (max-width:1099px){.bar-right>.sync-state{max-width:150px}}
+@media (min-width:800px) and (max-width:959px){.logo{display:none}}   /* « ← accueil » suffit pour revenir */
+@media (min-width:800px) and (max-width:959px){.bar-right{gap:6px}.seg button{padding:8px 10px}}
+@media (max-width:799px){
+  .more{display:contents}
+  .more-btn{display:none}
+  .more-menu{display:contents}
+}
+html[data-style="ascii"] .more-menu{border-style:dashed;box-shadow:none}
+
+/* ===== v9 : pièces jointes (notes-att.js / attach.js) ===== */
+.att-box{border-top:1px solid var(--line);padding:10px 28px;font-size:.74rem;color:var(--fg-soft)}
+.att-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.att-h b{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--fg-faint);font-weight:500}
+.att-n{color:var(--fg-faint);font-variant-numeric:tabular-nums}
+.att-h .ico-btn{margin-left:auto}
+.att-c{display:flex;align-items:center;gap:5px;font-size:.68rem;color:var(--fg-faint);cursor:pointer}
+.att-l{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto}
+.att-it{display:flex;align-items:center;gap:8px}
+.att-th{width:40px;height:40px;object-fit:cover;border:1px solid var(--line);border-radius:4px;flex:none;background:var(--bg-2,transparent)}
+.att-th.pdf{display:grid;place-items:center;font-size:.6rem;letter-spacing:.1em;color:var(--fg-soft)}
+.att-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg)}
+.att-nm small{display:block;color:var(--fg-faint);font-size:.64rem}
+.att-it .ico-btn{font-size:.66rem;padding:4px 7px}
+.att-it .ico-btn.danger:hover{color:#d55;border-color:#d55}
+.att-e,.att-s{margin-top:6px;color:var(--fg-faint);font-size:.68rem}
+.editor.att-drop{outline:2px dashed var(--fg-soft);outline-offset:-6px}
+.rendered img.att-img{max-width:100%;height:auto;border-radius:4px;border:1px solid var(--line);display:block;margin:8px 0}
+.att-miss{display:inline-block;font-size:.74rem;color:var(--fg-faint);border:1px dashed var(--line-2);border-radius:4px;padding:2px 6px}
+@media (max-width:799px){.att-box{padding:10px 14px}.att-it{flex-wrap:wrap}.att-nm{flex-basis:calc(100% - 50px)}}
+html[data-style="ascii"] .att-box b::before{content:"# "}
+html[data-style="ascii"] .att-th,html[data-style="ascii"] .rendered img.att-img{border:1px dashed var(--line-2);border-radius:0}
+
+/* ===== v9 : copies de conflit — bandeau + comparaison côte à côte (conflict.js) ===== */
+.cf-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 28px;font-size:.74rem;color:var(--fg);
+  background:rgba(242,139,139,.08);border-bottom:1px solid rgba(242,139,139,.35)}
+.cf-bar[hidden]{display:none}
+.cf-bar .ico-btn{margin-left:auto}
+.cf-dlg{width:min(1100px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;gap:10px}
+.cf-grid{display:grid;grid-template-columns:1fr 1fr;overflow:auto;min-height:120px;max-height:60vh;border:1px solid var(--line);font-size:.74rem;line-height:1.55}
+.cf-grid[hidden],.cf-merge[hidden],.cf-tabs[hidden],.cf-acts [hidden],.cf-warn[hidden]{display:none}
+.cf-hd{position:sticky;top:0;background:var(--panel);padding:6px 10px;border-bottom:1px solid var(--line);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-soft);z-index:1}
+.cf-hd small{text-transform:none;letter-spacing:0;color:var(--fg-faint)}
+.cf-hd em{display:block;font-style:normal;text-transform:none;letter-spacing:0;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf-c{padding:1px 10px;white-space:pre-wrap;word-break:break-word;color:var(--fg-soft);min-height:1.55em}
+.cf-c.cf-a{border-right:1px solid var(--line)}
+.cf-c.cf-del{background:rgba(242,139,139,.16);color:var(--fg)}
+.cf-c.cf-add{background:rgba(120,200,150,.16);color:var(--fg)}
+.cf-c.empty{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--line) 6px 7px)}
+.cf-tabs{display:none;gap:6px}
+.cf-tabs button{flex:1;background:transparent;border:1px solid var(--line-2);color:var(--fg-soft);font:inherit;font-size:.7rem;padding:8px;cursor:pointer}
+.cf-tabs button.active{color:var(--bg);background:var(--fg);border-color:var(--fg)}
+.cf-merge{display:flex;flex-direction:column;gap:6px;font-size:.72rem;color:var(--fg-soft)}
+.cf-merge textarea{min-height:42vh;background:var(--bg);color:var(--fg);border:1px solid var(--line-2);font-family:var(--mono);font-size:.78rem;line-height:1.55;padding:10px;resize:vertical}
+.cf-warn{color:var(--bad);font-size:.72rem}
+.cf-acts{flex-wrap:wrap;margin-top:0}
+@media (max-width:799px){
+  .cf-bar{padding:8px 14px}
+  .cf-tabs{display:flex}
+  .cf-grid{grid-template-columns:1fr}
+  .cf-grid[data-show="a"] .cf-b,.cf-grid[data-show="b"] .cf-a{display:none}
+  .cf-c.cf-a{border-right:0}
+  .cf-c.empty{display:none}
+  .cf-acts .tpl-b{flex:1 1 45%}
+}
+html[data-style="ascii"] .cf-grid,html[data-style="ascii"] .cf-merge textarea{border:1px dashed var(--line-2)}
+html[data-style="ascii"] .cf-c.cf-del::before{content:"- ";color:var(--bad)}
+html[data-style="ascii"] .cf-c.cf-add::before{content:"+ ";color:var(--ok)}
+html[data-style="ascii"] .cf-bar{border-bottom:1px dashed rgba(242,139,139,.6)}
+
+/* v9 : « + Nouvelle note » + 📷 (Photo → note) */
+.new-row{display:flex;gap:8px}
+.new-row #newBtn{flex:1}
+.ph-btn{flex:none;padding-left:12px;padding-right:12px;filter:grayscale(1)}

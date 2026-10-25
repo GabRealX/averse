@@ -161,6 +161,7 @@ function imageItems(getFile){
     {label:'Copier l\'image',run:async()=>copyImage(await getFile())},
     {label:'Envoyer vers…',sub:async()=>sendItems({files:[await getFile()]})},
     hasNoxe()&&NOXE.tools.some(t=>t.key==='ocr')?{label:'Envoyer vers OCR (lire le texte)',run:async()=>NOXE.open('ocr',{files:[await getFile()]})}:null,
+    window.PHOTO?{label:'Photo → note (lire le texte)',run:async()=>PHOTO.open(await getFile())}:null,   // v9
     {label:'Télécharger',run:async()=>{const f=await getFile();dl(f,f.name);}}
   ].filter(Boolean);
 }
