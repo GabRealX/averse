@@ -15,7 +15,8 @@ const ATT=(function(){
 const TEST=sessionStorage.getItem('averse-tests')==='1';
 const MKEY='averse-att',SKEY='averse-att-sync',PKEY='averse-att-webp',DBN=TEST?'averse-tests-att':'averse-att';
 const MAX=5*1024*1024,TOTAL=50*1024*1024,MAXN=200;
-const TYPES={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif','application/pdf':'pdf'};   // pas de SVG (scripts)
+const DRAWT='application/vnd.averse.draw+json';            // v10 : dessin (draw.js) = JSON vectoriel, rendu en SVG PAR AVERSE
+const TYPES={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif','application/pdf':'pdf',[DRAWT]:'json'};   // pas de SVG importé (scripts)
 const RE_ID=/^a[\w-]{6,40}$/;
 const te=new TextEncoder();
 const now=()=>Date.now();
@@ -95,6 +96,9 @@ function revoke(id){if(URLS[id]){URL.revokeObjectURL(URLS[id]);delete URLS[id];}
 function resolve(root){
   if(!root)return;
   root.querySelectorAll('img[data-att]').forEach(async im=>{const id=im.dataset.att,m=get(id);
+    if(m&&m.type===DRAWT&&window.DRAW){const d=await DRAW.load(id);                 // v10 : dessin → SVG généré ici (que des <path>)
+      if(d){if(im.dataset.u)URL.revokeObjectURL(im.dataset.u);const u=DRAW.svgUrl(d);im.dataset.u=u;im.src=u;im.classList.add('att-draw');im.title='Dessin — toucher pour le modifier';
+        im.alt=im.alt||'dessin';im.tabIndex=0;im.setAttribute('role','button');return;}}
     const u=m&&/^image\//.test(m.type)?await url(id):null;
     if(u){im.src=u;im.title=m.name;}
     else{const s=document.createElement('span');s.className='att-miss';s.textContent=m?'[pièce jointe « '+m.name+' » : pas encore reçue sur cet appareil]':'[pièce jointe introuvable]';im.replaceWith(s);}});
@@ -215,7 +219,7 @@ async function importAll(v){
   return n;
 }
 
-return{add,remove,removeNote,list,get,used,url,open,download,resolve,payload,merge,syncBlobs,sig,exportAll,validate,importAll,
+return{blob:getBlob,DRAWT,add,remove,removeNote,list,get,used,url,open,download,resolve,payload,merge,syncBlobs,sig,exportAll,validate,importAll,
   pref,setPref,on:f=>listen.push(f),mo,MAX,TOTAL,MAXN,TYPES,AttError,getBlob,haveIds,
   _seal:seal,_unseal:unseal,_dropBlob:id=>delBlob(id).then(()=>revoke(id)),_reset:async()=>{Object.keys(URLS).forEach(revoke);try{const d=await db();d.close();}catch(e){}dbp=null;}};
 })();

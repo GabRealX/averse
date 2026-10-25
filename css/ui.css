@@ -145,3 +145,33 @@ html[data-theme="papier"] .sh-info.warn{color:#7a4d0c}
 /* v7 : easter egg du titre (les lettres « dégoulinent » une fois) */
 .egg-drip{display:inline-block;animation:drip 1.6s cubic-bezier(.5,0,.6,1) both}
 @keyframes drip{0%{transform:none}35%{transform:translateY(.18em) scaleY(1.25)}60%{transform:translateY(.05em) scaleY(.92)}100%{transform:none}}
+
+/* ========== v10 : PETITS TÉLÉPHONES (iPhone SE 320 / 375 px, Android 360 px) ==========
+   Vérifié par pw/audit10.js et par le test « Petit écran (v10) » de tests.html :
+   - toute cible tactile fait au moins 44 × 44 px (recommandation Apple / WCAG 2.5.5) ;
+   - tout champ de saisie est en 16 px au moins : sinon Safari iOS ZOOME la page au focus ;
+   - rien ne déborde horizontalement. Les liens DANS un texte (paragraphe, aperçu Markdown) restent des liens normaux. */
+@media (max-width:600px){
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),textarea,select{font-size:16px!important}
+  button,.btn,.ico-btn,.del,.tpl-b,[role=button],[role=tab],summary,select,label.btn{min-height:44px}
+  button,.btn,.ico-btn,.del,.tpl-b,[role=button],[role=tab]{min-width:44px}
+  .ico-btn,.del,.tpl-b,.linklike{display:inline-flex;align-items:center;justify-content:center}
+  summary{display:flex;align-items:center}
+  /* cases à cocher / boutons radio : toute la ligne (le label) est la cible */
+  label:has(>input[type=checkbox]),label:has(>input[type=radio]){min-height:44px;display:inline-flex;align-items:center;gap:8px}
+  input[type=checkbox],input[type=radio]{width:20px;height:20px;flex:none}
+  input[type=color]{min-width:44px;min-height:44px}
+  /* liens du pied de page (une liste de liens, pas un texte) */
+  .footer-links a,.footer-copyright a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:0 4px}
+  /* en-têtes : logo, liens de navigation, retour */
+  nav a.logo,.nav-links a,a.back,.modal-eyebrow a{display:inline-flex;align-items:center;min-height:44px;min-width:44px}
+  .modal-star,.modal-close,.modal-note,.modal-send{min-width:44px;min-height:44px}
+  label:has(>input[type=checkbox]),label:has(>input[type=radio]){min-width:44px}
+  /* tâches « - [ ] » de l'aperçu : la case reste petite à l'œil, mais sa zone tactile fait 44 px */
+  li.task>input[type=checkbox]:not(:disabled){-webkit-appearance:none;appearance:none;width:44px;height:44px;margin:-12px -8px -12px -12px;vertical-align:middle;cursor:pointer;
+    background:no-repeat center/18px 18px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Crect x='1' y='1' width='16' height='16' rx='3' fill='none' stroke='%23999' stroke-width='1.6'/%3E%3C/svg%3E")}
+  li.task>input[type=checkbox]:not(:disabled):checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Crect x='1' y='1' width='16' height='16' rx='3' fill='%23999'/%3E%3Cpath d='M4.5 9.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E")}
+  li.task>input[type=checkbox]:focus-visible{outline:2px solid var(--fg);outline-offset:-10px}
+  /* les sorties des outils : un long libellé passe à la ligne au lieu de déborder */
+  .out .line>span:first-child{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+}

@@ -127,5 +127,7 @@ if(typeof CTX!=='undefined'){
 /* boutons : carnet (#photoBtn) et accueil (#qPhoto) */
 ['photoBtn','qPhoto'].forEach(k=>{const b=document.getElementById(k);if(b){b.hidden=false;b.addEventListener('click',()=>open());}});
 if(/^#photo$/.test(location.hash)&&document.getElementById('photoBtn'))setTimeout(()=>open(),300);
-window.PHOTO={open,close,makeNote,titleOf,setEngine:f=>{OCR=f;},stop:()=>{if(worker){worker.terminate().catch(()=>{});worker=null;}}};
+/* v10 : lire une image sans la fenêtre (partage → note : bouton « Lire le texte ») */
+const read=async(f,prog)=>tidy(await OCR(f,(l,p,pp)=>{if(prog)prog(l,p!=null?p:pp);}));
+window.PHOTO={open,close,makeNote,titleOf,read,setEngine:f=>{OCR=f;},stop:()=>{if(worker){worker.terminate().catch(()=>{});worker=null;}}};
 })();

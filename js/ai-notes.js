@@ -13,10 +13,11 @@ async function related(n,host){
   const b=box(host,'aiRelated','backlinks ai-rel');
   if(!b.dataset.id||b.dataset.id!==n.id)b.innerHTML='<div class="bl-head">Notes liées (par le sens)</div><div class="none">calcul local…</div>';
   b.dataset.id=n.id;
-  try{const r=await AI.similarTo(n.id,5);if(tok!==relTok)return;
-    const by=notesDebug.data.notes,list=r.filter(x=>by[x.id]&&x.s>.25);
-    b.innerHTML='<div class="bl-head">Notes liées (par le sens)</div>'+(list.length?list.map(x=>'<a data-id="'+esc(x.id)+'" title="similarité '+x.s.toFixed(2)+'">'+esc(by[x.id].title||'Sans titre')+
-      ' <small>'+Math.round(x.s*100)+' %</small></a>').join(''):'<div class="none">Rien de proche pour l\'instant.</div>');
+  /* v10 : plus de « 80 % » trompeur — seulement les notes NETTEMENT plus proches que le reste du carnet, avec un libellé */
+  try{const r=await AI.related(n.id,4);if(tok!==relTok)return;
+    const by=notesDebug.data.notes,list=r.filter(x=>by[x.id]);
+    b.innerHTML='<div class="bl-head">Notes liées (par le sens)</div>'+(list.length?list.map(x=>'<a data-id="'+esc(x.id)+'" data-rel="'+(x.label==='très proche'?'2':'1')+'" title="'+esc(x.label)+(x.tags?' · tag en commun':'')+'">'+esc(by[x.id].title||'Sans titre')+
+      ' <small class="rel-l">'+esc(x.label)+'</small></a>').join(''):'<div class="none">Aucune note vraiment proche.</div>');
   }catch(e){if(tok===relTok)b.innerHTML='<div class="bl-head">Notes liées (par le sens)</div><div class="none">indisponible : '+esc(e.message)+'</div>';}
 }
 function semantic(q,host,shown){
@@ -25,24 +26,20 @@ function semantic(q,host,shown){
   q=String(q||'').trim();if(!on()||q.length<3)return;
   semT=setTimeout(async()=>{
     try{const r=await AI.search(q,8);if(tok!==semTok)return;
-      const by=notesDebug.data.notes,skip=new Set(shown),list=r.filter(x=>by[x.id]&&!skip.has(x.id)&&x.s>.2).slice(0,5);
+      const by=notesDebug.data.notes,skip=new Set(shown),list=r.filter(x=>by[x.id]&&!skip.has(x.id)&&x.ok).slice(0,5);
       if(!list.length)return;
       const b=document.createElement('div');b.id='aiSem';b.className='ai-sem';
-      b.innerHTML='<div class="ai-sem-h">≈ Par le sens</div>'+list.map(x=>'<div class="note-item" data-id="'+esc(x.id)+'"><h4>'+esc(by[x.id].title||'Sans titre')+'</h4><div class="meta"><span>'+Math.round(x.s*100)+' % proche</span></div></div>').join('');
+      b.innerHTML='<div class="ai-sem-h">≈ Par le sens</div>'+list.map(x=>'<div class="note-item" data-id="'+esc(x.id)+'"><h4>'+esc(by[x.id].title||'Sans titre')+'</h4><div class="meta"><span>'+esc(x.label)+'</span></div></div>').join('');
       host.appendChild(b);
     }catch(e){}
   },250);
 }
-/* graphe : paires proches (au plus 2 par note, similarité > 0,5) */
+/* graphe : paires nettement proches (au plus 2 par note) */
 let semOn=false;
 async function graphSem(){
   const G=notesDebug.G;if(!semOn||!on()){G.semIds=[];notesDebug.draw&&redrawSafe();return;}
-  const V=await AI.indexNotes(),ids=[...V.keys()],pairs=[],seen=new Set();
-  ids.forEach(a=>{const va=V.get(a).v;ids.filter(b=>b!==a).map(b=>[b,dotp(va,V.get(b).v)]).sort((x,y)=>y[1]-x[1]).slice(0,2)
-    .forEach(([b,s])=>{const k=a<b?a+'|'+b:b+'|'+a;if(s>.5&&!seen.has(k)){seen.add(k);pairs.push([a,b,s]);}});});
-  G.semIds=pairs;redrawSafe();
+  G.semIds=await AI.semPairs();redrawSafe();                  // v10 : calibré sur le carnet (voir ai.js)
 }
-const dotp=(a,b)=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;};
 function redrawSafe(){try{if(typeof redraw==='function')redraw();}catch(e){}}
 function syncUi(){
   const b=document.getElementById('graphSem');if(b){b.hidden=!on();b.setAttribute('aria-pressed',String(semOn&&on()));}

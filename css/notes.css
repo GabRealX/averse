@@ -398,3 +398,43 @@ html[data-style="ascii"] .cf-bar{border-bottom:1px dashed rgba(242,139,139,.6)}
 .new-row{display:flex;gap:8px}
 .new-row #newBtn{flex:1}
 .ph-btn{flex:none;padding-left:12px;padding-right:12px;filter:grayscale(1)}
+/* v10 : bandeau « partage reçu » (notes-share.js) */
+.share-in{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0;padding:8px 12px;border:1px solid var(--fg-soft);font-size:.74rem;color:var(--fg)}
+.share-in span{flex:1 1 200px}.share-in .bad{color:var(--bad)}
+
+/* ========== v10 : tableau blanc (draw.js) — plein écran, utilisable sur iPhone SE ========== */
+html.dw-lock,html.dw-lock body{overflow:hidden;overscroll-behavior:none}
+.dw-ov{position:fixed;inset:0;z-index:300;background:var(--bg,#06060a);display:flex;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.dw-dlg{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.dw-bar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:6px;border-bottom:1px solid rgba(var(--acc-rgb),.18)}
+.dw-b{min-width:44px;min-height:44px;padding:0 8px;border-radius:10px;border:1px solid rgba(var(--acc-rgb),.18);background:transparent;
+  color:var(--fg);font:inherit;font-size:18px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.dw-b[aria-pressed="true"]{background:rgba(var(--acc-rgb),.16);border-color:rgba(var(--acc-rgb),.6)}
+.dw-b:disabled{opacity:.35;cursor:default}
+.dw-b:focus-visible{outline:2px solid var(--fg);outline-offset:1px}
+.dw-c i{width:20px;height:20px;border-radius:50%;display:block;border:1px solid rgba(255,255,255,.25)}
+.dw-s i{display:block;border-radius:50%;background:var(--fg)}
+.dw-ok{font-size:14px;font-weight:600;background:rgba(var(--acc-rgb),.14)}
+.dw-sep{width:1px;height:26px;background:rgba(var(--acc-rgb),.18);margin:0 2px}
+.dw-sp{flex:1}
+.dw-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:6px;overflow:hidden}
+.dw-cv{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;background:rgba(var(--acc-rgb),.03);
+  border:1px dashed rgba(var(--acc-rgb),.22);border-radius:8px;cursor:crosshair}
+.dw-cv[data-tool="erase"]{cursor:cell}
+@media (max-width:420px){.dw-bar{gap:3px;padding:4px}.dw-sep{display:none}.dw-b{padding:0 6px}.dw-ok{flex:1 0 auto}}
+/* le dessin dans l'aperçu / la liste des pièces jointes */
+#preview img.att-draw{max-width:100%;height:auto;cursor:pointer;border-radius:8px;background:rgba(var(--acc-rgb),.03);border:1px solid rgba(var(--acc-rgb),.12)}
+.att-th.draw{background:rgba(var(--acc-rgb),.05);object-fit:contain}
+
+/* v10 : PETITS TÉLÉPHONES — l'en-tête de la note (titre, tags, boutons de 44 px) ne doit plus écraser la zone d'écriture :
+   l'éditeur défile en entier et l'écriture garde toujours au moins la moitié de l'écran. */
+@media (max-width:600px){
+  .main{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .editor{height:auto;min-height:100%}
+  .panes{flex:none}
+  .pane{min-height:52vh;padding:16px 16px}
+  .pane.write textarea{min-height:50vh}
+  .ed-row{gap:6px;flex-wrap:wrap}
+  .ed-row .del{margin-left:0!important;padding:0 10px}
+}

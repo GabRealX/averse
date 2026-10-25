@@ -1282,16 +1282,17 @@ T('Glyph : UNE seule boucle pour tous, arrêtée quand c\'est fini (done, error)
 /* ---- IA : un faux fournisseur (fetch) et un faux worker d'embeddings, jamais le vrai réseau ---- */
 const AIKEY='AIzaTEST_ONLY_not_a_real_key_0000000000',OAKEY='sk-TESTONLY-000000000000000000000000';
 function aiNet(){                         // remplace W.fetch : enregistre tout, répond en flux SSE
-  const log=[],real=W.fetch;let status=200,parts=['Voici ','un **résumé** ','en trois ','morceaux.'];
+  const log=[],real=W.fetch;let status=200,delay=0,parts=['Voici ','un **résumé** ','en trois ','morceaux.'];
   const sse=(prov)=>{const te=new W.TextEncoder();return new W.ReadableStream({async start(c){
     for(const t of parts){const j=prov==='openai'?{choices:[{delta:{content:t}}]}:{candidates:[{content:{parts:[{text:t}]}}]};c.enqueue(te.encode('data: '+JSON.stringify(j)+'\n\n'));await sleep(40);}
     if(prov==='openai')c.enqueue(te.encode('data: [DONE]\n\n'));c.close();}});};
   W.fetch=async(url,o)=>{url=String(url);const ai=/googleapis|openai|openrouter|mistral|groq|ai\.test/.test(url);
     if(!ai)return real.call(W,url,o);
     log.push({url,headers:Object.assign({},o&&o.headers),body:o&&o.body?JSON.parse(o.body):null,cred:o&&o.credentials});
+    if(delay)await sleep(delay);                                        // v10 : latence avant les en-têtes (fournisseur « lent »)
     if(status!==200)return new W.Response(JSON.stringify({error:{message:'nope'}}),{status});
     return new W.Response(sse(/googleapis/.test(url)?'gemini':'openai'),{status:200,headers:{'content-type':'text/event-stream'}});};
-  return{log,set status(s){status=s;},set parts(p){parts=p;}};
+  return{log,set status(s){status=s;},set parts(p){parts=p;},set delay(v){delay=v;}};
 }
 function aiWorker(model){                 // faux worker : « sac de mots » → vecteur normé de 64 cases (model : nom annoncé, v8)
   const log=[],texts=[];const fold=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -1327,7 +1328,9 @@ T('IA : « Envoyer » → UN appel Gemini (clé en en-tête, sans cookies, texte
     d.querySelector('[data-ai="send"]').click();
     await until(()=>d.querySelector('[data-ai="copy"]'),5000);
     if(net.log.length!==1)throw new Error(net.log.length+' appels');const c=net.log[0];
-    if(!/^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-2\.5-flash:streamGenerateContent\?alt=sse$/.test(c.url))throw new Error(c.url);
+    if(!/^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.5-flash-lite:streamGenerateContent\?alt=sse$/.test(c.url))throw new Error(c.url);
+    /* v10 : modèle rapide par défaut, réflexion au minimum (1er mot plus tôt) */
+    if(!c.body.generationConfig.thinkingConfig||c.body.generationConfig.thinkingConfig.thinkingLevel!=='minimal')throw new Error('thinkingConfig '+JSON.stringify(c.body.generationConfig));
     if(c.headers['x-goog-api-key']!==AIKEY||c.url.includes(AIKEY)||c.cred!=='omit')throw new Error('clé / cookies');
     if(c.body.contents[0].parts[0].text!=='Texte à résumer : la pluie tombe.')throw new Error('texte envoyé');
     has(d.getElementById('aiOut').textContent,'Voici un résumé en trois morceaux.');if(!d.querySelector('#aiOut strong'))throw new Error('Markdown');
@@ -1580,7 +1583,7 @@ T('IA locale v8 : changement de modèle → anciens vecteurs effacés et recalcu
     if(await c.match(OLD))throw new Error('ancien modèle encore en cache');if(!(await c.match(OTHER)))throw new Error('cache voisin supprimé');
     if(!wk.texts.some(t=>t.startsWith('passage: Transistor')))throw new Error('préfixe passage : '+wk.texts.slice(0,2));
     await A.search('transistor',2);if(!wk.texts.some(t=>t==='query: transistor'))throw new Error('préfixe query');
-    if(A.rel().min!==.815||A.rel().gap!==.03)throw new Error('seuil E5 : '+JSON.stringify(A.rel()));
+    {const r=A.rel();if(r.nn.floor!==.81||r.nn.z!==2.2||r.qp.floor!==.76||r.qp.gap!==.04)throw new Error('calibration E5 : '+JSON.stringify(r));}   // v10 : calibrée (README)
     /* même version : rien n'est recalculé */
     const n0=wk.texts.length;await A.indexNotes();if(wk.texts.length!==n0)throw new Error('ré-indexé pour rien');
   }finally{try{(await caches.open('transformers-cache')).delete(OTHER);}catch(e){}
@@ -1719,6 +1722,198 @@ T('Glyph (v9) : plus grand (barre 46 px, réponse 64, fenêtres 64) avec une gri
     if(seen.some(s=>/\b0 note/.test(s)))throw new Error('« 0 note indexée » affiché : '+seen.join(' | '));
     has(st(),'3 notes indexées');W.AI.close();
   }finally{if(F){const w=F.contentWindow;try{await w.AI.forget(['gx_a','gx_b','gx_c']);}catch(e){}F.remove();}restoreLS(S);}});
+
+/* ==================== v10 ==================== */
+const offNet=(w,off)=>{Object.defineProperty(w.navigator,'onLine',{get:()=>!off,configurable:true});w.dispatchEvent(new w.Event(off?'offline':'online'));};
+T('IA v10 : Gemini rapide par défaut (flash-lite, réflexion minimale), choix du modèle dans les réglages ; ancien modèle 2.5 → budget 0',async()=>{const S=snap();
+  try{await homeAi();const A=W.AI;
+    if(A.PROV.gemini.model!=='gemini-3.5-flash-lite')throw new Error('défaut '+A.PROV.gemini.model);
+    const tf=m=>JSON.stringify(A.thinkFor(m));
+    const exp={'gemini-3.5-flash-lite':'{"thinkingLevel":"minimal"}','gemini-3.6-flash':'{"thinkingLevel":"minimal"}','gemini-3.8-flash':'{"thinkingLevel":"low"}',
+      'gemini-2.5-flash':'{"thinkingBudget":0}','gemini-2.5-flash-lite':'{"thinkingBudget":0}','mon-modele':'null'};
+    for(const k in exp)if(tf(k)!==exp[k])throw new Error(k+' → '+tf(k));
+    if(!A.MODELS.gemini.length||!/rapide/.test(A.MODELS.gemini[0][1]||A.MODELS.gemini[0].label||JSON.stringify(A.MODELS.gemini[0])))throw new Error('liste des modèles');
+    A.settings();await until(()=>W.document.getElementById('aiModel'));const m=W.document.getElementById('aiModel'),dl=W.document.getElementById('aiModels');
+    if(m.getAttribute('list')!=='aiModels'||!dl||dl.options.length<3)throw new Error('choix du modèle (datalist)');
+    has(m.placeholder,'flash-lite','rapide');A.close();
+  }finally{if(F)F.remove();restoreLS(S);}});
+T('IA v10 hors ligne : rien ne part, message clair + indicateur ; file d\'attente SEULEMENT après clic, envoyée au retour du réseau',async()=>{const S=snap();
+  try{setLS('averse-ai',{skipFree:true});await homeAi();const d=W.document,net=aiNet(),P=d.getElementById('aiPanel');await W.AI.setKey('gemini',AIKEY);
+    offNet(W,true);
+    W.AI.settings();await until(()=>d.getElementById('aiNet'));has(d.getElementById('aiNet').textContent,'Hors ligne');W.AI.close();
+    let thrown='';try{await W.AI.fire('free','p',()=>{});}catch(e){thrown=e.name;}if(thrown!=='OfflineError')throw new Error('send hors ligne : '+thrown);
+    const q=qType('? Pourquoi le ciel est bleu');has(d.getElementById('results').textContent,'Hors ligne');
+    wkey(q,'Enter');await until(()=>P.querySelector('[data-p="queue"]'),3000).catch(()=>{throw new Error('pas de proposition : '+P.innerHTML.slice(0,300));});
+    has(P.textContent,'rien n\'a été envoyé');if(net.log.length)throw new Error('envoyé hors ligne');
+    if(W.AIBAR.state()!=='offline')throw new Error('état '+W.AIBAR.state());
+    /* retour du réseau SANS avoir cliqué → rien */
+    offNet(W,false);await sleep(150);if(net.log.length)throw new Error('envoyé sans consentement');
+    /* consentement → envoi au retour */
+    offNet(W,true);P.querySelector('[data-p="queue"]').click();has(P.textContent,'En attente du réseau');await sleep(100);if(net.log.length)throw new Error('envoyé avant le réseau');
+    offNet(W,false);await until(()=>P.querySelector('[data-p="note"]'),5000).catch(()=>{throw new Error('pas envoyé au retour : '+P.innerHTML.slice(0,300));});
+    if(net.log.length!==1)throw new Error(net.log.length+' appels');has(P.querySelector('.aip-out').textContent,'trois morceaux');
+    W.AIBAR.close();
+  }finally{if(F){try{offNet(F.contentWindow,false);}catch(e){}F.remove();}restoreLS(S);}});
+T('Barre IA v10 : étapes réelles (je lis, je cherche dans N notes, notes trouvées en puces cliquables, envoi, rédige, reçue + chrono), squelette, GRAND Glyph',async()=>{const S=snap();let ids=[];
+  try{const base=[{id:'v10_a',title:'Volcans',body:'Un volcan rejette du magma.\n\nLe Piton de la Fournaise est un volcan très actif, magma fluide.'},{id:'v10_b',title:'Liste de courses',body:'pain, lait, tomates'},
+      {id:'v10_c',title:'Recette',body:'farine, oeufs, beurre, sucre'}];ids=base.map(n=>n.id);sNotes(base);
+    setLS('averse-ai',{local:true});const wk=aiWorker();
+    await homeAi(()=>{W.AI.workerFactory=wk.make;});const d=W.document,net=aiNet(),P=d.getElementById('aiPanel'),hv=d.getElementById('homeView');await W.AI.setKey('gemini',AIKEY);
+    net.delay=900;net.parts=['Le Piton ','de la ','**Fournaise**.'];
+    const steps=[];const obs=new W.MutationObserver(()=>{const s=W.AIBAR.steps().join(',');if(steps[steps.length-1]!==s)steps.push(s);});obs.observe(P,{subtree:true,childList:true,attributes:true});
+    const q=qType('? Quel volcan est actif magma');d.querySelector('#results .res-ai-notes').click();
+    await until(()=>P.querySelector('[data-p="send"]'),5000).catch(()=>{throw new Error('confirmation : '+P.innerHTML.slice(0,300));});
+    const all=steps.join(' | ');has(all,'read:','look:','found:');
+    has(P.querySelector('.aip-steps').textContent,'Je lis ta question','Je cherche dans tes 3 notes','note trouvée');
+    const chip=P.querySelector('.aip-steps a.aip-chip[data-note="v10_a"]');if(!chip)throw new Error('puce de la note trouvée');has(chip.textContent,'Volcans');
+    if(P.querySelector('.aip-chip[data-note="v10_b"]'))throw new Error('note sans rapport en puce');
+    F.style.width='375px';F.style.height='667px';await sleep(150);   // iPhone SE
+    W.scrollTo(0,1e6);await sleep(50);                  // petit écran : on est descendu jusqu'au bouton « Envoyer »
+    if(W.scrollY<50)throw new Error('page pas défilable à 375×667 : le test ne prouverait rien');
+    P.querySelector('[data-p="send"]').click();
+    /* immédiatement : squelette + grand Glyph (pas de fausse progression : une étape « J'envoie » en cours) */
+    await until(()=>P.querySelector('.aip-skel'),800).catch(()=>{throw new Error('pas de squelette');});
+    /* pendant l'attente, le Glyph revient À L'ÉCRAN (sinon on ne le voit pas sur un iPhone SE) */
+    const inView=()=>{const r=d.querySelector('#homeView .home-glyph').getBoundingClientRect();return r.top>=-1&&r.bottom<=W.innerHeight+1;};
+    await until(inView,1500).catch(()=>{const r=d.querySelector('#homeView .home-glyph').getBoundingClientRect();throw new Error('Glyph hors écran pendant l\'attente : top='+Math.round(r.top)+' bas='+Math.round(r.bottom)+' / '+W.innerHeight);});
+    if(hv.dataset.ai!=='busy')throw new Error('accueil pas en mode IA : '+hv.dataset.ai);
+    const gl=d.querySelector('#homeView .home-glyph canvas, #homeView canvas.glyph');if(!gl||gl.getBoundingClientRect().width<100)throw new Error('Glyph pas grand pendant l\'attente : '+(gl&&gl.getBoundingClientRect().width));
+    has(W.AIBAR.steps().join(','),'send:now');if(P.querySelector('progress,[role="progressbar"]'))throw new Error('barre de progression inventée');
+    await until(()=>P.querySelector('[data-p="note"]'),6000);
+    const fin=W.AIBAR.steps().join(',');has(fin,'think:ok','write:ok','done:ok');if(/:now/.test(fin))throw new Error('étape restée en cours : '+fin);
+    has(P.querySelector('.aip-steps').textContent,'Réponse reçue','1er mot à');
+    if(P.querySelector('.aip-skel'))throw new Error('squelette resté');has(P.querySelector('.aip-out').textContent,'Le Piton de la Fournaise.');
+    if(hv.dataset.ai!=='answer')throw new Error('mode réponse');const w2=gl.getBoundingClientRect().width;if(w2<72)throw new Error('Glyph trop petit pendant la réponse : '+w2);
+    obs.disconnect();
+    /* la puce ouvre la note */
+    const ch2=P.querySelector('.aip-chip[data-note="v10_a"]');if(!ch2||!/notes\.html#v10_a/.test(ch2.getAttribute('href')))throw new Error('lien de la puce');
+    wkey(q,'Escape');await sleep(50);if(hv.dataset.ai)throw new Error('mode IA pas quitté');
+    return 'Glyph '+Math.round(gl.getBoundingClientRect().width||w2)+' px en réponse';
+  }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
+T('IA v10 : question préparée pendant la frappe (local, aucun réseau) ; index gardé sur le disque : seules les notes modifiées sont recalculées',async()=>{const S=snap();let ids=[];
+  try{const base=[{id:'ix_a',title:'Alpha',body:'transistor silicium courant'},{id:'ix_b',title:'Beta',body:'farine levure pain'},{id:'ix_c',title:'Gamma',body:'routeur paquets réseau'}];ids=base.map(n=>n.id);sNotes(base);
+    setLS('averse-ai',{local:true});const E5='Xenova/multilingual-e5-small';let wk=aiWorker(E5);await homeAi(()=>{W.AI.workerFactory=wk.make;});const net=aiNet();
+    await W.AI.prewarm();if(W.AI.timing().indexed!==3)throw new Error('1er index : '+W.AI.timing().indexed);
+    const n0=W.AI.qCache();qType('? comment marche un transistor');await until(()=>W.AI.qCache()>n0,3000).catch(()=>{throw new Error('question pas préparée');});
+    await until(()=>wk.texts.some(t=>/^query: comment marche un transistor$/.test(t)),3000).catch(()=>{throw new Error('question pas calculée (préfixe query:) : '+wk.texts.slice(-2));});
+    if(net.log.length||aiReq().some(u=>/googleapis|openai/.test(u)))throw new Error('réseau pendant la frappe');
+    F.remove();
+    /* rechargement : rien à recalculer */
+    wk=aiWorker(E5);await homeAi(()=>{W.AI.workerFactory=wk.make;});await W.AI.indexNotes();
+    if(W.AI.timing().indexed!==0)throw new Error('après rechargement : '+W.AI.timing().indexed+' recalculées');
+    /* index relu du disque (Worker pas forcément prêt) : la calibration doit rester celle du modèle qui a calculé les vecteurs */
+    if(!(W.AI._nn().cal&&W.AI._nn().cal.nn.mu>.5))throw new Error('index relu : mauvaise calibration (modèle inconnu) mu='+(W.AI._nn().mu).toFixed(3));
+    F.remove();
+    /* une note modifiée → elle seule */
+    const nd0=getLS('noxe-notes');nd0.notes.ix_b.body='farine levure pain brioche';nd0.notes.ix_b.updated=Date.now();setLS('noxe-notes',nd0);
+    wk=aiWorker(E5);await homeAi(()=>{W.AI.workerFactory=wk.make;});await W.AI.indexNotes();
+    if(W.AI.timing().indexed!==1)throw new Error('note modifiée : '+W.AI.timing().indexed);
+    if(wk.texts.some(t=>/transistor|routeur/.test(t)))throw new Error('notes inchangées recalculées');
+  }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
+T('Notes liées v10 : calibrées — « très proche / proche » (jamais de %), au plus 4, RIEN pour une note isolée',async()=>{const S=snap();let ids=[];
+  try{const base=[{id:'rl_a',title:'Transistors',body:'transistor silicium courant tension grille drain'},{id:'rl_b',title:'MOSFET',body:'transistor silicium courant grille drain source'},
+      {id:'rl_c',title:'Courses',body:'pomme banane carotte poireau'},{id:'rl_d',title:'Poèmes',body:'lune étoile océan silence'},{id:'rl_e',title:'Vélo',body:'chaîne pédale guidon selle'},
+      {id:'rl_f',title:'Jardin',body:'tulipe rosier arrosoir bêche'}];ids=base.map(n=>n.id);sNotes(base);
+    setLS('averse-ai',{local:true});const wk=aiWorker();
+    await frame('notes.html#rl_a',()=>W.AI&&W.notesApi);await W.AI.ready;W.AI.workerFactory=wk.make;await W.AI.indexNotes();
+    const r=await W.AI.related('rl_a',4);if(!r.length||r[0].id!=='rl_b')throw new Error('voisine : '+JSON.stringify(r));
+    if(r.some(x=>x.id!=='rl_b'))throw new Error('bruit : '+r.map(x=>x.id));if(!/proche/.test(r[0].label))throw new Error('libellé');
+    if((await W.AI.related('rl_d',4)).length)throw new Error('note isolée avec des « liées »');
+    W.notesApi.open('rl_a');const box=()=>W.document.querySelector('.ai-rel,#aiRel,[data-ai-rel]');
+    await until(()=>box()&&box().querySelector('a[data-id="rl_b"]'),5000).catch(()=>{throw new Error('bloc : '+(box()&&box().outerHTML.slice(0,300)));});
+    if(/%/.test(box().textContent))throw new Error('% affiché : '+box().textContent);has(box().textContent,'proche');
+    W.notesApi.open('rl_d');await until(()=>box()&&/Aucune note vraiment proche/.test(box().textContent),5000).catch(()=>{throw new Error('note isolée : '+(box()&&box().textContent));});
+  }finally{if(F){const w=F.contentWindow;try{await w.AI.forget(ids);}catch(e){}F.remove();}restoreLS(S);}});
+T('Partager vers AVERSE (v10) : lien → note titrée SANS requête vers le lien ; texte, JSON ; image jointe + OCR au clic',async()=>{const S=snap();const made=[];
+  if(!('caches' in window))throw Object.assign(new Error('Cache API absente'),{skip:true});
+  const put=async(meta,files)=>{const c=await caches.open('averse-share');for(const k of await c.keys())await c.delete(k);
+    for(let i=0;i<(files||[]).length;i++)await c.put('./__share/'+i,new Response(files[i],{headers:{'content-type':files[i].type,'x-name':encodeURIComponent(files[i].name)}}));
+    await c.put('./__share/meta',new Response(JSON.stringify(Object.assign({title:'',text:'',url:'',files:(files||[]).length,t:Date.now()},meta)),{headers:{'content-type':'application/json'}}));};
+  const C=(m,t)=>W.notesShare.compose(m,t);
+  try{sNotes([{id:'sh_x',title:'Existante',body:'x'}]);await frame('notes.html',()=>W.notesShare);
+    let c=C({title:'Un article',url:'https://exemple.test/a'});if(c.title!=='Un article'||c.body!=='[Un article](https://exemple.test/a)')throw new Error('lien+titre '+JSON.stringify(c));
+    c=C({text:'https://exemple.test/b'});if(c.title!=='https://exemple.test/b'||c.body!=='<https://exemple.test/b>')throw new Error('lien seul '+JSON.stringify(c));
+    c=C({text:'# Idée\nfaire un jardin'});if(c.title!=='Idée'||!/faire un jardin/.test(c.body))throw new Error('texte '+JSON.stringify(c));
+    c=C({},[{name:'d.json',type:'application/json',text:'{"a":1}'}]);if(c.title!=='d'||c.body!=='```json\n{"a":1}\n```')throw new Error('json '+JSON.stringify(c));
+    if(!/^Partage du /.test(C({}).title))throw new Error('titre de repli');
+    F.remove();
+    /* vrai parcours : le cache rempli comme par sw.js, puis notes.html?share=1 */
+    await put({title:'Article intéressant',text:'à lire',url:'https://exemple.test/article'});
+    await frame('notes.html?share=1',()=>W.notesApi&&Object.values(nd().notes).some(n=>n.title==='Article intéressant'));
+    let n=Object.values(nd().notes).find(n=>n.title==='Article intéressant');made.push(n.id);
+    if(!(n.tags||[]).includes('partage'))throw new Error('tag');has(n.body,'à lire','[Article intéressant](https://exemple.test/article)');
+    if(W.location.search)throw new Error('?share pas retiré');
+    if(W.performance.getEntriesByType('resource').some(e=>/exemple\.test/.test(e.name)))throw new Error('requête vers le lien partagé');
+    if((await (await caches.open('averse-share')).keys()).length)throw new Error('cache pas vidé');
+    F.remove();
+    /* image : jointe, affichée, OCR seulement au clic */
+    await put({text:'Tableau'},[await (async()=>{const b=await(await png(40,20)).arrayBuffer();return new File([b],'tableau.png',{type:'image/png'});})()]);
+    await frame('notes.html?share=1',()=>W.notesApi&&W.document.getElementById('shareIn'));
+    n=Object.values(nd().notes).find(n=>n.title==='Tableau');made.push(n.id);
+    if(W.ATT.list(n.id).length!==1||!/\(att:/.test(n.body))throw new Error('image pas jointe : '+n.body);
+    let calls=0;W.PHOTO.setEngine(async(f,prog)=>{calls++;prog('lecture',.5,.5);await sleep(30);return 'Texte du tableau';});
+    await sleep(150);if(calls)throw new Error('OCR sans clic');
+    W.document.querySelector('#shareIn [data-sh="ocr"]').click();
+    await until(()=>/Texte lu \(OCR\)[\s\S]*Texte du tableau/.test(nd().notes[n.id].body),3000).catch(()=>{throw new Error('OCR : '+nd().notes[n.id].body);});
+  }finally{if(F){const w=F.contentWindow;for(const id of made)try{await w.ATT.removeNote(id);}catch(e){}F.remove();}try{await caches.delete('averse-share');}catch(e){}restoreLS(S);}});
+const ptr=(el,type,x,y,o)=>{const r=el.getBoundingClientRect();el.dispatchEvent(new W.PointerEvent(type,Object.assign({bubbles:true,cancelable:true,pointerId:7,pointerType:'pen',isPrimary:true,
+  clientX:r.left+x,clientY:r.top+y,pressure:.5,button:0,buttons:type==='pointerup'?0:1},o||{})));};
+const stroke=(cv,pts,o)=>{ptr(cv,'pointerdown',pts[0][0],pts[0][1],o);for(const p of pts.slice(1))ptr(cv,'pointermove',p[0],p[1],Object.assign({},o,p[2]!=null?{pressure:p[2]}:{}));const l=pts[pts.length-1];ptr(cv,'pointerup',l[0],l[1],o);};
+T('Dessin (v10) : plein écran, stylo + pression, gomme, couleurs, annuler/rétablir ; JSON vectoriel joint (chiffré/synchro) ; aperçu SVG ; modifier ; PNG',async()=>{const S=snap();
+  try{sNotes([{id:'dw_a',title:'Croquis',body:'Mon schéma :'}]);await frame('notes.html#dw_a',()=>W.DRAW&&W.notesAtt&&W.document.getElementById('drawAdd'));const d=W.document;
+    W.notesApi.open('dw_a');d.getElementById('drawAdd').click();await until(()=>d.getElementById('drawDlg'));
+    const ov=d.getElementById('drawDlg'),cv=ov.querySelector('canvas'),api=W.DRAW.api();
+    if(!d.documentElement.classList.contains('dw-lock'))throw new Error('défilement pas bloqué');
+    if(W.getComputedStyle(cv).touchAction!=='none')throw new Error('touch-action');
+    const r=ov.getBoundingClientRect();if(r.width<W.innerWidth-2||r.height<W.innerHeight-2)throw new Error('pas plein écran');
+    stroke(cv,[[20,20,.1],[60,30,.5],[100,40,1]]);
+    ov.querySelector('[data-col="#4ea1ff"]').click();ov.querySelector('[data-size="12"]').click();stroke(cv,[[20,120],[140,120]]);
+    let D=api.data();if(D.s.length!==2)throw new Error(D.s.length+' traits');
+    const p=D.s[0].p;if(p[2]>=p[p.length-1])throw new Error('pression pas gardée : '+p);if(D.s[1].c!=='#4ea1ff'||D.s[1].w!==12)throw new Error('couleur/épaisseur');
+    ov.querySelector('[data-dw="undo"]').click();if(api.data().s.length!==1)throw new Error('annuler');
+    ov.querySelector('[data-dw="redo"]').click();if(api.data().s.length!==2)throw new Error('rétablir');
+    ov.querySelector('[data-dw="erase"]').click();stroke(cv,[[80,115],[80,125]]);if(api.data().s.length!==1)throw new Error('gomme : '+api.data().s.length);
+    wkey(d.body,'z',{ctrlKey:true});if(api.data().s.length!==2)throw new Error('Ctrl+Z');
+    const svg=W.DRAW.svg(api.data());if(!/^<svg[^>]*><path /.test(svg)||/<script|on\w+=/i.test(svg))throw new Error('SVG');
+    const pngB=await W.DRAW.png(api.data());if(!pngB||pngB.type!=='image/png'||pngB.size<200)throw new Error('PNG');
+    ov.querySelector('[data-dw="ok"]').click();await until(()=>!d.getElementById('drawDlg')&&W.ATT.list('dw_a').length===1,3000).catch(()=>{throw new Error('enregistrement');});
+    if(d.documentElement.classList.contains('dw-lock'))throw new Error('défilement resté bloqué');
+    const m=W.ATT.list('dw_a')[0];if(m.type!=='application/vnd.averse.draw+json')throw new Error('type '+m.type);
+    await until(()=>/!\[dessin\]\(att:/.test(nd().notes.dw_a.body)).catch(()=>{throw new Error('référence : '+nd().notes.dw_a.body);});
+    const j=JSON.parse(await (await W.ATT.blob(m.id)).text());if(j.v!==1||j.s.length!==2)throw new Error('JSON stocké');
+    if(!W.ATT.payload()||!JSON.stringify(W.ATT.payload()).includes(m.id))throw new Error('pas dans la liste synchronisée');
+    /* l'aperçu montre le SVG ; un clic le rouvre ; modifier = nouvelle pièce jointe, l'ancienne retirée */
+    d.querySelector('.panes-tabs [data-p="prev"]').click();
+    const im=await until(()=>d.querySelector('#preview img.att-draw[src^="blob:"]'),3000).catch(()=>{throw new Error('aperçu : '+d.getElementById('preview').innerHTML.slice(0,200));});
+    d.querySelector('#preview img.att-draw').click();await until(()=>d.getElementById('drawDlg'),3000).catch(()=>{throw new Error('pas rouvert');});
+    if(W.DRAW.api().data().s.length!==2)throw new Error('dessin relu');
+    stroke(d.querySelector('#drawDlg canvas'),[[30,200],[90,210]]);d.querySelector('#drawDlg [data-dw="ok"]').click();
+    await until(()=>{const l=W.ATT.list('dw_a');return l.length===1&&l[0].id!==m.id;},3000).catch(()=>{throw new Error('modification : '+W.ATT.list('dw_a').map(x=>x.id));});
+    const m2=W.ATT.list('dw_a')[0];if(!nd().notes.dw_a.body.includes('att:'+m2.id)||nd().notes.dw_a.body.includes('att:'+m.id))throw new Error('référence pas mise à jour');
+    /* données hostiles (synchro) : nettoyées */
+    const bad=W.DRAW.clean({v:1,w:1e9,h:-5,s:[{c:'red;"><script>',w:999,p:[1,2,'x',4]},{c:'#00ff00',p:[1,2,3]}]});
+    if(bad.w!==4000||bad.h!==50||bad.s[0].c!=='acc'||bad.s[0].w!==40||bad.s[0].p.length!==3)throw new Error('nettoyage '+JSON.stringify(bad));
+    /* Échap sans changement : ferme */
+    W.DRAW.open({});wkey(d.body,'Escape');await until(()=>!d.getElementById('drawDlg'),1500).catch(()=>{throw new Error('Échap');});
+  }finally{if(F){const w=F.contentWindow;try{w.DRAW.close();await w.ATT.removeNote('dw_a');}catch(e){}F.remove();}restoreLS(S);}});
+T('Petit écran (v10) : carnet, accueil, IA, dessin à 320 px — cibles ≥ 44 px (boutons principaux), champs ≥ 16 px, pas de défilement horizontal',async()=>{const S=snap();
+  const bad=[];
+  const audit=(w,where)=>{const d=w.document;const vw=d.documentElement.clientWidth;
+    if(d.documentElement.scrollWidth>vw+1)bad.push(where+' : déborde ('+d.documentElement.scrollWidth+' > '+vw+')');
+    d.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]),textarea,select').forEach(i=>{const r=i.getBoundingClientRect();
+      if(r.width&&r.height&&w.getComputedStyle(i).visibility!=='hidden'&&parseFloat(w.getComputedStyle(i).fontSize)<16)bad.push(where+' : champ #'+(i.id||i.name||i.className)+' '+w.getComputedStyle(i).fontSize);});
+    d.querySelectorAll('button,a[href],[role=button],summary,select,input[type=checkbox]').forEach(b=>{const r=b.getBoundingClientRect();
+      if(!r.width||!r.height||w.getComputedStyle(b).visibility==='hidden')return;if(b.closest('.prose,#preview,.md,.ai-out,p,li .att-nm'))return;   // liens dans le texte : exemptés (WCAG 2.5.8)
+      if(r.top>w.innerHeight*3)return;
+      const t=b.matches('input[type=checkbox]')?(b.closest('label')||b).getBoundingClientRect():r;
+      if(Math.min(t.width,t.height)<44&&!(t.height>=44&&t.width>=24)&&!(t.width>=44&&t.height>=40))bad.push(where+' : cible '+(b.id||b.dataset.p||b.dataset.dw||b.className||b.tagName)+' '+Math.round(t.width)+'×'+Math.round(t.height));});};
+  try{sNotes([{id:'sm_a',title:'Petit',body:'texte'}]);
+    await frame('notes.html#sm_a',()=>W.notesApi&&W.notesAtt);F.style.width='320px';F.style.height='640px';await sleep(250);audit(W,'carnet');
+    W.document.getElementById('drawAdd').click();await until(()=>W.document.getElementById('drawDlg'));await sleep(50);audit(W,'dessin');W.DRAW.close();F.remove();
+    await homeAi();F.style.width='320px';F.style.height='640px';await sleep(250);audit(W,'accueil');
+    await W.AI.setKey('gemini',AIKEY);aiNet();const q=qType('? test');wkey(q,'Enter');await until(()=>W.AIBAR.open());await sleep(100);audit(W,'IA (confirmation)');W.AIBAR.close();
+    if(bad.length)throw new Error(bad.slice(0,8).join(' ; ')+(bad.length>8?' … (+'+(bad.length-8)+')':''));
+  }finally{if(F)F.remove();restoreLS(S);}});
 
 (async()=>{
   let ok=0,skip=0,run=0;const box=$('res');
