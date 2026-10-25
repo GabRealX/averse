@@ -1,0 +1,11 @@
+name: Demande
+description: Une question ou un besoin précis.
+title: "[Demande] "
+labels: ["demande"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Ta demande
+    validations:
+      required: true

@@ -2,7 +2,16 @@
    - Le Gist ne contient que le coffre chiffré (voir vault.js) : GitHub ne peut pas lire tes notes.
    - Chaque appareil garde (dans ce navigateur) : le jeton GitHub (droit « gist » seulement), l'identifiant du Gist,
      et la clé des données sous forme NON exportable (IndexedDB) — sauf si tu choisis « verrouiller à chaque ouverture ».
-   - Quand : à l'ouverture, au retour sur l'onglet, toutes les 30 s si la page est visible ; envoi 2,5 s après une modif.
+   - Quand (v9 : beaucoup moins de requêtes) : à l'ouverture ; au retour sur l'onglet (focus / page de nouveau visible,
+     au plus une fois toutes les 20 s) ; envoi 6 s après la DERNIÈRE frappe (au plus 60 s d'attente si tu tapes sans
+     arrêt) ; en quittant l'onglet (page cachée) s'il reste des modifs ; et seulement toutes les 5 min si la page reste
+     visible sans rien faire (rien du tout si elle est cachée). Rien n'est envoyé si rien n'a changé (empreinte du contenu),
+     et la lecture est conditionnelle (ETag → 304).
+   - Avant de partir (v9) : s'il reste des modifs pas encore envoyées → le navigateur demande confirmation (beforeunload),
+     et un dernier envoi part en « keepalive » (pagehide) si le coffre fait moins de 60 Ko. Sur téléphone, beforeunload
+     est peu fiable : c'est l'envoi au passage en arrière-plan (visibilitychange → hidden) qui compte. Jamais de question
+     si tout est synchronisé.
+   - Pièces jointes (v9, attach.js) : leur liste voyage dans le coffre, les fichiers chiffrés dans un 2e Gist.
    - Fusion : la même que le fichier lié (notes.js : syncMerge → la plus récente gagne, pierres tombales, copies de conflit).
    - Anti-écrasement : lecture conditionnelle (ETag → 304 si rien n'a bougé), on relit TOUJOURS avant d'écrire, et après
      l'écriture on vérifie dans l'historique du Gist que personne n'a écrit entre les deux ; sinon on récupère cette
@@ -13,7 +22,7 @@
 const TEST=sessionStorage.getItem('averse-tests')==='1';      // tests.html : clés à part et réseau coupé (faux GitHub injecté)
 const CKEY=TEST?'averse-tests-cloud':'averse-cloud',FILE='averse-carnet.json',DESC='AVERSE — carnet chiffré (ne pas modifier à la main)';
 const TOKEN_URL='https://github.com/settings/tokens/new?scopes=gist&description=AVERSE';
-let POLL=30000,PUSH_DELAY=2500,ITER=VAULT.ITER;
+let POLL=300000,PUSH_DELAY=6000,MAX_WAIT=60000,FOCUS_MIN=20000,ITER=VAULT.ITER;   // v8 : 30 s et 2,5 s
 let API='https://api.github.com';
 try{const o=localStorage.getItem('averse-cloud-api');if(o&&o.startsWith(location.origin+'/'))API=o.replace(/\/+$/,'');}catch(e){}   // faux GitHub local (tests) : même origine seulement
 let fetchFn=TEST?null:(u,o)=>fetch(u,o);
@@ -21,7 +30,8 @@ let creds=()=>navigator.credentials;
 
 /* ---------- état ---------- */
 let CS=load();                                             // {gistId, token, slotId, credId, prfSalt, name, base, version, etag, hash, lock, at}
-const M={key:null,vault:null,state:'off',detail:'',busy:null,again:false,dirty:false,t:0,poll:0,conflicts:0};
+const M={key:null,vault:null,state:'off',detail:'',busy:null,again:false,dirty:false,t:0,poll:0,conflicts:0,
+  first:0,checked:0,pre:null,preT:0,att:null,gen:0};              // v9 : first = 1re modif pas encore envoyée, checked = dernier contact avec GitHub
 function load(){try{const o=JSON.parse(localStorage.getItem(CKEY)||'null');return o&&o.gistId&&o.token?o:null;}catch(e){return null;}}
 function store(){try{if(CS)localStorage.setItem(CKEY,JSON.stringify(CS));else localStorage.removeItem(CKEY);}catch(e){}}
 const DKEY='cloud-dk';
@@ -38,8 +48,11 @@ function ui(state,detail){
   if(b){b.textContent=!CS?'Synchro':state==='lock'?'Synchro — déverrouiller':state==='err'?'Synchro ⚠':'Synchro ✓';b.classList.toggle('on',!!CS&&(state==='ok'||state==='ext'||state==='busy'));}
   if(!st)return;
   st.hidden=state==='off';st.dataset.state=state;
-  st.textContent=state==='off'?'':'☁ '+LABEL[state]+(detail?' : '+detail:'')+((state==='ok'||state==='ext')&&CS&&CS.at?' · '+hm(CS.at):'');
-  st.title='Synchro chiffrée (Gist GitHub secret)'+(CS&&CS.name?' — cet appareil : '+CS.name:'')+(M.conflicts?' — '+M.conflicts+' copie(s) de conflit':'');
+  const wait=(state==='ok'||state==='ext')&&M.dirty;          // v9 : modifs tapées, pas encore parties
+  st.dataset.wait=wait?'1':'';
+  st.textContent=state==='off'?'':'☁ '+(wait?'modifs à envoyer':LABEL[state])+(detail?' : '+detail:'')+((state==='ok'||state==='ext')&&CS&&CS.at?' · '+hm(CS.at):'');
+  st.title='Synchro chiffrée (Gist GitHub secret)'+(CS&&CS.name?' — cet appareil : '+CS.name:'')+(M.conflicts?' — '+M.conflicts+' copie(s) de conflit':'')+
+    (CS&&CS.at?'\nDernière synchro : '+new Date(CS.at).toLocaleString('fr-FR'):'')+(wait?'\nModifs pas encore envoyées (envoi quelques secondes après ta dernière frappe)':'');
   if(window.barScroll)barScroll.update();
 }
 
@@ -52,7 +65,8 @@ async function gh(method,path,body,o){
   if(o.etag)h['If-None-Match']=o.etag;
   if(body)h['Content-Type']='application/json';
   let r;
-  try{r=await fetchFn(API+path,{method,headers:h,body:body?JSON.stringify(body):undefined,cache:'no-store'});}
+  const b=body?JSON.stringify(body):undefined,ka=!!(o.keepalive&&(!b||b.length<60000));   // v9 : keepalive (page qui se ferme) : 64 Ko max
+  try{r=await fetchFn(API+path,Object.assign({method,headers:h,body:b,cache:'no-store'},ka?{keepalive:true}:{}));}
   catch(e){throw E('net','pas de réseau (ou GitHub injoignable)');}
   if(r.status===304)return{status:304};
   if(r.status===401)throw E('auth','jeton GitHub refusé (faux, expiré ou révoqué ?)');
@@ -129,12 +143,14 @@ function ready(){return !!(CS&&M.key);}
 function sync(why){
   if(!ready())return Promise.resolve();
   if(M.busy){M.again=true;return M.busy;}
+  const gen0=M.gen;                                          // v9 : une modif tapée PENDANT la synchro reste « à envoyer »
   M.busy=(async()=>{
     try{
       if(window.AI&&AI.ready)await AI.ready;               // v7 : clés de l'IA déchiffrées avant d'écrire (sinon on les effacerait du coffre)
       let res={n:0,c:0},remoteText=null,v=M.vault,ver=CS.version;
-      const r=await gh('GET','/gists/'+CS.gistId,null,{etag:M.vault&&CS.etag});
+      const r=await gh('GET','/gists/'+CS.gistId,null,{etag:M.vault&&!CS.blind&&CS.etag});M.checked=Date.now();
       if(r.status!==304){
+        if(CS.blind)await blindCheck(r.json);                // v9 : un envoi « à l'aveugle » (page fermée) a pu passer par-dessus une écriture
         v=await vaultOf(r.json);ver=version(r.json);
         if(!v.slots.some(s=>s.type==='device'&&s.id===CS.slotId)){await removedHere();return;}
         const d=await VAULT.openData(v,M.key).catch(()=>{throw E('key','clé de chiffrement différente (synchro réinitialisée ailleurs ?)');});
@@ -151,7 +167,7 @@ function sync(why){
         out.slots=out.slots.filter(s=>s.type!=='pair'||s.exp>Date.now());          // appairage expiré : on nettoie
         out.by=CS.slotId;
         await VAULT.sealData(out,M.key,notesApi.payload());
-        const p=await gh('PATCH','/gists/'+CS.gistId,{files:{[FILE]:{content:JSON.stringify(out)}}});
+        const p=await gh('PATCH','/gists/'+CS.gistId,{files:{[FILE]:{content:JSON.stringify(out)}}},{keepalive:why==='hide'});
         const h=p.json&&p.json.history||[];
         M.vault=out;CS.version=version(p.json);CS.etag=null;CS.remote=hash(local);
         if(before&&h[1]&&h[1].version!==before){            // quelqu'un a écrit entre notre lecture et notre écriture
@@ -161,9 +177,16 @@ function sync(why){
           M.again=true;                                     // et on renvoie le tout fusionné
         }
       }
-      CS.base=notesApi.base();CS.hash=hash(notesApi.text());CS.at=Date.now();M.dirty=false;store();
-      ui(res.n?'ext':(M.state==='ext'&&why==='poll'?'ext':'ok'),res.c?res.c+' conflit(s) gardé(s) en double':'');
+      CS.base=notesApi.base();CS.hash=hash(notesApi.text());CS.at=Date.now();
+      /* v9 : les fichiers joints (2e Gist) — rien du tout si rien n'a bougé ; une erreur ici n'empêche pas la synchro des notes */
+      let attErr='';
+      if(window.ATT&&!M.again)try{M.att=await ATT.syncBlobs({gh,raw:rawText,key:M.key});}catch(e){attErr='pièces jointes : '+(e instanceof CloudError?e.message:(e&&e.message||'erreur')).slice(0,80);}
+      if(hash(notesApi.text())!==CS.hash)M.again=true;       // la liste des pièces a changé (adresse du 2e Gist) : on la renvoie
+      if(!M.again&&!attErr&&M.gen===gen0){M.dirty=false;M.first=0;}
+      store();
+      ui(attErr?'err':res.n?'ext':(M.state==='ext'&&why==='poll'?'ext':'ok'),attErr||(res.c?res.c+' conflit(s) gardé(s) en double':''));
     }catch(e){
+      if(M.first)M.first=Date.now();                         // v9 : hors ligne → pas de rafale d'essais à chaque frappe
       ui('err',(e instanceof CloudError?e.message:'erreur inattendue').slice(0,140));
       if(e&&e.code==='auth')ui('err','jeton GitHub refusé : Synchro → « Changer de jeton »');
     }finally{
@@ -177,10 +200,56 @@ async function removedHere(){                              // notre case a été
   clearInterval(M.poll);clearTimeout(M.t);CS=null;store();await forgetKey();M.vault=null;
   ui('removed','cet appareil a été retiré de la synchro (tes notes restent ici)');
 }
-function later(){if(!ready())return;M.dirty=true;clearTimeout(M.t);M.t=setTimeout(()=>sync('save'),PUSH_DELAY);}
-function watch(){clearInterval(M.poll);M.poll=setInterval(()=>{if(ready()&&!document.hidden)sync('poll');},POLL);}
-addEventListener('focus',()=>{if(ready())sync('focus');});
-document.addEventListener('visibilitychange',()=>{if(!ready())return;if(document.hidden){if(M.dirty)sync('hide');}else sync('focus');});
+async function rawText(u){if(!fetchFn)throw E('net','réseau coupé');const r=await fetchFn(u,{cache:'no-store'});if(!r.ok)throw E('http','lecture impossible ('+r.status+')');return r.text();}
+/* v9 : après un envoi « à l'aveugle » (keepalive, page fermée), la version écrite juste avant (par un autre appareil)
+   a pu être recouverte : on relit les versions entre celle qu'on connaissait et maintenant, et on les fusionne. */
+async function blindCheck(g){
+  const b=CS.blind;CS.blind=null;store();
+  const h=(g&&g.history||[]).map(x=>x.version);let i=h.indexOf(b.before);if(i<0)i=Math.min(h.length,6);
+  for(const ver of h.slice(1,i)){                            // h[0] : fusionnée juste après, comme d'habitude
+    try{const o=await gh('GET','/gists/'+CS.gistId+'/'+ver),lv=await vaultOf(o.json),ld=await VAULT.openData(lv,M.key);
+      const r2=notesApi.merge(ld,CS.base);M.conflicts+=r2.c;}catch(e){}
+  }
+}
+/* modifié depuis la dernière synchro ? (empreinte du contenu : ouvrir une note, la relire… ne compte pas) */
+const changedHere=()=>!!CS&&hash(notesApi.text())!==CS.hash;
+function pending(){return ready()&&(M.dirty||!!M.busy&&M.first>0||changedHere());}
+/* envoi différé : 6 s après la DERNIÈRE modif (attente max 60 s si on tape sans arrêt) */
+function later(){
+  if(!ready())return;
+  if(!changedHere()&&!M.dirty)return;                         // rien de neuf : aucune requête
+  if(!M.first)M.first=Date.now();
+  M.dirty=true;M.gen++;clearTimeout(M.t);
+  const wait=Math.max(0,Math.min(PUSH_DELAY,M.first+MAX_WAIT-Date.now()));
+  M.t=setTimeout(()=>sync('save'),wait);
+  if(M.state==='ok'||M.state==='ext')ui(M.state,M.detail);
+  clearTimeout(M.preT);M.preT=setTimeout(prepare,800);       // le dernier envoi possible, prêt au cas où la page se ferme
+}
+/* v9 : coffre chiffré prêt à partir (pagehide → fetch keepalive), si le coffre fait moins de 60 Ko */
+async function prepare(){
+  M.pre=null;if(!ready()||!M.vault||!changedHere())return;
+  try{const out=JSON.parse(JSON.stringify(M.vault));out.by=CS.slotId;const h=hash(notesApi.text());
+    await VAULT.sealData(out,M.key,notesApi.payload());
+    const body=JSON.stringify({files:{[FILE]:{content:JSON.stringify(out)}}});
+    if(body.length<60000)M.pre={h,body,before:CS.version};}catch(e){}
+}
+function lastChance(){                                        // page qui se ferme : rien d'asynchrone ne survivra
+  if(!pending()||!M.pre||!fetchFn||M.pre.h!==hash(notesApi.text()))return false;
+  try{CS.blind={before:M.pre.before,at:Date.now()};store();
+    fetchFn(API+'/gists/'+CS.gistId,{method:'PATCH',keepalive:true,cache:'no-store',body:M.pre.body,
+      headers:{'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Authorization':'Bearer '+CS.token,'Content-Type':'application/json'}}).catch(()=>{});
+    return true;}catch(e){return false;}
+}
+/* page visible et au repos : un coup d'œil toutes les 5 min seulement (rien si elle est cachée) */
+function watch(){clearInterval(M.poll);M.poll=setInterval(()=>{if(ready()&&!document.hidden&&Date.now()-M.checked>=POLL-1000)sync('poll');},POLL);}
+function back(){if(!ready())return;if(pending()||Date.now()-M.checked>=FOCUS_MIN)sync('focus');}   // retour sur l'onglet
+addEventListener('focus',back);
+document.addEventListener('visibilitychange',()=>{if(!ready())return;
+  if(document.hidden){if(pending()){clearTimeout(M.t);sync('hide');}}    // téléphone : c'est souvent le DERNIER moment fiable
+  else back();});
+/* v9 : avant de partir — confirmation SEULEMENT s'il reste des modifs pas synchronisées */
+addEventListener('beforeunload',e=>{if(!pending())return;e.preventDefault();e.returnValue='';});
+addEventListener('pagehide',()=>{if(pending())lastChance();});
 
 /* ---------- mise en place ---------- */
 const guessName=()=>/iPhone/.test(navigator.userAgent)?'iPhone':/iPad/.test(navigator.userAgent)?'iPad':/Android/.test(navigator.userAgent)?'Téléphone Android':
@@ -423,9 +492,9 @@ async function init(){
 window.cloudLater=later;
 const ready0=init();
 window.cloudSync={state:()=>M.state,status:()=>{const s=$('cloudState');return s?s.textContent:'';},sync,open:openPanel,ready:()=>ready0,
-  configured:()=>!!CS,unlocked:()=>!!M.key,parsePair};
+  configured:()=>!!CS,unlocked:()=>!!M.key,parsePair,pending,lastSync:()=>CS&&CS.at||0};
 if(TEST)window.cloudDebug={                                // tests.html seulement : faux GitHub, fausses passkeys, réglages rapides
-  setFetch:f=>{fetchFn=f;},setCreds:c=>{creds=()=>c;},setIter:n=>{ITER=n;},setTimes:(poll,push)=>{POLL=poll;PUSH_DELAY=push;if(CS&&M.key)watch();},
+  setFetch:f=>{fetchFn=f;},setCreds:c=>{creds=()=>c;},setIter:n=>{ITER=n;},setTimes:(poll,push,max,focus)=>{POLL=poll;PUSH_DELAY=push;if(max)MAX_WAIT=max;if(focus!=null)FOCUS_MIN=focus;if(CS&&M.key)watch();},prepare,lastChance,
   M,get CS(){return CS;},show,close,view:()=>WS.view,reset:async()=>{await disableHere();close();},reload:async()=>{CS=load();M.key=null;M.vault=null;await init();},
   forgetLocalKey:async()=>{M.key=null;try{await idbSet(DKEY,null);}catch(e){}},setup:setupFirst,startPair,joinPair,recover,removeDevice,addRecoveryNow,fullUnlock};
 })();

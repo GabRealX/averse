@@ -9,7 +9,7 @@ Il faut un petit serveur local (service worker, Worker et crypto ne marchent pas
     python3 -m http.server 8000     # puis http://localhost:8000
 
 ## Utiliser
-- **L'accueil est une recherche** : tape quelques lettres (« jsn », « fusion pdf », « qr »…), **Entrée** ouvre le meilleur résultat, ↑ ↓ pour choisir. Les notes du carnet sortent aussi dans les résultats. **Ctrl+K** remet le curseur dans la recherche (depuis les autres pages : revient à l'accueil).
+- **L'accueil est une recherche** (v9 : derrière le Glyph, voir plus bas) : tape quelques lettres (« jsn », « fusion pdf », « qr »…), **Entrée** ouvre le meilleur résultat, ↑ ↓ pour choisir. Les notes du carnet sortent aussi dans les résultats. **Ctrl+K** remet le curseur dans la recherche (depuis les autres pages : revient à l'accueil).
 - **Favoris** : l'étoile ☆ sur une carte ou en haut d'un outil. Favoris et **récents** s'affichent sous la recherche.
 - **Collage malin** : colle (Ctrl+V) directement sur l'accueil un JSON, un JWT, une URL, une couleur (#ff8800), un timestamp, un UUID, du Base64, une IP, un hash… ou une image : l'outil qui va bien est proposé (Entrée pour l'ouvrir).
 - **Glisser-déposer** un fichier n'importe où : un PDF ouvre l'outil PDF, une image propose optimiser / convertir / éditer / mettre en PDF, un autre fichier propose hash ou Base64.
@@ -18,6 +18,20 @@ Il faut un petit serveur local (service worker, Worker et crypto ne marchent pas
 - **Carnet** : **Ctrl+J** (⌘+J sur Mac) ouvre le panneau des notes partout. **→ Carnet** en haut de chaque outil envoie entrées + résultats dans une note. Le carnet complet reste `notes.html`.
 - **Autres outils** (`#/autres`) : réseau, électronique, texte & dates, aide-mémoire. Moins utilisés, mais toujours trouvables par la recherche.
 - **Pluie** : désactivée par défaut, lien « pluie : off/on » en bas de page. **Style ASCII** : lien « style » en bas (ou `?style=ascii`).
+
+## Nouveautés v9
+- **Nouvel accueil.** Plus de grille d'outils : le titre AVERSE, un **grand Glyph** au centre (il respire, cligne, regarde, fait des petites ondes ; immobile si « réduire les animations » est activé) et les liens en bas. **Clic / Entrée sur le Glyph, `/`, Ctrl+K ou simplement taper** → la barre de recherche s'ouvre (le Glyph rapetisse au-dessus), résultats dessous. **Échap** ou barre vide quittée → retour au Glyph seul. La liste complète reste à un clic (« tous les outils », ou barre vide).
+  - Le Glyph change de motif selon ce que tu tapes (pdf, image, code, note, synchro, conflit, photo/ocr, `?` → réflexion IA) et quand tu glisses un fichier (il « aspire »). Au dépôt : JSON → outil JSON, PDF → outils PDF, image → choix (dont **Photo → note**), texte → outil adapté. Coller fait pareil.
+  - Une seule boucle d'animation, **arrêtée** quand l'onglet est caché ou qu'un outil est ouvert.
+- **Photo → note** (carnet et accueil) : prendre / choisir une photo, lecture du texte en local (Tesseract, fra+eng, téléchargé une fois), note créée avec la photo jointe. « Mettre au propre » par l'IA est **optionnel** : aperçu d'abord, rien ne part sans clic.
+- **Conflits côte à côte** : « La mienne » / « L'autre », lignes changées surlignées ; Garder la mienne / Garder l'autre / Fusionner… (onglets sur téléphone). La copie de conflit disparaît ensuite sur tous les appareils.
+- **Pièces jointes chiffrées** (5 Mo max par fichier) : stockées dans le navigateur (IndexedDB), synchronisées chiffrées AES-GCM dans un 2e Gist secret, incluses dans la sauvegarde ; le partage d'une note indique qu'elles ne sont pas incluses.
+- **Synchro plus sobre** : rien n'est envoyé si rien n'a changé, lecture conditionnelle (ETag → 304), envoi groupé quelques secondes après la dernière frappe, relecture au retour sur l'onglet, rien quand l'onglet est caché. « Dernière synchro » affichée. Mesuré (horloge simulée) : 2 min d'édition 12 → 4 requêtes ; 10 min onglet visible sans rien faire 20 → 1 ; 10 min onglet caché 0 → 0.
+- **Fermer la page** : confirmation seulement s'il reste des modifs non envoyées ; dernier envoi en `keepalive` (pagehide).
+- **Conflit fantôme corrigé** : deux appareils modifiant la même note dans la même milliseconde pouvaient diverger (départage désormais déterministe).
+- **Fenêtre installée (WCO)** : la barre se range dans la zone de titre (`env(titlebar-area-*)`), les boutons système ne cachent plus rien, la barre est déplaçable (`app-region`), les actions secondaires passent dans le menu « ⋯ ».
+- **IA locale** : progression de l'indexation (« 12 / 40 ») au lieu de « 0 note(s) indexée(s) ». Glyph plus grand partout.
+- **Clé IA** : Réglages IA → choisir le fournisseur → lien « Obtenir une clé » (Gemini : https://aistudio.google.com/apikey, gratuit).
 
 ## Nouveautés v8
 - **L'IA dans la barre de l'accueil.** Tape une question (« comment… », « what is… », « … ? », ou 5 mots et plus) : « Demander à l'IA » et « Demander à mes notes » apparaissent **en tête** des résultats, sans voler la sélection (Entrée ouvre toujours le 1er outil). Pour viser l'IA : préfixe `?`, touche **Tab**, ou le Glyph à droite du champ. Rien ne part tant que tu n'as pas choisi l'option puis cliqué « Envoyer ».

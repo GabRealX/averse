@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="css/ai.css">
 <link rel="stylesheet" href="css/ascii.css">
 <script src="js/core.js"></script>
+<script src="js/wco.js"></script>
 <script src="js/theme.js"></script>
 <script src="js/accent.js"></script>
 <script src="js/templates.js"></script>
@@ -42,7 +43,7 @@
 
 <main class="wrap">
   <!-- accueil = recherche -->
-  <section id="homeView" class="view">
+  <section id="homeView" class="view" data-home="rest">
     <header class="home-head">
       <pre class="ascii-logo" aria-hidden="true">    ___     _______ ____  ____  _____
    / \ \   / / ____|  _ \/ ___|| ____|
@@ -53,10 +54,16 @@
       <h1>AVERSE</h1>
       <p class="hero-subtitle">Ta boîte à outils du quotidien : tout tourne dans ton navigateur, même hors ligne. Rien n'est envoyé nulle part.</p>
     </header>
+    <!-- v9 : au centre, le grand Glyph (l'assistant). Clic / tap, « / », Ctrl+K ou taper au clavier → la barre de recherche -->
+    <div class="home-stage">
+      <button type="button" id="homeGlyph" class="home-glyph" aria-label="Assistant AVERSE : chercher un outil, une note ou poser une question" aria-controls="q" aria-expanded="false"></button>
+      <p class="home-hint" id="homeHint">Touche le Glyph ou tape au clavier · glisse un fichier ici · <button type="button" class="linklike" id="homeAll">tous les outils</button></p>
+    </div>
     <div class="search-hero">
       <label class="sr-only" for="q">Que veux-tu faire ?</label>
       <div class="qbar">
-        <input type="text" id="q" class="big-search" placeholder="Que veux-tu faire ?  json, pdf, qr, couleur…" autocomplete="off" spellcheck="false" autofocus>
+        <input type="text" id="q" class="big-search" placeholder="Que veux-tu faire ?  json, pdf, qr, couleur…" autocomplete="off" spellcheck="false">
+        <button type="button" id="qPhoto" class="qbar-ph" title="Photo → note (lire le texte d'une photo)" aria-label="Photo vers note" hidden>📷</button>
         <button type="button" id="qAi" class="qbar-ai" title="Demander à l'IA (Tab)" aria-label="Demander à l'IA" hidden></button>
       </div>
       <div id="aiPanel" class="ai-panel" role="region" aria-label="Réponse de l'IA" hidden></div>
@@ -96,6 +103,7 @@
 <script src="js/tools/dev.js"></script>
 <script src="js/tools/encodage.js"></script>
 <script src="js/tools/carnet.js"></script>
+<script src="js/attach.js"></script>
 <script src="js/backup.js"></script>
 <script src="js/tools/sauvegarde.js"></script>
 <script src="js/tools/reseau.js"></script>
@@ -116,5 +124,7 @@
 <script src="js/md.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/ai-bar.js"></script>
+<script src="js/photo.js"></script>
+<script src="js/home.js"></script>
 </body>
 </html>

@@ -79,6 +79,9 @@ async function dialog(note){
   ov.innerHTML='<div class="ctx-dlg share-dlg" role="dialog" aria-modal="true" aria-labelledby="shT">'+
     '<div class="ctx-dt" id="shT">Partager « '+esc(note.title||'Sans titre')+' »</div>'+
     '<p class="ctx-msg">Lien chiffré : la note est <b>dans le lien</b> (après le #), chiffrée avec une clé tirée au hasard. Aucun serveur ne la voit ; qui a le lien peut la lire (en lecture seule) et l\'importer dans son carnet.</p>'+
+    ((window.ATT&&note.id&&ATT.list(note.id).length)||/\(att:[\w-]+\)/.test(note.body||'')?
+      '<p class="ctx-msg sh-att" id="shAtt">📎 Les pièces jointes ('+(window.ATT&&note.id?ATT.list(note.id).length:'?')+') ne sont <b>pas incluses</b> dans le lien : la personne verra « pièce jointe non partagée ». Envoie-les à part (Télécharger).</p>':
+      '<p class="ctx-msg sh-att" id="shAtt">Les pièces jointes ne sont jamais incluses dans le lien.</p>')+
     '<label class="sh-opt"><input type="checkbox" id="shApart"> envoyer la clé à part (le lien seul ne suffit plus)</label>'+
     '<textarea id="shLink" class="sh-link" readonly rows="3" aria-label="Lien de partage"></textarea>'+
     '<div class="sh-key" id="shKeyRow" hidden>Clé : <code id="shKey"></code> <button type="button" class="tpl-b" data-a="copykey">Copier la clé</button></div>'+

@@ -5,6 +5,23 @@
   const bn=$('blankNew');if(bn)bn.addEventListener('click',()=>$('newBtn').click());
   if('serviceWorker' in navigator&&location.protocol!=='file:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
+  /* ===== v9 : menu « ⋯ » (actions secondaires, ordinateur) ===== */
+  const mb=$('moreBtn'),mm=$('moreMenu');
+  if(mb&&mm){
+    const items=()=>[...mm.querySelectorAll('button')];
+    const open=(on,focus)=>{mm.classList.toggle('open',on);mb.setAttribute('aria-expanded',on?'true':'false');
+      if(on&&focus)items()[0].focus();};
+    mb.addEventListener('click',e=>{e.stopPropagation();open(!mm.classList.contains('open'),e.detail===0);});
+    mm.addEventListener('click',e=>{if(e.target.closest('button'))open(false);});        // une action choisie → le menu se ferme
+    document.addEventListener('click',e=>{if(mm.classList.contains('open')&&!e.target.closest('#barMore'))open(false);});
+    mm.addEventListener('keydown',e=>{const it=items(),i=it.indexOf(document.activeElement);
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();it[(i+(e.key==='ArrowDown'?1:-1)+it.length)%it.length].focus();}
+      else if(e.key==='Home'){e.preventDefault();it[0].focus();}else if(e.key==='End'){e.preventDefault();it[it.length-1].focus();}});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mm.classList.contains('open')){e.stopPropagation();open(false);mb.focus();}},true);
+    mb.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();open(true,true);}});
+    window.barMore={open,isOpen:()=>mm.classList.contains('open')};
+  }
+
   /* ===== barre défilante ===== */
   const row=document.querySelector('.bar-right'),nav=$('barNav'),th=$('barThumb'),L=$('barL'),R=$('barR');
   if(!row||!nav)return;

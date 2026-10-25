@@ -136,6 +136,7 @@ async function openData(v,key){
   const r={notes:o&&typeof o.notes==='object'?o.notes:{},deleted:o&&typeof o.deleted==='object'?o.deleted:{}};
   if(o&&o.templates&&typeof o.templates==='object')r.templates=o.templates;   // v6 : les modèles de note voyagent aussi
   if(o&&o.secrets&&typeof o.secrets==='object')r.secrets=o.secrets;           // v7 : clés d'API de l'IA (dans la boîte chiffrée)
+  if(o&&o.att&&typeof o.att==='object')r.att=o.att;                           // v9 : la liste des pièces jointes (revérifiée par attach.js)
   return r;
 }
 /* v7 : petit secret (clé d'API de l'IA) chiffré sur CET appareil, avec une clé AES-GCM non exportable

@@ -77,11 +77,11 @@ function allTags(){const s={};allNotes().forEach(n=>(n.tags||[]).forEach(t=>{s[t
 /* ===== RENDU MARKDOWN LÉGER ===== */
 // v6 : le moteur est dans md.js (partagé avec share.html, la page de lecture d'une note partagée)
 const safeUrl=MD.safeUrl;
-const MDO={exists:t=>!!byTitle(t)};
+const MDO={exists:t=>!!byTitle(t),att:true};               // v9 : att → ![nom](att:ID) = image jointe
 const inline=t=>MD.inline(t,MDO);
 const render=body=>MD.render(body,MDO);
 const renderMd=body=>MD.renderMd(body,MDO);
-const typeset=el=>{if(typeof MATH!=='undefined')MATH.typeset(el);};
+const typeset=el=>{if(typeof MATH!=='undefined')MATH.typeset(el);if(window.ATT)ATT.resolve(el);};
 
 /* ===== LISTE ===== */
 function matchQuery(n){if(!query)return true;const q=norm(query);
@@ -121,6 +121,8 @@ function renderEditor(){
   $('bodyIn').value=n.body||'';
   $('preview').innerHTML='<div class="rendered">'+render(n.body)+'</div>';typeset($('preview'));
   renderBacklinks(n);
+  if(window.notesAtt)notesAtt.render();                     // v9 : pièces jointes de la note
+  if(window.CONFLICT)CONFLICT.check(n);                     // v9 : copie de conflit → bandeau « Comparer »
 }
 function renderBacklinks(n){
   const bl=backlinks(n),host=$('backlinks');
@@ -134,7 +136,7 @@ function liveSave(){
   n.title=$('titleIn').value;
   n.tags=$('tagsIn').value.split(',').map(s=>s.trim()).filter(Boolean);
   n.body=$('bodyIn').value;n.updated=now();
-  clearTimeout(saveT);saveT=setTimeout(save,250);
+  clearTimeout(saveT);saveT=setTimeout(()=>{saveT=0;save();},250);
 }
 function livePreview(){
   const n=data.notes[data.openId];if(!n)return;
@@ -153,6 +155,7 @@ async function delNote(){
   const ok=await confirmBox('Supprimer « '+(n.title||'Sans titre')+' » ? Cette action est définitive.','Supprimer');
   if(!ok)return;
   (data.deleted||(data.deleted={}))[data.openId]=now();    // pierre tombale : les autres onglets la suppriment aussi
+  if(window.ATT)ATT.removeNote(data.openId);                // v9 : ses pièces jointes aussi (pierres tombales synchronisées)
   delete data.notes[data.openId];
   data.openId=allNotes().sort((a,b)=>b.updated-a.updated)[0]?.id||null;
   save();renderAll();
@@ -160,8 +163,10 @@ async function delNote(){
 }
 
 /* ===== EXPORT / IMPORT ===== */
-function exportJSON(){
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+async function exportJSON(){
+  const out=Object.assign({},data);
+  if(window.ATT){try{const a=await ATT.exportAll();if(a)out.attachments=a;}catch(e){}}   // v9 : pièces jointes (base64) dans l'export
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
   const u=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=u;a.download='noxe-carnet-'+new Date().toISOString().slice(0,10)+'.json';a.click();
   setTimeout(()=>URL.revokeObjectURL(u),2000);
@@ -174,6 +179,7 @@ function importJSON(file){
       if(data.deleted&&data.deleted[n.id]){delete data.deleted[n.id];n.updated=now();}   // réimportée exprès : elle gagne
       data.notes[n.id]=n;merged++;}});
     data.openId=data.openId||allNotes()[0]?.id||null;save();renderAll();
+    if(d.attachments&&window.ATT){const v=ATT.validate(d.attachments);ATT.importAll(v).then(k=>{if(k){toast(k+' pièce(s) jointe(s) importée(s)');renderEditor();}});}
     toast(merged+' note(s) importée(s)');
   }catch(e){toast('Fichier illisible');}};
   r.readAsText(file);
@@ -244,11 +250,16 @@ function mergeNotes(d){
   Object.entries(d.deleted||{}).forEach(([id,t])=>{t=+t||0;if(t>(del[id]||0))del[id]=t;});
   Object.values(d.notes||{}).forEach(x=>{if((x=sanitizeNote(x))){
     if((del[x.id]||0)>=(x.updated||0))return;              // supprimée depuis : on ne la ressuscite pas
-    const old=data.notes[x.id];if(!old||(x.updated||0)>(old.updated||0)){data.notes[x.id]=x;n++;}}});
+    const old=data.notes[x.id];if(!old||cmpNote(x,old)>0){data.notes[x.id]=x;n++;}}});
   Object.keys(del).forEach(id=>{const x=data.notes[id];if(x&&(x.updated||0)<=del[id]){delete data.notes[id];n++;}});
   if(data.openId&&!data.notes[data.openId])data.openId=allNotes().sort((a,b)=>b.updated-a.updated)[0]?.id||null;
   return n;
 }
+/* v9 : qui gagne entre deux versions d'une même note ? la plus récente ; À ÉGALITÉ DE DATE (deux appareils
+   modifiés dans la même milliseconde — c'était la cause du smoke « conflit » instable) on départage par le
+   contenu, de façon identique sur tous les appareils : sinon chacun gardait la sienne et ils divergeaient. */
+const noteKey=n=>(n.title||'')+'\u0002'+(n.body||'')+'\u0002'+(n.tags||[]).join('\u0001');
+function cmpNote(a,b){const d=(a.updated||0)-(b.updated||0);if(d)return d;const x=noteKey(a),y=noteKey(b);return x>y?1:x<y?-1:0;}
 const sameNote=(a,b)=>a.title===b.title&&a.body===b.body&&(a.tags||[]).join('\u0001')===(b.tags||[]).join('\u0001');
 /* ce qu'on écrit dans le fichier : trié et normalisé (identique d'un appareil à l'autre) */
 function fileText(){
@@ -280,10 +291,10 @@ function syncMerge(d,base){
   for(const k of Object.keys(notes)){
     const r=sanitizeNote(notes[k]);if(!r)continue;
     const l=data.notes[r.id];
-    if(l&&!sameNote(l,r)&&r.updated!==l.updated&&since(r.id,l.updated)&&since(r.id,r.updated)){
+    if(l&&!sameNote(l,r)&&since(r.id,l.updated)&&since(r.id,r.updated)){     // v9 : même date ≠ même contenu
       /* la plus récente reste « la » note (comme mergeNotes, donc les deux appareils convergent),
          la plus ancienne est gardée à côté en copie de conflit */
-      const older=(r.updated||0)>(l.updated||0)?l:r;
+      const older=cmpNote(r,l)>0?l:r;
       c+=conflictCopy(older,(older===r?'version de l\'autre appareil, ':'version de cet appareil, ')+new Date(older.updated||0).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}));
     }
     if(!l&&del[r.id]&&del[r.id]>=(r.updated||0)&&base&&base[r.id]!=null&&r.updated>base[r.id])
@@ -388,14 +399,31 @@ window.notesApi={
   payload:()=>{const o=JSON.parse(fileText()),p={notes:o.notes,deleted:o.deleted};if(o.templates)p.templates=o.templates;
     /* v7 : clés d'API de l'IA — SEULEMENT ici (coffre Gist chiffré de bout en bout), jamais dans le fichier lié en clair (fileText) */
     const sec=window.AI&&AI.syncPart();if(sec)p.secrets={ai:sec};
+    const att=window.ATT&&ATT.payload();if(att)p.att=att;      // v9 : la LISTE des pièces jointes (les fichiers : 2e Gist, attach.js)
     return p;},   // trié, sans l'état de l'appareil
   text:()=>JSON.stringify(window.notesApi.payload()),
   merge:(d,base)=>{const r=syncMerge(d,base);
     if(d.secrets&&d.secrets.ai&&window.AI)AI.syncReceive(d.secrets.ai);   // v7
+    if(d.att&&window.ATT){const k=ATT.merge(d.att);if(k)r.n+=k;}          // v9
     if(r.n){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}renderAll();
       if(r.c)toast(r.c+' conflit(s) : les deux versions sont gardées (tag « conflit »)');}
     return r;},
-  base:baseNow,count:()=>Object.keys(data.notes).length};
+  base:baseNow,count:()=>Object.keys(data.notes).length,
+  /* v9 : pour attach.js / photo.js / conflict.js */
+  current:()=>data.openId,get:id=>data.notes[id]||null,all:()=>data.notes,open:id=>openNote(id),
+  insert:t=>{const b=$('bodyIn');if(!b||!data.notes[data.openId])return;const a=b.selectionStart!=null?b.selectionStart:b.value.length,z=b.selectionEnd!=null?b.selectionEnd:a;
+    const pre=b.value.slice(0,a),sep=pre&&!pre.endsWith('\n')?'\n':'';b.value=pre+sep+t+'\n'+b.value.slice(z);b.selectionStart=b.selectionEnd=a+sep.length+t.length+1;liveSave();livePreview();},
+  create:(title,body,tags)=>{const id=uid();data.notes[id]={id,title:title||'Sans titre',body:body||'',tags:tags||[],created:now(),updated:now()};data.openId=id;save();renderAll();return id;},
+  update:(id,fn)=>{const n=data.notes[id];if(!n)return false;fn(n);n.updated=now();save();renderAll();return true;},
+  remove:id=>{if(!data.notes[id])return false;(data.deleted||(data.deleted={}))[id]=now();delete data.notes[id];
+    if(data.openId===id)data.openId=allNotes().sort((a,b)=>b.updated-a.updated)[0]?.id||null;save();renderAll();return true;},
+  render:b=>render(b),typeset:el=>typeset(el),preview:()=>livePreview(),cmp:(a,b)=>cmpNote(a,b)};
+/* v9 : la page se ferme → ce qui est tapé (enregistrement différé de 250 ms) est écrit tout de suite ;
+   fichier lié pas encore écrit → le navigateur demande confirmation (rien si tout est à jour) */
+function flushSave(){if(saveT){clearTimeout(saveT);saveT=0;save();}}
+addEventListener('beforeunload',e=>{flushSave();if(FS.h&&FS.dirty){e.preventDefault();e.returnValue='';}});
+addEventListener('pagehide',flushSave);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flushSave();});
 window.notesSync={attach:fsAttach,sync:fsSync,state:()=>FS.state,unlink:()=>{FS.h=null;clearInterval(FS.poll);fsUi('off');},
   status:()=>{const s=$('syncState');return s?s.textContent:'';},setPoll:ms=>{clearInterval(FS.poll);FS.poll=setInterval(()=>{if(FS.h&&!document.hidden)fsSync('poll');},ms);}};
 
@@ -465,7 +493,7 @@ const NOTE_OPS={
   duplicate:id=>{const n=data.notes[id];if(!n)return;const nid=uid();
     data.notes[nid]=Object.assign({},n,{id:nid,title:(n.title||'Sans titre')+' (copie)',tags:(n.tags||[]).slice(),created:now(),updated:now(),pinned:false});
     data.openId=nid;save();renderAll();},
-  remove:id=>{if(!data.notes[id])return;(data.deleted||(data.deleted={}))[id]=now();delete data.notes[id];
+  remove:id=>{if(!data.notes[id])return;(data.deleted||(data.deleted={}))[id]=now();delete data.notes[id];if(window.ATT)ATT.removeNote(id);
     if(data.openId===id)data.openId=allNotes().sort((a,b)=>b.updated-a.updated)[0]?.id||null;save();renderAll();toast('Note supprimée');},
   pdf:id=>{openNoteFromGraph({id});printNote();}
 };
