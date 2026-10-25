@@ -88,3 +88,31 @@ html[data-style="ascii"] .ai-panel{border:1px dashed var(--line-2)}
 @media(max-width:560px){.ph-work{flex-direction:column}.ph-img{width:100%;max-height:200px}.ph-dlg .ctx-db .tpl-b{flex:1 1 auto}.ph-pick .tpl-b{flex:1 1 100%;padding:12px}}
 html[data-style="ascii"] .ph-img,html[data-style="ascii"] .ph-right textarea{border:1px dashed var(--line-2)}
 @media(max-width:560px){.qbar-ph{right:54px;width:40px;height:40px;font-size:1.05rem}}
+/* ---------- v10 : étapes réelles, squelette, arrivée de la réponse ---------- */
+.aip-steps{list-style:none;margin:2px 0 8px;padding:0;display:flex;flex-direction:column;gap:4px;font-size:.74rem;color:var(--fg-soft)}
+.aip-steps:empty{display:none}
+.aip-steps li{display:flex;align-items:baseline;gap:8px;line-height:1.5;animation:aip-in .28s ease both}
+.aip-steps li .aip-st{flex:1;min-width:0}
+.aip-steps li small{color:var(--fg-faint)}
+.aip-d{flex:none;width:8px;height:8px;border:1px solid var(--fg-faint);transform:translateY(1px)}
+.aip-steps li.now{color:var(--fg)}
+.aip-steps li.now .aip-d{border-color:var(--fg);background:var(--fg);animation:aip-pulse 1s ease-in-out infinite}
+.aip-steps li.ok .aip-d{background:var(--fg-soft);border-color:var(--fg-soft)}
+.aip-steps li.bad{color:var(--bad)}.aip-steps li.bad .aip-d{border-color:var(--bad)}
+.aip-t{flex:none;font-size:.64rem;color:var(--fg-faint);font-variant-numeric:tabular-nums}
+.aip-chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border:1px solid var(--line-2);color:var(--fg);text-decoration:none;font-size:.7rem;line-height:1.5}
+.aip-chip:hover,.aip-chip:focus-visible{border-color:var(--fg-soft);background:var(--tint)}
+.aip-skel{display:flex;flex-direction:column;gap:8px;padding:2px 0}
+.aip-skel i{display:block;height:9px;background:linear-gradient(90deg,var(--line) 0,var(--line-2) 40%,var(--line) 80%);background-size:300% 100%;animation:aip-sh 1.3s linear infinite}
+.aip-skel i:nth-child(1){width:92%}.aip-skel i:nth-child(2){width:78%}.aip-skel i:nth-child(3){width:54%}
+.aip-off{font-size:.72rem;color:var(--bad);margin:8px 0 0}
+.ai-panel.aip-arrive .aip-out{animation:aip-arr .7s ease}
+.ai-panel.aip-arrive .ai-src,.ai-panel.aip-arrive .aip-a{animation:aip-in .45s ease both}
+@keyframes aip-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes aip-pulse{50%{opacity:.35}}
+@keyframes aip-sh{from{background-position:100% 0}to{background-position:-100% 0}}
+@keyframes aip-arr{0%{border-color:var(--fg)}100%{border-color:var(--line-2)}}
+@media(prefers-reduced-motion:reduce){.aip-steps li,.aip-steps li.now .aip-d,.aip-skel i,.ai-panel.aip-arrive *{animation:none!important}}
+@media(max-width:560px){.aip-chip{padding:8px 10px;font-size:.74rem}.aip-steps{font-size:.76rem}}
+.ai-net{font-size:.7rem;margin:0 0 6px;color:var(--fg-faint)}.ai-net.off{color:var(--bad)}.ai-net b{color:inherit}
+.ai-offl{color:var(--bad);font-weight:500}

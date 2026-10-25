@@ -16,9 +16,18 @@
 const AI=(function(){
 const CFG='averse-ai',SEC='averse-ai-sec',NKEY='noxe-notes';
 const PROV={
-  gemini:{name:'Google Gemini',short:'Gemini',model:'gemini-2.5-flash',base:'https://generativelanguage.googleapis.com/v1beta',keyUrl:'https://aistudio.google.com/apikey'},
+  gemini:{name:'Google Gemini',short:'Gemini',model:'gemini-3.5-flash-lite',base:'https://generativelanguage.googleapis.com/v1beta',keyUrl:'https://aistudio.google.com/apikey'},
   openai:{name:'Service OpenAI-compatible',short:'OpenAI-compatible',model:'gpt-4o-mini',base:'https://api.openai.com/v1',keyUrl:'https://platform.openai.com/api-keys'}
 };
+/* v10 : modèles proposés (on peut toujours en taper un autre). Le plus rapide par défaut : la réponse commence plus tôt. */
+const MODELS={gemini:[['gemini-3.5-flash-lite','rapide (par défaut)'],['gemini-3.6-flash','équilibré'],['gemini-3.8-flash','plus fort, plus lent'],['gemini-2.5-flash-lite','ancien, rapide']],openai:[]};
+/* v10 : « réflexion » au minimum pour les modèles qui l'acceptent (sinon Gemini réfléchit plusieurs secondes avant le 1er mot).
+   Gemini 3 : thinkingLevel (minimal / low) ; Gemini 2.5 Flash : thinkingBudget 0. Modèle inconnu : on n'envoie rien (pas d'erreur 400). */
+function thinkFor(m){m=String(m||'');
+  if(/^gemini-3(\.\d+)?-flash-lite/.test(m)||/^gemini-3(\.[0-6])?-flash($|-preview)/.test(m))return{thinkingLevel:'minimal'};
+  if(/^gemini-3\.[7-9]-flash($|-)/.test(m)||/^gemini-4/.test(m))return{thinkingLevel:'low'};
+  if(/^gemini-2\.5-flash/.test(m))return{thinkingBudget:0};
+  return null;}
 const okBase=u=>/^https:\/\/[a-z0-9.-]+(:\d+)?(\/[\w.~\/-]*)?$/i.test(u)||/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/[\w.~\/-]*)?$/i.test(u);
 const okKey=k=>typeof k==='string'&&/^[\x21-\x7e]{8,400}$/.test(k);
 function readCfg(){const c=getLS(CFG,{})||{};return{provider:PROV[c.provider]?c.provider:'gemini',
@@ -72,20 +81,29 @@ function syncReceive(r){if(!r||typeof r!=='object'||!(+r.at>KAT))return;
 /* ---------- B) appel du fournisseur (streaming) ---------- */
 let armed=false;                     // mis à true UNIQUEMENT par un clic sur « Envoyer » (voir dialogue) ; consommé par send()
 const stats={calls:0};
-async function send(system,prompt,onText,signal){
+/* v10 : hors ligne → erreur claire (l'IA locale, elle, marche sans réseau) */
+class OfflineError extends Error{constructor(){super('hors ligne : l\'IA par clé a besoin du réseau');this.name='OfflineError';}}
+const online=()=>navigator.onLine!==false;
+async function send(system,prompt,onText,signal,onPhase){
   if(!armed)throw new Error('aucune requête sans action explicite');
   armed=false;
+  if(!online())throw new OfflineError();
+  const ph=(k)=>{TIME[k]=Math.round(performance.now()-TIME.t0);if(onPhase)try{onPhase(k);}catch(e){}};TIME.t0=performance.now();
   const key=KEYS[cfg.provider];if(!key)throw new Error('pas de clé d\'API');
   let url,headers={'content-type':'application/json'},body;
   if(cfg.provider==='gemini'){
     url=base()+'/models/'+encodeURIComponent(model())+':streamGenerateContent?alt=sse';headers['x-goog-api-key']=key;
     body={systemInstruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:.3}};
+    const th=thinkFor(model());if(th)body.generationConfig.thinkingConfig=th;
   }else{
     url=base()+'/chat/completions';headers.authorization='Bearer '+key;
     body={model:model(),stream:true,temperature:.3,messages:[{role:'system',content:system},{role:'user',content:prompt}]};
   }
   stats.calls++;
-  const res=await window.fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal,credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',mode:'cors'});
+  ph('sent');let res;
+  try{res=await window.fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal,credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',mode:'cors'});}
+  catch(e){if(e&&e.name==='AbortError')throw e;if(!online())throw new OfflineError();throw new Error('réseau indisponible ('+host()+' injoignable)');}
+  ph('headers');
   if(!res.ok){let msg='';try{const j=await res.json();msg=(j.error&&(j.error.message||j.error.status))||'';}catch(e){}
     throw new Error(({400:'requête refusée',401:'clé refusée',403:'clé refusée ou service non autorisé',404:'modèle introuvable',429:'quota dépassé (réessaie plus tard)'}[res.status]||'erreur '+res.status)+(msg?' — '+String(msg).slice(0,160):''));}
   const rd=res.body.getReader(),td=new TextDecoder();let buf='',all='';
@@ -93,11 +111,12 @@ async function send(system,prompt,onText,signal){
     let j;try{j=JSON.parse(d);}catch(e){return;}
     const t=cfg.provider==='gemini'?((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('')
       :((j.choices&&j.choices[0]&&j.choices[0].delta&&j.choices[0].delta.content)||'');
-    if(t){all+=t;onText(t,all);}};
+    if(t){if(!all)ph('first');all+=t;onText(t,all);}};
   for(;;){const {done,value}=await rd.read();if(done)break;
     if(signal&&signal.aborted){try{rd.cancel();}catch(e){}throw new DOMException('arrêté','AbortError');}buf+=td.decode(value,{stream:true});
     const parts=buf.split('\n');buf=parts.pop();parts.forEach(line);}
   if(buf)line(buf);
+  ph('done');
   return all;
 }
 
@@ -105,6 +124,7 @@ async function send(system,prompt,onText,signal){
 const E={w:null,seq:0,wait:new Map(),state:'off',p:0,subs:new Set(),err:''};
 let workerFactory=()=>new Worker('js/ai-worker.js',{type:'module'});
 const emit=()=>E.subs.forEach(f=>{try{f(E);}catch(e){}});
+/* v10 : le Worker reste vivant toute la vie de la page (jamais arrêté entre deux questions) */
 function worker(){
   if(E.w)return E.w;
   E.w=workerFactory();
@@ -128,88 +148,184 @@ async function embed(texts,role){
   const id=++E.seq;
   return new Promise((res,rej)=>{E.wait.set(id,{res,rej});worker().postMessage({type:'embed',id,texts});});
 }
-async function enableLocal(){cfg.local=true;saveCfg();E.err='';await loadModel();await indexNotes();}
+async function enableLocal(){cfg.local=true;saveCfg();E.err='';await loadModel();warmed=true;await indexNotes();}
 async function disableLocal(){
-  cfg.local=false;saveCfg();if(E.w){E.w.terminate();E.w=null;}E.state='off';E.p=0;E.wait.clear();VEC.clear();vecLoaded=false;
+  cfg.local=false;saveCfg();if(E.w){E.w.terminate();E.w=null;}E.state='off';E.p=0;E.wait.clear();VEC.clear();vecLoaded=false;vecModel='';QC.clear();VERS++;warmed=false;
   try{await idb('vec','readwrite',s=>s.clear());}catch(e){}
   try{await caches.delete('transformers-cache');await caches.delete('averse-ai-1');}catch(e){}
   emit();
 }
 
-/* v8 : modèle multilingue (français + anglais). Les vecteurs d'un AUTRE modèle ne sont pas comparables :
-   si la version d'index change, on vide les vecteurs et l'ancien modèle (cache), puis tout est recalculé. */
-const IDX='e5s-1';                                   // multilingual-e5-small q8 (voir ai-worker.js)
+/* v8 : modèle multilingue (français + anglais). Les vecteurs d'un AUTRE modèle (ou d'une autre façon de découper) ne sont pas
+   comparables : si la version d'index change, on vide les vecteurs (et l'ancien modèle v7 du cache), puis tout est recalculé.
+   v10 (e5s-2) : titre + texte NETTOYÉ du Markdown, découpé en passages (6 au plus par note) ; vecteur de note = moyenne des passages. */
+const IDX='e5s-2';
 const PFX={q:'query: ',p:'passage: '};               // préfixes attendus par la famille E5 (seulement pour elle)
 async function migrate(){
   if(cfg.idx===IDX)return;
   try{await idb('vec','readwrite',s=>s.clear());}catch(e){}
-  VEC.clear();vecLoaded=false;
+  VEC.clear();vecLoaded=false;vecModel='';VERS++;
   if(cfg.idx||cfg.local){try{const c=await caches.open('transformers-cache');
     for(const r of await c.keys())if(/all-MiniLM-L6-v2/.test(r.url))await c.delete(r);}catch(e){}}
   cfg.idx=IDX;saveCfg();
 }
-/* vecteurs des notes : {id → {h, v}} ; h = empreinte du texte (on ne recalcule que ce qui a changé) */
-const VEC=new Map();let vecLoaded=false;
+/* vecteurs des notes, gardés dans IndexedDB : {id → {h, v, c:[vecteurs des passages]}} ;
+   h = empreinte des passages : seules les notes MODIFIÉES sont recalculées (aussi d'une visite à l'autre). */
+const VEC=new Map();let vecLoaded=false,VERS=0,vecModel='';   // vecModel : modèle qui a calculé les vecteurs gardés (IndexedDB)
 const fnv=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return(h>>>0).toString(36);};
 const notes=()=>{const d=getLS(NKEY,null);return d&&d.notes?Object.values(d.notes).filter(n=>n&&n.id):[];};
-const noteText=n=>((n.title||'')+'\n'+(n.tags||[]).join(', ')+'\n'+(n.body||'')).slice(0,1600);
 const dot=(a,b)=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;};
+/* Markdown → texte simple (le modèle n'a que faire des #, **, liens, adresses, pièces jointes…) */
+function plain(md){
+  return String(md||'').replace(/\r/g,'')
+    .replace(/```[\w+-]*\n?/g,'')                                   // blocs de code : on garde le code, pas les clôtures
+    .replace(/!\[[^\]]*\]\([^)]*\)/g,' ')                           // images, pièces jointes, dessins
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,(m,a,b)=>b||a)       // [[lien|texte]]
+    .replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')                         // [texte](adresse)
+    .replace(/https?:\/\/\S+/g,' ').replace(/<[^>]{0,200}>/g,' ')
+    .replace(/^[ \t]*\|?[ \t]*:?-{2,}.*$/gm,'').replace(/\|/g,' ')     // tableaux
+    .replace(/^[ \t]{0,3}(?:#{1,6}|>|[-*+]|\d+[.)]|- \[[ x]\])[ \t]+/gim,'')
+    .replace(/\*\*|__|~~|`/g,'').replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g,'$1$2')
+    .replace(/\$\$?/g,' ').replace(/[ \t]+/g,' ').replace(/ *\n */g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+const CHMAX=6,CHLEN=600;
+const SKIPTAG=new Set(['conflit','ia','photo','partage','dessin']);
+/* passages d'une note : t = le texte (montré / envoyé pour le RAG), e = ce qui est vectorisé (titre et tags devant) */
+function passages(n){
+  const title=String(n.title||'').trim(),tags=(n.tags||[]).filter(t=>!SKIPTAG.has(t)).join(', ');
+  const head=(title?title+(/[.!?:]$/.test(title)?' ':'. '):'')+(tags?'('+tags+') ':'');
+  const out=[];let cur='';
+  const push=s=>{s=s.trim();if(s)out.push(s);};
+  for(let p of plain(n.body).split(/\n\s*\n/)){
+    while(p.length>CHLEN*1.5){const cut=Math.max(p.lastIndexOf('. ',CHLEN),p.lastIndexOf('\n',CHLEN));const k=cut>CHLEN/3?cut+1:CHLEN;
+      if(cur){push(cur);cur='';}push(p.slice(0,k));p=p.slice(k);}
+    if(cur&&(cur+'\n\n'+p).length>CHLEN){push(cur);cur=p;}else cur=cur?cur+'\n\n'+p:p;
+  }
+  push(cur);
+  const L=(out.length?out:['']).slice(0,CHMAX);
+  return L.map(t=>({t,e:(head+t).slice(0,1200)||' '}));
+}
+const mean=vs=>{const d=vs[0].length,m=new Float32Array(d);vs.forEach(v=>{for(let i=0;i<d;i++)m[i]+=v[i];});let n=0;for(let i=0;i<d;i++)n+=m[i]*m[i];n=Math.sqrt(n)||1;for(let i=0;i<d;i++)m[i]/=n;return m;};
 let indexing=null;const IXP={done:0,total:0};          // v9 : progression de l'indexation (affichée dans les réglages)
+async function loadVecs(){if(vecLoaded)return;
+  try{const all=await idb('vec','readonly',s=>s.getAll()),ks=await idb('vec','readonly',s=>s.getAllKeys());
+    /* v10 : chaque vecteur garde le nom du modèle (r.m) → la calibration est la bonne MÊME si le Worker n'est pas encore lancé
+       (index entièrement relu depuis IndexedDB). Un vecteur sans nom de modèle est recalculé (une seule fois). */
+    ks.forEach((k,i)=>{const r=all[i];if(r&&r.v&&Array.isArray(r.c)&&r.m){VEC.set(k,r);if(!vecModel)vecModel=r.m;}});}catch(e){}
+  vecLoaded=true;VERS++;}
 async function indexNotes(onP){
   if(indexing)return indexing;
   indexing=(async()=>{
-    await migrate();
-    if(!vecLoaded){try{const all=await idb('vec','readonly',s=>s.getAll()),ks=await idb('vec','readonly',s=>s.getAllKeys());
-      ks.forEach((k,i)=>VEC.set(k,all[i]));}catch(e){}vecLoaded=true;}
+    const t0=performance.now();
+    await migrate();await loadVecs();
     const ns=notes(),live=new Set(ns.map(n=>n.id));
-    for(const k of [...VEC.keys()])if(!live.has(k))VEC.delete(k);
-    const todo=ns.filter(n=>{const v=VEC.get(n.id);return!v||v.h!==fnv(noteText(n));});
+    for(const k of [...VEC.keys()])if(!live.has(k)){VEC.delete(k);VERS++;idb('vec','readwrite',s=>s.delete(k)).catch(()=>{});}
+    const todo=[];ns.forEach(n=>{const ps=passages(n),h=fnv(ps.map(p=>p.e).join('\u0001')),v=VEC.get(n.id);if(!v||v.h!==h)todo.push({n,ps,h});});
     IXP.done=0;IXP.total=todo.length;if(todo.length)emit();
-    for(let i=0;i<todo.length;i+=16){
-      const part=todo.slice(i,i+16),vs=await embed(part.map(noteText),'p');
-      for(let k=0;k<part.length;k++){const o={h:fnv(noteText(part[k])),v:vs[k]};VEC.set(part[k].id,o);idb('vec','readwrite',s=>s.put(o,part[k].id)).catch(()=>{});}
-      IXP.done=i+part.length;emit();
-      if(onP)onP((i+part.length)/todo.length);
+    /* par paquets d'environ 16 passages */
+    for(let i=0;i<todo.length;){
+      const part=[];let np=0;while(i<todo.length&&(np<16||!part.length)){part.push(todo[i]);np+=todo[i].ps.length;i++;}
+      const vs=await embed([].concat(...part.map(x=>x.ps.map(p=>p.e))),'p');let o=0;
+      for(const x of part){const c=vs.slice(o,o+x.ps.length);o+=x.ps.length;const r={h:x.h,v:mean(c),c,m:E.model||''};VEC.set(x.n.id,r);vecModel=r.m;
+        idb('vec','readwrite',s=>s.put(r,x.n.id)).catch(()=>{});}
+      VERS++;IXP.done=i;emit();if(onP)onP(i/todo.length);
     }
+    TIME.index=Math.round(performance.now()-t0);TIME.indexed=todo.length;
     return VEC;
   })();
   try{return await indexing;}finally{indexing=null;IXP.total=0;emit();}
 }
+
+/* ---------- v10 : calibration des scores ----------
+   E5 « tasse » ses cosinus (deux notes SANS rapport ≈ 0,75–0,82) : afficher le cosinus brut (« 80 % ») faisait croire à un lien.
+   On compare donc chaque score à la DISTRIBUTION du carnet lui-même : z = (s − moyenne) / écart-type des paires du carnet,
+   estimées sur tes notes et « tirées » vers des valeurs a priori mesurées (jeu d'évaluation, voir README) tant qu'il y a peu de notes.
+   On n'affiche que ce qui est NETTEMENT au-dessus du lot (z ≥ seuil ET cosinus ≥ plancher), au plus 4, avec un libellé
+   (« très proche » / « proche ») au lieu d'un faux pourcentage. Rien plutôt que du bruit. Même principe pour le RAG. */
+/* valeurs mesurées sur le jeu d'évaluation (25 notes FR/EN, README) : paires du carnet ≈ 0,779 ± 0,032 ;
+   question ↔ passages : la moyenne varie beaucoup d'une question à l'autre (0,70–0,79) → a priori faible (K=8) */
+const CAL={'Xenova/multilingual-e5-small':{nn:{mu:.779,sd:.032,floor:.81,z:2.2,hi:3.2},qp:{mu:.745,sd:.032,floor:.76,z:1.9,gap:.04},tag:.6}};
+const CAL0={nn:{mu:0,sd:.15,floor:.25,z:2.0,hi:3.5},qp:{mu:0,sd:.12,floor:.2,z:2.0,gap:.2},tag:.6};   // autre modèle (faux Worker des tests)
+const calOf=()=>CAL[E.model||vecModel]||CAL0;
+const K0=30;                                                     // poids de l'a priori (en « paires »)
+function shrink(vals,p,K){K=K==null?K0:K;const n=vals.length;let m=0;vals.forEach(v=>m+=v);m=n?m/n:p.mu;let q=0;vals.forEach(v=>q+=(v-m)*(v-m));const va=n>1?q/(n-1):p.sd*p.sd;
+  const mu=(n*m+K*p.mu)/(n+K),sd=Math.sqrt((n*va+K*p.sd*p.sd)/(n+K));return{mu,sd:Math.max(sd,.008),n};}
+let NNS=null;
+function nnStats(){const C=calOf();if(NNS&&NNS.vers===VERS&&NNS.cal===C)return NNS;
+  const ids=[...VEC.keys()].sort().slice(0,300),vals=[];
+  for(let i=0;i<ids.length;i++){const a=VEC.get(ids[i]).v;for(let j=i+1;j<ids.length;j++)vals.push(dot(a,VEC.get(ids[j]).v));}
+  NNS=Object.assign(shrink(vals,C.nn),{vers:VERS,cal:C});return NNS;}
+const tagsOf=n=>new Set((n&&n.tags||[]).filter(t=>!SKIPTAG.has(t)).map(t=>String(t).toLowerCase()));
+const label=(z,hi)=>z>=hi?'très proche':'proche';
+/* notes liées à une note : [{id, s, z, label, tags}] — déjà filtrées (peut être vide) */
+async function related(id,k){await indexNotes();const me=VEC.get(id);if(!me)return[];
+  const C=calOf(),st=nnStats(),by=Object.fromEntries(notes().map(n=>[n.id,n])),mt=tagsOf(by[id]);
+  return[...VEC].filter(([x])=>x!==id&&by[x]).map(([x,o])=>{const s=dot(me.v,o.v),ct=[...tagsOf(by[x])].filter(t=>mt.has(t)).length;
+      const z=(s-st.mu)/st.sd+C.tag*Math.min(2,ct);return{id:x,s,z,tags:ct};})
+    .filter(r=>r.z>=C.nn.z&&r.s>=C.nn.floor-(r.tags?.02:0)).sort((a,b)=>b.z-a.z).slice(0,k||4).map(r=>Object.assign(r,{label:label(r.z,C.nn.hi)}));}
+/* brut (compatibilité, tests) : cosinus des vecteurs de notes */
 async function similarTo(id,k){await indexNotes();const me=VEC.get(id);if(!me)return[];
   return[...VEC].filter(([x])=>x!==id).map(([x,o])=>({id:x,s:dot(me.v,o.v)})).sort((a,b)=>b.s-a.s).slice(0,k||5);}
-async function search(q,k){await indexNotes();const [v]=await embed([q]);
-  return[...VEC].map(([x,o])=>({id:x,s:dot(v,o.v)})).sort((a,b)=>b.s-a.s).slice(0,k||8);}
-/* RAG : les meilleurs EXTRAITS (paragraphes) pour une question — calcul 100 % local */
-function chunks(n){const out=[],ps=String(n.body||'').split(/\n\s*\n/);let cur='';
-  for(const p of ps){if((cur+'\n\n'+p).length>700&&cur){out.push(cur);cur=p;}else cur=cur?cur+'\n\n'+p:p;}
-  if(cur.trim())out.push(cur);return out.map(t=>t.slice(0,900));}
-/* seuil de pertinence du RAG, par modèle. Mesuré dans Chromium avec E5 (8 notes FR/EN, 10 questions, voir README) :
-   ses scores sont serrés — meilleure note SANS rapport ≈ .76–.81, extrait pertinent ≈ .82–.88.
-   On garde ce qui est au-dessus de « min » ET à moins de « gap » du meilleur. */
-const RELS={'Xenova/multilingual-e5-small':{min:.815,gap:.03}};
-const relOf=()=>RELS[E.model]||{min:.25,ratio:.8};           // autre modèle (ou faux Worker des tests) : seuil v7 relatif
+/* paires du graphe « ≈ sens » : au plus 2 par note, nettement au-dessus du lot */
+async function semPairs(){await indexNotes();const C=calOf(),st=nnStats(),ids=[...VEC.keys()],pairs=[],seen=new Set();
+  ids.forEach(a=>{const va=VEC.get(a).v;ids.filter(b=>b!==a).map(b=>[b,dot(va,VEC.get(b).v)]).sort((x,y)=>y[1]-x[1]).slice(0,2)
+    .forEach(([b,s])=>{const kk=a<b?a+'|'+b:b+'|'+a,z=(s-st.mu)/st.sd;if(z>=C.nn.z+.3&&s>=C.nn.floor&&!seen.has(kk)){seen.add(kk);pairs.push([a,b,s]);}});});
+  return pairs;}
+
+/* ---------- v10 : vecteur de la question calculé EN AVANCE (pendant la frappe, sans réseau), gardé en mémoire ---------- */
+const QC=new Map();
+const normQ=q=>String(q||'').replace(/^\s*\?\s*/,'').trim().replace(/\s+/g,' ').slice(0,500);
+function qvec(q){q=normQ(q);let p=QC.get(q);
+  if(p){QC.delete(q);QC.set(q,p);p.hit=true;return p;}
+  p=embed([q],'q').then(v=>v[0]);p.catch(()=>QC.delete(q));QC.set(q,p);
+  while(QC.size>40)QC.delete(QC.keys().next().value);return p;}
+/* appelé (avec un délai) pendant que tu tapes une question : 100 % local, aucun appel réseau */
+function prepare(q){q=normQ(q);if(!cfg.local||q.length<3||E.state==='error')return false;
+  qvec(q).catch(()=>{});if(!vecLoaded&&!indexing)indexNotes().catch(()=>{});return true;}
+/* ---------- v10 : pré-chauffage quand l'IA locale est activée : Worker + modèle + index, quand la page n'a rien d'autre à faire ---------- */
+let warmed=false,warmP=null;
+function prewarm(){if(!cfg.local)return Promise.resolve(false);if(warmP)return warmP;
+  warmP=new Promise(res=>{const go=async()=>{try{const t0=performance.now();await loadModel();TIME.load=Math.round(performance.now()-t0);
+      await embed(['ok'],'q');warmed=true;TIME.warm=Math.round(performance.now()-t0);await indexNotes();res(true);}catch(e){warmP=null;res(false);}};
+    (window.requestIdleCallback?f=>requestIdleCallback(f,{timeout:3000}):f=>setTimeout(f,200))(go);});
+  return warmP;}
+if(cfg.local&&sessionStorage.getItem('averse-tests')!=='1'){          // (les tests appellent AI.prewarm() eux-mêmes, avec un faux Worker)
+  const kick=()=>setTimeout(prewarm,400);if(document.readyState==='complete')kick();else window.addEventListener('load',kick,{once:true});}
+
+/* temps mesurés de la dernière demande (ms) — affichés nulle part, utiles pour mesurer (README) */
+const TIME={};
+async function search(q,k){const t0=performance.now();await indexNotes();const t1=performance.now();const v=await qvec(q);const t2=performance.now();
+  const C=calOf(),all=[...VEC].map(([x,o])=>{let s=dot(v,o.v);o.c.forEach(c=>{const y=dot(v,c);if(y>s)s=y;});return{id:x,s};});
+  const st=shrink(all.map(r=>r.s),C.qp,8);
+  const out=all.map(r=>Object.assign(r,{z:(r.s-st.mu)/st.sd})).sort((a,b)=>b.s-a.s);
+  out.forEach(r=>{r.ok=r.z>=C.qp.z-.5&&r.s>=C.qp.floor;r.label=label(r.z,C.qp.z+1.2);});
+  Object.assign(TIME,{index:Math.round(t1-t0),qEmbed:Math.round(t2-t1),search:Math.round(performance.now()-t2)});
+  return out.slice(0,k||8);}
+/* RAG : les meilleurs PASSAGES pour une question — calcul 100 % local */
+function chunks(n){return passages(n).map(p=>p.t).filter(Boolean);}
 async function retrieve(q,max){
-  max=max||3500;
+  max=max||3500;const T0=performance.now();
   const by=Object.fromEntries(notes().map(n=>[n.id,n]));
-  let cand;
-  if(cfg.local){const [qv]=await embed([q]);await indexNotes();
-    const top=[...VEC].map(([x,o])=>({id:x,s:dot(qv,o.v)})).sort((a,b)=>b.s-a.s).slice(0,6).filter(r=>by[r.id]);
-    const parts=[];top.forEach(r=>chunks(by[r.id]).forEach(t=>parts.push({id:r.id,t})));
-    const vs=parts.length?await embed(parts.map(p=>(by[p.id].title||'')+'\n'+p.t),'p'):[];
-    cand=parts.map((p,i)=>({id:p.id,t:p.t,s:dot(qv,vs[i])})).sort((a,b)=>b.s-a.s);
+  let cand,keep;
+  if(cfg.local){
+    const pq=qvec(q),hit=!!pq.hit;await indexNotes();const t1=performance.now();const qv=await pq;const t2=performance.now();
+    cand=[];for(const [id,o] of VEC){if(!by[id])continue;const ps=passages(by[id]);o.c.forEach((c,i)=>{if(ps[i]&&ps[i].t)cand.push({id,t:ps[i].t,s:dot(qv,c)});});}
+    cand.sort((a,b)=>b.s-a.s);
+    const C=calOf().qp,st=shrink(cand.map(c=>c.s),C,8),best=cand.length?cand[0].s:0;
+    keep=c=>c.s>=C.floor&&(c.s-st.mu)/st.sd>=C.z&&c.s>=best-C.gap;
+    Object.assign(TIME,{index:Math.round(t1-T0),qEmbed:Math.round(t2-t1),qHit:hit,search:Math.round(performance.now()-t2)});
   }else{                                                     // repli sans modèle : mots en commun (moins bon, mais local)
     const ws=String(q).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/\W+/).filter(w=>w.length>2);
     cand=[];Object.values(by).forEach(n=>chunks(n).forEach(t=>{const tt=((n.title||'')+' '+t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       const s=ws.reduce((a,w)=>a+(tt.includes(w)?1:0),0)/Math.max(1,ws.length);if(s>0)cand.push({id:n.id,t,s});}));
-    cand.sort((a,b)=>b.s-a.s);
+    cand.sort((a,b)=>b.s-a.s);const best=cand.length?cand[0].s:0;keep=c=>c.s>=Math.max(.34,best*.5);
   }
   /* seulement ce qui est vraiment proche : rien d'une note sans rapport ne doit partir chez le fournisseur */
-  const best=cand.length?cand[0].s:0;const R0=relOf();
-  cand=cand.filter(c=>c.s>=(cfg.local?Math.max(R0.min,R0.gap!=null?best-R0.gap:best*R0.ratio):Math.max(.34,best*.5)));
   const out=[];let len=0;
-  for(const c of cand){if(out.length>=6||len+c.t.length>max)continue;out.push({id:c.id,title:by[c.id].title||'Sans titre',t:c.t,s:c.s});len+=c.t.length;}
+  for(const c of cand.filter(keep)){if(out.length>=6||len+c.t.length>max)continue;out.push({id:c.id,title:by[c.id].title||'Sans titre',t:c.t,s:c.s});len+=c.t.length;}
   return out;
 }
+const relOf=()=>calOf();
 
 /* ---------- langue des réponses (v8) ---------- */
 const LANG={
@@ -288,6 +404,7 @@ function run(task,o){
       'et y est traité selon ses conditions. AVERSE n\'envoie rien d\'autre, nulle part. Évite les données sensibles.'+
       '<details><summary>Voir exactement ce qui sera envoyé</summary><pre class="ai-pre" id="aiPre"></pre></details>';
     w.querySelector('#aiPre').textContent=txt||'(vide)';
+    if(!online())w.insertAdjacentHTML('afterbegin','<b class="ai-offl">Hors ligne : l\'envoi échouera tant que le réseau n\'est pas revenu (rien ne part).</b><br>');
     btns(B('x','Annuler')+(task==='ask'&&!extracts?B('find','Chercher dans mes notes','primary'):B('send','Envoyer à '+p.short,'primary')));
     if(task==='ask'&&!extracts)w.innerHTML='Étape 1 : AVERSE cherche les extraits utiles <b>sur ton appareil</b>'+(cfg.local?' (recherche par le sens)':' (mots en commun — active la recherche par le sens pour mieux faire)')+
       '. Rien n\'est envoyé à cette étape.';
@@ -363,13 +480,14 @@ function settings(){
   const P=k=>'<label class="ai-radio"><input type="radio" name="aiProv" value="'+k+'"'+(cfg.provider===k?' checked':'')+'> '+esc(PROV[k].name)+(k==='gemini'?' <small>(offre gratuite)</small>':'')+'</label>';
   ov.innerHTML='<form class="ctx-dlg ai-dlg ai-set" role="dialog" aria-modal="true" aria-labelledby="aiST" novalidate>'+
     '<div class="ai-head"><span class="ai-gl"></span><div><div class="ctx-dt" id="aiST">IA — réglages</div><div class="ai-sub">Tout est désactivé par défaut. Rien ne part sans ton clic.</div></div></div>'+
+    '<p class="ai-net" id="aiNet" role="status"></p>'+
     '<h3 class="ai-h">1 · Recherche par le sens <small>(100 % locale)</small></h3>'+
     '<p class="ai-p">Un modèle multilingue (multilingual-e5-small quantifié : français et anglais, une question en anglais retrouve une note en français) tourne <b>dans ton navigateur</b> : recherche par le sens, notes liées, liens dans le graphe, « demander à mes notes ». '+
     'Téléchargement unique ≈ 155 Mo à l\'activation — prévois du Wi-Fi (moteur 21 Mo depuis cdn.jsdelivr.net, vérifié par empreinte SHA-384 ; modèle 118 Mo + vocabulaire 17 Mo depuis huggingface.co), puis hors ligne. Tes notes ne quittent pas l\'appareil.</p>'+
     '<div class="ai-row"><span id="aiLoc"></span><span class="ai-bt" id="aiLocBt"></span></div>'+
     '<h3 class="ai-h">2 · Assistant <small>(ta clé d\'API)</small></h3>'+
     '<div class="ai-provs">'+P('gemini')+P('openai')+'</div>'+
-    '<div class="ai-grid"><label for="aiModel">Modèle</label><input id="aiModel" spellcheck="false" maxlength="80">'+
+    '<div class="ai-grid"><label for="aiModel">Modèle</label><input id="aiModel" spellcheck="false" maxlength="80" list="aiModels" autocomplete="off"><datalist id="aiModels"></datalist>'+
     '<label for="aiBase" class="ai-ob">Adresse de l\'API</label><input id="aiBase" class="ai-ob" spellcheck="false" placeholder="https://api.openai.com/v1">'+
     '<label for="aiKey">Clé d\'API</label><input id="aiKey" type="password" autocomplete="off" spellcheck="false" maxlength="400"></div>'+
     '<div class="ai-grid ai-lang"><label for="aiLang">Langue des réponses</label><select id="aiLang">'+
@@ -384,7 +502,7 @@ function settings(){
   document.body.appendChild(ov);
   const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=GLYPH.create({size:64,kind:'model'});f.querySelector('.ai-gl').appendChild(g.el);
   let closed=false;
-  const close=()=>{closed=true;E.subs.delete(loc);g.destroy();ov.remove();OPEN=null;document.removeEventListener('keydown',onKey,true);};
+  const close=()=>{closed=true;E.subs.delete(loc);E.subs.delete(net);removeEventListener('online',net);removeEventListener('offline',net);g.destroy();ov.remove();OPEN=null;document.removeEventListener('keydown',onKey,true);};
   const onKey=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}};
   document.addEventListener('keydown',onKey,true);
   ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
@@ -402,8 +520,16 @@ function settings(){
     bt.innerHTML=(s!=='ready'?'<button type="button" class="btn ghost" data-s="on">Charger</button> ':'')+'<button type="button" class="btn ghost" data-s="off">Désactiver et supprimer le modèle</button>';
   }
   E.subs.add(loc);
+  /* v10 : ce qui marche sans réseau, dit clairement */
+  function net(){const n=$i('aiNet');if(!n)return;const on=online(),ok=cfg.local&&(E.state==='ready'||vecLoaded);
+    n.className='ai-net '+(on?'on':'off');
+    n.innerHTML=on?'● En ligne : tout est disponible.'
+      :'○ Hors ligne · recherche par le sens : '+(cfg.local?(ok?'<b>marche</b> (modèle sur l\'appareil)':'marche si le modèle a déjà été téléchargé'):'désactivée')+
+       ' · assistant par clé : <b>indisponible</b> (il a besoin du réseau).';}
+  addEventListener('online',net);addEventListener('offline',net);E.subs.add(net);
   function prov(){
-    const p=PROV[cfg.provider];$i('aiModel').value=cfg.model[cfg.provider]||'';$i('aiModel').placeholder=p.model;
+    const p=PROV[cfg.provider];$i('aiModel').value=cfg.model[cfg.provider]||'';$i('aiModel').placeholder=p.model+' (rapide)';
+    $i('aiModels').innerHTML=(MODELS[cfg.provider]||[]).map(m=>'<option value="'+esc(m[0])+'" label="'+esc(m[1])+'">').join('');
     f.querySelectorAll('.ai-ob').forEach(x=>x.hidden=cfg.provider!=='openai');$i('aiBase').value=cfg.base||'';
     $i('aiHost').textContent=p.name+' ('+host()+')';$i('aiGet').href=p.keyUrl;$i('aiKey').value='';
     $i('aiKey').placeholder=hasKey()?'•••••••• (enregistrée — tape pour remplacer)':'colle ta clé ici';
@@ -431,15 +557,15 @@ function settings(){
   });
   f.addEventListener('submit',e=>e.preventDefault());
   ready.then(()=>{if(!closed)prov();});
-  prov();loc();
+  prov();loc();net();
   OPEN={close,glyph:g,el:f};
   return OPEN;
 }
 function setPref(k,v){if(k==='lang')cfg.lang=['fr','en'].includes(v)?v:'auto';else if(k==='skipFree')cfg.skipFree=!!v;else return;saveCfg();}
 /* v8 : la barre de l'accueil (ai-bar.js) a sa propre interface ; elle passe par CETTE porte, appelée uniquement
    depuis un clic ou un Entrée sur « Envoyer » / l'option « Demander à l'IA » (jamais au fil de la frappe). */
-function fire(task,txt,onText,signal){if(!TASKS[task])return Promise.reject(new Error('demande inconnue'));armed=true;
-  return send(sysFor(task),txt,onText,signal).finally(()=>{armed=false;});}
+function fire(task,txt,onText,signal,onPhase){if(!TASKS[task])return Promise.reject(new Error('demande inconnue'));armed=true;
+  return send(sysFor(task),txt,onText,signal,onPhase).finally(()=>{armed=false;});}
 function refreshNotes(){if(typeof renderAll==='function')try{renderAll();}catch(e){}}
 
 /* ---------- points d'entrée : palette, clic droit ---------- */
@@ -463,7 +589,8 @@ if(typeof NOXE!=='undefined'&&NOXE.cmds)NOXE.cmds.push(
   {id:'ai-settings',title:'IA : réglages (clé d\'API, recherche par le sens)',words:'ia ai reglages cle api gemini openai modele sens embeddings intelligence artificielle',run:settings});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-ai-settings]');if(b){e.preventDefault();settings();}});
 
-return{PROV,TASKS,run,settings,ready,hasKey,fire,sysFor,setPref,askPayload,md,host,model,provider:()=>PROV[cfg.provider],IDX,rel:relOf,setKey,syncPart,syncReceive,embed,enableLocal,disableLocal,indexNotes,similarTo,search,retrieve,ctxItems,
+return{PROV,MODELS,thinkFor,online,OfflineError,prepare,prewarm,warmed:()=>warmed,related,semPairs,plain,passages,timing:()=>Object.assign({},TIME),qCache:()=>QC.size,_vecs:()=>VEC,_nn:()=>nnStats(),_qvec:q=>qvec(q),embedQ:q=>qvec(q),
+  TASKS,run,settings,ready,hasKey,fire,sysFor,setPref,askPayload,md,host,model,provider:()=>PROV[cfg.provider],IDX,rel:relOf,setKey,syncPart,syncReceive,embed,enableLocal,disableLocal,indexNotes,similarTo,search,retrieve,ctxItems,
   cfg:()=>JSON.parse(JSON.stringify(cfg)),local:()=>cfg.local,state:()=>E.state,stats,
   set workerFactory(f){workerFactory=f;},onState(f){E.subs.add(f);return()=>E.subs.delete(f);},isOpen:()=>!!OPEN,close:()=>OPEN&&OPEN.close(),
   forget:async ids=>{for(const id of ids){VEC.delete(id);try{await idb('vec','readwrite',s=>s.delete(id));}catch(e){}}}};   // tests : retire des vecteurs précis

@@ -90,3 +90,15 @@ body:has(#homeView.h-drag) .drop-veil{display:none}
   #homeView[data-home="open"] .home-glyph{--gz:56px}
 }
 @media(prefers-reduced-motion:reduce){.home-glyph canvas,#homeView .search-hero,#homeView .home-head{transition-duration:.01s}}
+/* v10 : une demande à l'IA en cours → le Glyph regrandit (il « travaille » sous tes yeux), les résultats s'effacent */
+#homeView[data-home="open"][data-ai="busy"] .home-glyph{--gz:min(190px,46vw,27vh)}
+#homeView[data-home="open"][data-ai="answer"] .home-glyph{--gz:min(128px,34vw,18vh)}
+#homeView[data-ai] #results,#homeView[data-ai] #homeBlocks,#homeView[data-ai] .search-hint{display:none!important}
+#homeView[data-ai] .aip-glw{display:none}
+#homeView[data-ai] .home-head{padding-top:72px}
+@media(max-width:560px){
+  #homeView[data-home="open"][data-ai="busy"] .home-glyph{--gz:min(150px,44vw,22vh)}
+  #homeView[data-home="open"][data-ai="answer"] .home-glyph{--gz:min(96px,28vw,14vh)}
+  #homeView[data-ai] .home-head{padding-top:60px}
+  #homeView[data-ai] .home-head h1{font-size:2rem}
+}

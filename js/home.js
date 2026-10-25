@@ -4,6 +4,7 @@
    - Échap, ou barre vide quand on la quitte → retour au Glyph seul ;
    - un fichier qui survole la page → le Glyph « aspire » ; au dépôt, app.js choisit l'outil (PDF, image, JSON…) ;
    - pendant la frappe, le motif du Glyph suit l'intention détectée (PDF, image, code, note, synchro, IA…).
+   v10 : pendant une demande à l'IA (data-ai), le Glyph REGRANDIT au-dessus du panneau et suit les étapes (ai-bar.js).
    Une seule boucle d'animation (glyph.js), arrêtée quand l'onglet est caché ou quand l'accueil n'est pas affiché. */
 (function(){
 const hv=document.getElementById('homeView'),btn=document.getElementById('homeGlyph'),q=document.getElementById('q');
@@ -39,7 +40,8 @@ function fileMotif(files){
   return'absorb';
 }
 function apply(m){if(g.state()!==m)g.set(m);hv.dataset.motif=m;}
-function mood(){if(Date.now()<hold)return;apply(isOpen?intent(q.value):'alive');}
+function mood(){if(Date.now()<hold||hv.dataset.ai)return;               // v10 : une demande IA en cours pilote le Glyph (ai-bar.js)
+  apply(isOpen?intent(q.value):'alive');}
 /* un motif d'action, gardé un moment puis retour à l'intention */
 function flash(m,ms){hold=Date.now()+(ms||1400);clearTimeout(holdT);apply(m);holdT=setTimeout(()=>{hold=0;mood();},ms||1400);}
 
@@ -60,6 +62,7 @@ NOXE.homeOpen=()=>setOpen(true);
 NOXE.homeIdle=()=>{if(document.activeElement===q||q.value.trim())return;setOpen(false);};
 NOXE.homeState=()=>({open:isOpen,motif:g.state()});
 NOXE.homeGlyph=g;
+NOXE.homeMood=()=>{hold=0;mood();};
 
 btn.addEventListener('click',()=>setOpen(true,true));
 document.getElementById('homeAll').addEventListener('click',()=>{q.value='';setOpen(true,true);});

@@ -3,7 +3,7 @@
    (averse-v14 → averse-v18…) pour que les visiteurs reçoivent la nouvelle version.
    Tous les chemins sont RELATIFS à ce fichier : le site marche aussi dans un sous-dossier
    (ex. https://toi.github.io/averse/ sur GitHub Pages). */
-const CACHE = 'averse-v18';
+const CACHE = 'averse-v19';
 const SHARE = 'averse-share';          // contenu partagé en attente (lu puis vidé par app.js)
 /* OCR (v4) : Tesseract.js pèse ~11 Mo (moteur wasm + langues). Il n'est PAS dans ASSETS : sinon chaque visiteur
    téléchargerait 11 Mo à l'installation, même sans jamais utiliser l'OCR, et à chaque nouvelle version du site.
@@ -46,7 +46,7 @@ const ASSETS = [
   './js/keys.js', './js/pwa.js', './js/ctxmenu.js', './js/backup.js', './js/math.js',
   './js/notes-graph.js', './js/notes-page.js', './js/vault.js', './js/cloud.js',   // v5 : graphe, barre mobile, synchro chiffrée
   './js/theme.js', './js/eggs.js', './js/glyph.js', './js/ai.js', './js/ai-bar.js', './js/ai-notes.js', './js/ai-worker.js', './css/ai.css',   // v7
-  './js/accent.js', './js/search.js', './js/templates.js', './js/notes-tpl.js', './js/md.js', './js/share.js', './js/share-view.js', './js/feedback.js',   // v6
+  './js/accent.js', './js/search.js', './js/templates.js', './js/notes-tpl.js', './js/md.js', './js/share.js', './js/share-view.js', './js/notes-share.js', './js/draw.js', './js/feedback.js',   // v6
   './js/tools/base.js', './js/tools/image.js', './js/tools/editeur.js', './js/tools/pdf.js', './js/tools/reseau.js',
   './js/tools/electronique.js', './js/tools/dev.js', './js/tools/encodage.js', './js/tools/carnet.js', './js/tools/texte.js', './js/tools/memo.js',
   './js/tools/sauvegarde.js', './js/tools/ocr.js',
@@ -69,10 +69,10 @@ self.addEventListener('activate', e => {
 });
 
 /* « Partager vers AVERSE » (manifest share_target) : le système envoie un POST multipart sur ./share-target.
-   On range titre / texte / lien / fichiers dans le cache SHARE, puis on redirige vers index.html?share=1
+   On range titre / texte / lien / fichiers dans le cache SHARE, puis on redirige vers notes.html?share=1 (v10 ; avant : index.html)
    (app.js lit, vide le cache et ouvre le bon outil). Rien ne quitte l'appareil. */
 async function receiveShare(req) {
-  const home = new URL('./index.html', self.registration.scope);
+  const home = new URL('./notes.html', self.registration.scope);   // v10 : un partage devient une NOTE (notes-share.js)
   try {
     const form = await req.formData();
     const c = await caches.open(SHARE);
