@@ -1,5 +1,5 @@
 /* ai-notes.js — v7 : l'IA dans le carnet (notes.html). Tout ici est LOCAL (embeddings, js/ai.js) sauf
-   les actions du menu « IA ✦ » qui ouvrent la fenêtre d'envoi (rien ne part sans le bouton « Envoyer »).
+   les actions du menu « IA * » qui ouvrent la fenêtre d'envoi (rien ne part sans le bouton « Envoyer »).
    - « Notes liées » sous les rétroliens de la note ouverte (les plus proches par le sens) ;
    - « Par le sens » sous les résultats quand tu cherches (même sans mot en commun) ;
    - graphe : bouton « ≈ sens » = liens suggérés en pointillés (paires très proches). */
@@ -61,7 +61,7 @@ function menu(btn){
     {label:'Demander à mes notes…',run:()=>AI.run('ask',{})},
     '-',
     {label:'Réglages IA…',run:()=>AI.settings()}];
-  CTX.open(r.left,r.bottom+4,items,'IA ✦');
+  CTX.open(r.left,r.bottom+4,items,'IA *');
 }
 if(window.AI){AI.onState(()=>{syncUi();});}
 document.addEventListener('DOMContentLoaded',syncUi);syncUi();

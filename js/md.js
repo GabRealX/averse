@@ -1,9 +1,10 @@
 /* md.js — v6 : le rendu Markdown léger d'AVERSE, partagé par le carnet (notes.js) et share.html.
    SÉCURITÉ : tout le texte passe par esc() AVANT d'être transformé ; seules quelques balises sûres sont produites
    (p, h1-3, strong, em, code, pre, ul/ol/li, table, blockquote, hr, a). Liens : http/https/mailto/ancre/relatif uniquement.
-   v9 : ![nom](att:ID) → <img data-att> (pièce jointe, remplie ensuite par attach.js) si l'option att est donnée ;
+   v11 : un bloc ```circuit … ``` devient un schéma (circuit-core.js, s'il est chargé ; sinon un bloc de code normal).
+   v9 : ![nom](att:ID) -> <img data-att> (pièce jointe, remplie ensuite par attach.js) si l'option att est donnée ;
         sinon (note partagée) un simple texte « pièce jointe non partagée ». Aucune autre image n'est chargée.
-   Options : exists(titre) → la note liée existe ? · nowiki : [[liens]] en simple texte (lecture d'une note partagée)
+   Options : exists(titre) -> la note liée existe ? · nowiki : [[liens]] en simple texte (lecture d'une note partagée)
              readonly : cases à cocher désactivées · empty : texte d'une note vide.
    Utilise esc() de core.js. */
 const MD=(function(){
@@ -43,7 +44,8 @@ function renderMd(body,opt){
   const isSep=l=>/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
   while(i<L.length){
     const l=L[i].replace(/\s+$/,'');
-    if(/^```/.test(l)){flushP();const code=[];i++;while(i<L.length&&!/^```/.test(L[i])){code.push(L[i]);i++;}i++;
+    if(/^```/.test(l)){flushP();const lang=/^```\s*([\w-]*)/.exec(l)[1].toLowerCase(),code=[];i++;while(i<L.length&&!/^```/.test(L[i])){code.push(L[i]);i++;}i++;
+      if(lang==='circuit'&&typeof CIRCUIT!=='undefined'){html+=CIRCUIT.block(code.join('\n'));continue;}   // v11 : un schéma de circuit (circuit-core.js)
       html+='<pre><code>'+esc(code.join('\n'))+'</code></pre>';continue;}
     const h=/^(#{1,3})\s+(.*)$/.exec(l);
     if(h){flushP();html+='<h'+h[1].length+'>'+inline(h[2])+'</h'+h[1].length+'>';i++;continue;}

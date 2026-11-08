@@ -196,7 +196,7 @@ body{overflow:hidden}
 @media (max-width:799px){
   .bar{gap:10px;padding:0 12px}
   .bar-left{gap:12px;flex:none}
-  .logo{display:none}            /* on garde « ← accueil », seul lien de retour */
+  .logo{display:none}            /* on garde « <- accueil », seul lien de retour */
   .back{white-space:nowrap}
   .bar-right{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;justify-content:flex-start}
   .bar-right>*{flex:none}
@@ -325,7 +325,7 @@ body{overflow:hidden}
   .more-menu .ico-btn:hover,.more-menu .ico-btn:focus-visible{border-color:var(--line-2);color:var(--fg)}
 }
 @media (min-width:800px) and (max-width:1099px){.bar-right>.sync-state{max-width:150px}}
-@media (min-width:800px) and (max-width:959px){.logo{display:none}}   /* « ← accueil » suffit pour revenir */
+@media (min-width:800px) and (max-width:959px){.logo{display:none}}   /* « <- accueil » suffit pour revenir */
 @media (min-width:800px) and (max-width:959px){.bar-right{gap:6px}.seg button{padding:8px 10px}}
 @media (max-width:799px){
   .more{display:contents}
@@ -394,7 +394,7 @@ html[data-style="ascii"] .cf-c.cf-del::before{content:"- ";color:var(--bad)}
 html[data-style="ascii"] .cf-c.cf-add::before{content:"+ ";color:var(--ok)}
 html[data-style="ascii"] .cf-bar{border-bottom:1px dashed rgba(242,139,139,.6)}
 
-/* v9 : « + Nouvelle note » + 📷 (Photo → note) */
+/* v9 : « + Nouvelle note » + photo (Photo -> note) */
 .new-row{display:flex;gap:8px}
 .new-row #newBtn{flex:1}
 .ph-btn{flex:none;padding-left:12px;padding-right:12px;filter:grayscale(1)}

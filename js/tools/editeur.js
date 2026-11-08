@@ -275,7 +275,7 @@ register({
 
     T=NOXE.tabs($('etabs'),[['crop','Recadrer',panelCrop],['size','Taille',panelSize],['rot','Pivoter',panelRotate],['col','Couleurs',panelColors],['mark','Filigrane',panelMark],['bg','Fond',panelBg]]);
     $('eundo').onclick=()=>{if(hist.length){work=hist.pop();refresh();}};
-    /* résultat pour « → Envoyer vers… » : l'image telle qu'elle est maintenant, en PNG */
+    /* résultat pour « -> Envoyer vers… » : l'image telle qu'elle est maintenant, en PNG */
     NOXE.setResult({get:async()=>{const c=cv(work.width,work.height);c.getContext('2d').drawImage(work,0,0);
       const b=await toBlob(c,'image/png');return b?{files:[new File([b],stem(file)+'-edit.png',{type:'image/png'})]}:null;}});
     $('edl').onclick=async()=>{

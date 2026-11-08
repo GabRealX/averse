@@ -40,7 +40,7 @@ function init(lazy){
   const rgba=a=>'rgba('+COL[0]+','+COL[1]+','+COL[2]+','+Math.min(1,a*AM)+')';
   window.rainSetColor=function(){COL=readColor();makeSprites();};
 
-  /* Sprite = une traînée verticale en dégradé (transparent en haut → couleur en bas), dessinée une seule fois.
+  /* Sprite = une traînée verticale en dégradé (transparent en haut -> couleur en bas), dessinée une seule fois.
      SPW de large, trait de 2 px au centre : on l'étire ensuite à la taille de chaque goutte. */
   const SPW=32,SPH=128;
   let sprNet,sprFar,sprBokeh;

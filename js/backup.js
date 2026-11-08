@@ -137,7 +137,7 @@ function apply(clean){
   return{notes,fav:clean.fav.length,fields,templates};
 }
 
-/* lire un fichier → vérifier → fusionner ; renvoie le compte rendu */
+/* lire un fichier -> vérifier -> fusionner ; renvoie le compte rendu */
 async function importFile(file){
   let d;
   try{d=JSON.parse(await(file.text?file.text():new Response(file).text()));}catch(e){toast('Fichier illisible (JSON invalide)');return{ok:false,error:'JSON invalide'};}

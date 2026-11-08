@@ -6,7 +6,7 @@
    - Cette clé n'est jamais envoyée en clair : elle est « emballée » dans des cases (slots) du coffre :
        · une case par APPAREIL : clé d'emballage = HKDF( mot de passe (PBKDF2-SHA256, 600 000 tours, sel aléatoire)
                                                          ‖ secret de la passkey de l'appareil (extension WebAuthn PRF) )
-         → il faut LES DEUX : le mot de passe ET la passkey (empreinte / visage / code PIN de CET appareil) ;
+         -> il faut LES DEUX : le mot de passe ET la passkey (empreinte / visage / code PIN de CET appareil) ;
        · une case SECOURS (facultative) : clé = HKDF(code de secours aléatoire de 160 bits) — ouvre le coffre à elle seule ;
        · une case d'APPAIRAGE temporaire (15 min) : clé = HKDF(mot de passe ‖ code d'appairage) ; elle transporte la DK et
          le jeton GitHub vers le nouvel appareil, qui s'ajoute alors sa propre case et efface celle-ci.
@@ -34,12 +34,12 @@ class VaultError extends Error{constructor(code,msg){super(msg);this.code=code;}
 const fail=(code,msg)=>{throw new VaultError(code,msg);};
 
 /* ---- briques ---- */
-async function pwBits(password,salt,iter){                 // mot de passe → 32 octets (lent exprès : ~0,3–1,5 s)
+async function pwBits(password,salt,iter){                 // mot de passe -> 32 octets (lent exprès : ~0,3–1,5 s)
   if(!password)fail('pw','mot de passe vide');
   const k=await C.importKey('raw',te.encode(String(password).normalize('NFC')),'PBKDF2',false,['deriveBits']);
   return new Uint8Array(await C.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:iter},k,256));
 }
-async function hkdfKey(ikm,salt,info){                     // secrets combinés → clé AES-GCM (non exportable)
+async function hkdfKey(ikm,salt,info){                     // secrets combinés -> clé AES-GCM (non exportable)
   const k=await C.importKey('raw',ikm,'HKDF',false,['deriveKey']);
   return C.deriveKey({name:'HKDF',hash:'SHA-256',salt,info:te.encode(info)},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
@@ -71,7 +71,7 @@ async function create(opts){
     slots:[],data:null,rev:0,updated:''};
   return{vault:v,dk:rnd(32)};
 }
-async function deviceWrapKey(v,pw,prf,salt){              // mot de passe ET passkey → clé d'emballage
+async function deviceWrapKey(v,pw,prf,salt){              // mot de passe ET passkey -> clé d'emballage
   const p=pw instanceof Uint8Array?pw:await pwBits(pw,unb64(v.kdf.salt),v.kdf.iter);
   if(!(prf instanceof Uint8Array)||prf.length<32)fail('prf','secret de passkey manquant');
   return hkdfKey(cat(p,prf),salt,'averse-wrap-v1');
@@ -83,7 +83,7 @@ async function addDevice(v,dk,pw,prf,info){
   const k=await deviceWrapKey(v,pw,prf,salt);Object.assign(s,await seal(k,dk,slotAad(v,s)));
   v.slots=v.slots.filter(x=>x.id!==s.id).concat(s);return s;
 }
-async function openDevice(v,slot,pw,prf){                  // → DK brute ; erreur 'pw' si mauvais mot de passe (ou passkey d'un autre coffre)
+async function openDevice(v,slot,pw,prf){                  // -> DK brute ; erreur 'pw' si mauvais mot de passe (ou passkey d'un autre coffre)
   const k=await deviceWrapKey(v,pw,prf,unb64(slot.salt));
   return open(k,slot,slotAad(v,slot),'pw');
 }
@@ -121,7 +121,7 @@ async function openPair(v,codeText,pw,now){
 function resetPassword(v,opts){v.kdf={alg:'PBKDF2-SHA256',iter:Math.max(MIN_ITER,(opts&&opts.iter)||ITER),salt:b64(rnd(16))};
   const gone=v.slots.filter(x=>x.type==='device'||x.type==='pair').length;v.slots=v.slots.filter(x=>x.type==='recovery');return gone;}
 
-/* données : {notes, deleted} ↔ boîte chiffrée (avec compression si possible) */
+/* données : {notes, deleted} <-> boîte chiffrée (avec compression si possible) */
 async function sealData(v,key,obj){
   let bytes=te.encode(JSON.stringify(obj)),z='';
   if(canZ){bytes=await gz(bytes,true);z='gzip';}

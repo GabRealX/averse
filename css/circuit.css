@@ -1,0 +1,19 @@
+/* circuit.css — v11 : les schémas de circuit (outil « Simulateur de circuit » + blocs ```circuit``` du carnet) */
+.circuit{margin:0 0 1.2em}
+.circuit-fig{overflow-x:auto;background:var(--tint);border:1px solid var(--line);padding:12px 10px}
+.circuit-svg{display:block;margin:0 auto;color:var(--fg);font-family:var(--mono)}
+.circuit-svg .w,.circuit-svg .sym{stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.circuit-svg .w{stroke-width:1.5}
+.circuit-svg .dot,.circuit-svg .ar{fill:currentColor;stroke:none}
+.circuit-svg .t{fill:currentColor;stroke:none;font-size:11px}
+.circuit-svg .t.m{opacity:.65;font-size:10px}
+.circuit-svg .t.b{font-weight:600}
+.circuit-svg .glow{stroke:none}
+.circuit-svg .fl{stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-dasharray:.1 14;opacity:.85;fill:none;animation:cflow 1.1s linear infinite}
+@keyframes cflow{to{stroke-dashoffset:-14}}
+@media (prefers-reduced-motion:reduce){.circuit-svg .fl{animation:none;opacity:0}}
+.circuit figcaption{font-size:.74rem;color:var(--fg-soft);margin-top:7px;line-height:1.5}
+.circuit-note{font-size:.74rem;padding:4px 9px;margin-top:5px;border-left:2px solid var(--fg-faint);color:var(--fg-soft)}
+.circuit-note.warn{border-left-color:#d9a441}.circuit-note.bad{border-left-color:var(--bad,#d05a5a);color:var(--fg)}
+.circuit-err{font-size:.78rem;padding:8px 10px;border:1px dashed var(--bad,#d05a5a);color:var(--fg);margin:0 0 .8em}
+@media print{.circuit-fig{background:none;border-color:#999}.circuit-svg{color:#000}.circuit-svg .fl{display:none}}

@@ -1,8 +1,8 @@
 /* app.js — l'accueil v2 : une grande barre de recherche, les favoris / récents, le collage malin,
    le glisser-déposer n'importe où, et le routage par adresse :
-     #/          → recherche (accueil)
-     #/autres    → les outils moins utilisés (réseau, électronique, texte & dates, mémo)
-     #/json …    → la page d'un outil (créée par NOXE.open, voir tools/base.js)
+     #/          -> recherche (accueil)
+     #/autres    -> les outils moins utilisés (réseau, électronique, texte & dates, mémo)
+     #/json …    -> la page d'un outil (créée par NOXE.open, voir tools/base.js)
    L'ancien lien index.html#outil=json marche encore. */
 (function(){
 const homeV=$('homeView'),othersV=$('othersView'),q=$('q'),resBox=$('results'),sugBox=$('suggest'),blocks=$('homeBlocks');
@@ -12,7 +12,7 @@ const toolOf=k=>NOXE.tools.find(t=>t.key===k);
 
 /* ---------- recherche « floue » ----------
    chaque mot tapé doit se retrouver quelque part (titre > mots-clés > description) ;
-   en dernier recours on accepte les lettres dans l'ordre (« jsn » → JSON, « qrc » → QR code) */
+   en dernier recours on accepte les lettres dans l'ordre (« jsn » -> JSON, « qrc » -> QR code) */
 const subseq=(w,s)=>{let i=0;for(const c of s)if(c===w[i])i++;return i===w.length;};
 const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function score(qn,t){
@@ -48,7 +48,7 @@ const runCmd=id=>{const c=CMDS.find(x=>x.id===id);if(c&&c.run){c.run();return;}
   if(id==='feedback'&&typeof FEEDBACK!=='undefined')FEEDBACK.open();else if((id==='accent'||id==='theme')&&typeof ACCENT!=='undefined')ACCENT.picker();};
 let totals={tool:0,note:0,memo:0};
 /* v8 : options placées EN TÊTE des résultats par d'autres fichiers (ai-bar.js : « Demander à l'IA »).
-   NOXE.searchLead(texte, forcé) → [{type:'ai', title, hint, run}] ; elles ne prennent la sélection que si on les force
+   NOXE.searchLead(texte, forcé) -> [{type:'ai', title, hint, run}] ; elles ne prennent la sélection que si on les force
    (préfixe « ? », Tab, bouton) ou s'il n'y a rien d'autre : Entrée garde son sens habituel. */
 let forceLead=false;
 NOXE.forceLead=()=>{if(!q.value.trim())return false;forceLead=true;sel=0;drawResults();return true;};
@@ -69,20 +69,20 @@ NOXE.searchTotals=()=>totals;
 const card=t=>{
   const f=NOXE.isFav(t.key);
   return'<div class="card"><a class="tool" href="#/'+t.key+'"><h3>'+esc(t.title)+'</h3><p>'+esc(t.desc)+'</p></a>'+
-    '<button class="star'+(f?' on':'')+'" data-star="'+t.key+'" aria-pressed="'+f+'" title="'+(f?'Retirer des favoris':'Ajouter aux favoris')+'">'+(f?'★':'☆')+'</button></div>';
+    '<button class="star'+(f?' on':'')+'" data-star="'+t.key+'" aria-pressed="'+f+'" title="'+(f?'Retirer des favoris':'Ajouter aux favoris')+'">'+(f?'*':'+')+'</button></div>';
 };
 const group=(title,list,extra)=>list.length||extra?'<div class="tool-group"><div class="tool-category">'+esc(title)+'</div><div class="tools">'+list.map(card).join('')+(extra||'')+'</div></div>':'';
 function renderHome(){
   const favs=NOXE.favs().map(toolOf).filter(Boolean),rec=NOXE.recents().map(toolOf).filter(t=>t&&!NOXE.isFav(t.key)).slice(0,4);
-  let html=group('★ Favoris',favs)+group('Récents',rec);
-  if(!favs.length)html+='<p class="hint-line">Astuce : clique ☆ sur un outil pour l\'épingler ici.</p>';
+  let html=group('* Favoris',favs)+group('Récents',rec);
+  if(!favs.length)html+='<p class="hint-line">Astuce : clique + sur un outil pour l\'épingler ici.</p>';
   NOXE.main.forEach(c=>{
     const extra=c==='notes'?'<div class="card"><a class="tool" href="notes.html"><h3>Carnet complet</h3><p>Toutes tes notes, liens [[entre notes]], graphe, export.</p></a></div>'+
       '<div class="card"><button class="tool" type="button" data-panel><h3>Panneau Ctrl+J</h3><p>Les notes à portée de main, depuis n\'importe quel outil.</p></button></div>':'';
     html+=group(catName(c),NOXE.tools.filter(t=>t.cat===c),extra);
   });
   const n=NOXE.tools.filter(t=>!NOXE.main.includes(t.cat)).length;
-  html+='<a class="more-link" href="#/autres">Autres outils ('+n+') : réseau, électronique, texte &amp; dates, mémo →</a>';
+  html+='<a class="more-link" href="#/autres">Autres outils ('+n+') : réseau, électronique, texte &amp; dates, mémo -></a>';
   blocks.innerHTML=html;
 }
 function renderOthers(){
@@ -91,7 +91,7 @@ function renderOthers(){
 document.addEventListener('click',e=>{
   const st=e.target.closest('[data-star]');
   if(st){e.preventDefault();const on=NOXE.toggleFav(st.dataset.star);toast(on?'Ajouté aux favoris':'Retiré des favoris');
-    if(!homeV.hidden&&!q.value)renderHome();else{st.classList.toggle('on',on);st.textContent=on?'★':'☆';st.setAttribute('aria-pressed',on);}
+    if(!homeV.hidden&&!q.value)renderHome();else{st.classList.toggle('on',on);st.textContent=on?'*':'+';st.setAttribute('aria-pressed',on);}
     if(!othersV.hidden)renderOthers();return;}
   if(e.target.closest('[data-panel]')&&window.notePanel)notePanel.open();
 });
@@ -155,12 +155,12 @@ function suggest(title,list){
   pending=list;
   sugBox.innerHTML='<div class="sug-title">'+esc(title)+'</div><div class="sug-list">'+
     list.map((s,i)=>'<button class="btn'+(i?' ghost':' primary')+'" data-sug="'+i+'">'+esc(s.label)+'</button>').join('')+
-    '<button class="btn ghost" data-sug="x" aria-label="Ignorer">✕</button></div><div class="sug-hint">Entrée = '+esc(list[0].label)+'</div>';
+    '<button class="btn ghost" data-sug="x" aria-label="Ignorer">x</button></div><div class="sug-hint">Entrée = '+esc(list[0].label)+'</div>';
   sugBox.hidden=false;if(NOXE.homeOpen)NOXE.homeOpen();   // v9 : la barre s'ouvre sous le Glyph
 }
 function useSuggest(i){
   const s=pending[i];if(!s)return;clearSuggest();
-  if(s.run){s.run();return;}                                 // v9 : choix qui n'est pas un outil (Photo → note)
+  if(s.run){s.run();return;}                                 // v9 : choix qui n'est pas un outil (Photo -> note)
   NOXE.open(s.key,s.files?{files:s.files}:{tab:s.tab,text:s.text,input:s.input});
 }
 sugBox.addEventListener('click',e=>{const b=e.target.closest('[data-sug]');if(!b)return;if(b.dataset.sug==='x'){clearSuggest();q.focus();}else useSuggest(+b.dataset.sug);});
@@ -172,7 +172,7 @@ NOXE.fileChoices=files=>{
     const l=[{key:'optimiser',label:'Optimiser'},{key:'convertir',label:'Convertir (PNG / JPG / WEBP)'}];
     if(files.length===1)l.push({key:'editeur',label:'Éditer (recadrer, retoucher…)'},{key:'ocr',label:'Lire le texte (OCR)'});
     l.push({key:'pdf',label:'Mettre en PDF'});
-    if(files.length===1&&window.PHOTO)l.push({key:'photo',label:'Photo → note (lire le texte)',run:()=>PHOTO.open(files[0])});
+    if(files.length===1&&window.PHOTO)l.push({key:'photo',label:'Photo -> note (lire le texte)',run:()=>PHOTO.open(files[0])});
     return l;
   }
   return[{key:'encodage',label:'Calculer le hash'},{key:'base64',label:'Convertir en Base64'}];
@@ -193,7 +193,7 @@ document.addEventListener('paste',e=>{
   const text=cd.getData('text/plain'),found=NOXE.detect(text);
   if(!found.length)return;                                  // rien de reconnu : le texte se colle dans la recherche
   e.preventDefault();
-  const kind=found[0].label.split(' →')[0];
+  const kind=found[0].label.split(' ->')[0];
   suggest('Collé : '+kind+' ('+text.trim().length+' caractères)',found);
 });
 /* glisser-déposer n'importe où sur la page (les zones de dépôt des outils passent en premier) */
@@ -215,8 +215,8 @@ addEventListener('drop',e=>{
 });
 
 /* ---------- « Ouvrir avec AVERSE » : fichiers et partages venus du système (v3) ----------
-   Chaque entrée va vers le bon outil : PDF → outils PDF, JSON → JSON, texte → l'outil qui le reconnaît
-   (sinon le carnet), images → la barre de choix (Entrée = Optimiser), le reste → hash / Base64. */
+   Chaque entrée va vers le bon outil : PDF -> outils PDF, JSON -> JSON, texte -> l'outil qui le reconnaît
+   (sinon le carnet), images -> la barre de choix (Entrée = Optimiser), le reste -> hash / Base64. */
 const readText=f=>f.text?f.text():new Response(f).text();
 NOXE.routeText=(text,title)=>{
   const t=String(text||'').trim();if(!t)return null;
@@ -264,7 +264,7 @@ NOXE.takeShare=async()=>{
   return NOXE.routeText(link||[meta.text,meta.url].filter(Boolean).join('\n')||meta.title,meta.title);
 };
 const params=new URLSearchParams(location.search);
-/* envoyé depuis une autre page (clic droit dans le carnet → « Envoyer vers… ») */
+/* envoyé depuis une autre page (clic droit dans le carnet -> « Envoyer vers… ») */
 try{
   const s=JSON.parse(sessionStorage.getItem('averse-send')||'null');sessionStorage.removeItem('averse-send');
   if(s&&typeof s.text==='string'&&s.key&&toolOf(s.key))setTimeout(()=>NOXE.sendTo(s.key,{text:s.text}),0);

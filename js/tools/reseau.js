@@ -10,7 +10,7 @@ const ip2n=s=>{
 };
 const n2ip=n=>[n>>>24,(n>>>16)&255,(n>>>8)&255,n&255].join('.');
 const maskOf=p=>p===0?0:(0xFFFFFFFF<<(32-p))>>>0;
-function prefixOfMask(n){                         // masque pointé → nombre de bits à 1, ou -1 si le masque n'est pas valide
+function prefixOfMask(n){                         // masque pointé -> nombre de bits à 1, ou -1 si le masque n'est pas valide
   let p=0;while(p<32&&(n&(0x80000000>>>p)))p++;
   return maskOf(p)===n?p:-1;
 }
@@ -126,7 +126,7 @@ register({
             if(pfx>30){o.innerHTML='<div class="info bad">Trop de sous-réseaux pour ce réseau (il faut garder au moins 4 adresses par sous-réseau).</div>';return;}
             const size=Math.pow(2,32-pfx),rows=[];
             for(let i=0;i<Math.min(n,256);i++)rows.push(row('Sous-réseau '+(i+1),base.net+i*size,pfx));
-            o.innerHTML=table(rows)+'<div class="info">'+n+' sous-réseaux en <b>/'+pfx+'</b> → '+(size-2)+' hôtes chacun'+(n<Math.pow(2,bits)?' ('+(Math.pow(2,bits)-n)+' sous-réseaux /'+pfx+' restent libres)':'')+(n>256?' — 256 premières lignes affichées':'')+'.</div>';
+            o.innerHTML=table(rows)+'<div class="info">'+n+' sous-réseaux en <b>/'+pfx+'</b> -> '+(size-2)+' hôtes chacun'+(n<Math.pow(2,bits)?' ('+(Math.pow(2,bits)-n)+' sous-réseaux /'+pfx+' restent libres)':'')+(n>256?' — 256 premières lignes affichées':'')+'.</div>';
           }
         }
         seg('smode',v=>{
@@ -186,12 +186,12 @@ register({
         });
         $('b_dec').value='202';$('b_dec').oninput();
       }],
-      ['txt','Texte ↔ octets',host=>{
+      ['txt','Texte <-> octets',host=>{
         const te=new TextEncoder(),td=new TextDecoder('utf-8',{fatal:true});
         let fmt='hex';
         host.innerHTML=
-          '<div class="field"><label>Texte → octets (UTF-8)</label><textarea id="t_in" style="min-height:70px" spellcheck="false">Bonjour é</textarea></div><div id="t_out"></div>'+
-          '<div class="field" style="margin-top:26px"><label>Octets → texte</label>'+
+          '<div class="field"><label>Texte -> octets (UTF-8)</label><textarea id="t_in" style="min-height:70px" spellcheck="false">Bonjour é</textarea></div><div id="t_out"></div>'+
+          '<div class="field" style="margin-top:26px"><label>Octets -> texte</label>'+
           '<div class="segmented" id="t_fmt" style="margin-bottom:8px"><button data-v="hex" class="active">Hexadécimal</button><button data-v="bin">Binaire</button><button data-v="dec">Décimal</button></div>'+
           '<textarea id="t_rev" style="min-height:70px" spellcheck="false" placeholder="ex : 42 6F 6E 6A 6F 75 72"></textarea></div><div id="t_res"></div>';
         function fwd(){

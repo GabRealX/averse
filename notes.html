@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="css/notes.css">
 <link rel="stylesheet" href="css/ui.css">
 <link rel="stylesheet" href="css/ai.css">
+<link rel="stylesheet" href="css/circuit.css">
 <link rel="stylesheet" href="css/ascii.css">
 <script src="js/core.js"></script>
 <script src="js/wco.js"></script>
@@ -30,24 +31,24 @@
 
 <div class="bar">
   <div class="bar-left">
-    <button class="ico-btn menu-btn" id="menuBtn" aria-label="Notes">☰</button>
+    <button class="ico-btn menu-btn" id="menuBtn" aria-label="Notes">menu</button>
     <div class="logo">AVERSE <b>/ CARNET</b></div>
-    <a class="back" href="index.html">← accueil</a>
+    <a class="back" href="index.html"><- accueil</a>
   </div>
   <div class="bar-right">
     <div class="seg">
       <button class="active" data-v="editor">Éditeur</button>
       <button data-v="graph">Graphe</button>
     </div>
-    <button class="ico-btn" id="aiBtn" title="Assistant IA : résumé, flashcards, demander à mes notes… (désactivé tant que tu ne le configures pas)">IA ✦</button>
+    <button class="ico-btn" id="aiBtn" title="Assistant IA : résumé, flashcards, demander à mes notes… (désactivé tant que tu ne le configures pas)">IA *</button>
     <span class="sync-state" id="syncState" role="status" aria-live="polite" hidden></span>
     <button class="ico-btn" id="cloudBtn" title="Synchro chiffrée entre tes appareils (PC + téléphone) via un Gist GitHub secret">Synchro</button>
     <span class="sync-state" id="cloudState" role="status" aria-live="polite" hidden></span>
     <button class="ico-btn install-btn" data-install hidden>Installer</button>
-    <!-- v9 : actions secondaires regroupées dans « ⋯ » sur ordinateur (la barre tient à toutes les largeurs, même en appli
+    <!-- v9 : actions secondaires regroupées dans « ... » sur ordinateur (la barre tient à toutes les largeurs, même en appli
          installée sous les boutons de fenêtre). Sur mobile, le menu s'efface et ses boutons défilent avec les autres. -->
     <div class="more" id="barMore">
-      <button class="ico-btn more-btn" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="Plus d'actions : fichier, export, sauvegarde, apparence…">⋯</button>
+      <button class="ico-btn more-btn" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="Plus d'actions : fichier, export, sauvegarde, apparence…">...</button>
       <div class="more-menu" id="moreMenu" role="menu" aria-label="Plus d'actions">
         <button class="ico-btn" id="fileBtn" role="menuitem" title="Synchro : lie le carnet à un fichier (ex. dans ton dossier OneDrive / Google Drive)">Fichier</button>
         <button class="ico-btn" id="exportBtn" role="menuitem">Export</button>
@@ -63,8 +64,8 @@
     <input type="file" id="bakFile" accept=".json,application/json" style="display:none">
   </div>
   <!-- v5 : sur mobile, la barre de boutons défile au doigt : flèches + fondus aux bords + petite barre de position -->
-  <button class="bar-arrow l" id="barL" aria-label="Boutons précédents" hidden>‹</button>
-  <button class="bar-arrow r" id="barR" aria-label="Boutons suivants" hidden>›</button>
+  <button class="bar-arrow l" id="barL" aria-label="Boutons précédents" hidden><</button>
+  <button class="bar-arrow r" id="barR" aria-label="Boutons suivants" hidden>></button>
   <div class="bar-nav" id="barNav" hidden><span id="barThumb"></span></div>
 </div>
 
@@ -73,7 +74,7 @@
   <aside class="side" id="side">
     <div class="side-top">
       <input class="search" id="search" placeholder="Rechercher…">
-      <div class="new-row"><button class="btn primary" id="newBtn">+ Nouvelle note</button><button class="btn ph-btn" id="photoBtn" type="button" title="Photo → note : prendre une photo ou choisir une image, le texte est lu sur ton appareil" aria-label="Photo vers note">📷</button></div>
+      <div class="new-row"><button class="btn primary" id="newBtn">+ Nouvelle note</button><button class="btn ph-btn" id="photoBtn" type="button" title="Photo -> note : prendre une photo ou choisir une image, le texte est lu sur ton appareil" aria-label="Photo vers note">photo</button></div>
       <select class="tpl" id="tplSel" aria-label="Modèle de note"><option value="">Note vide</option><option value="tp">Modèle : compte-rendu de TP</option><option value="cours">Modèle : fiche de cours</option><option value="stage">Modèle : journal de stage</option><option value="adressage">Modèle : plan d'adressage</option><option value="incident">Modèle : dépannage</option><option value="taches">Modèle : liste de tâches</option></select>
       <div class="tagbar" id="tagbar"></div>
     </div>
@@ -95,7 +96,7 @@
           <span>Tags</span>
           <input class="tags-in" id="tagsIn" placeholder="séparés par des virgules">
           <button class="del" id="mdBtn" style="margin-left:auto">Exporter .md</button>
-          <button class="del" id="pdfBtn" style="margin-left:0" title="Vue d'impression propre → « Enregistrer au format PDF »">PDF</button>
+          <button class="del" id="pdfBtn" style="margin-left:0" title="Vue d'impression propre -> « Enregistrer au format PDF »">PDF</button>
           <button class="del" id="shareBtn" style="margin-left:0" title="Partager cette note : lien chiffré, fichier, ou partage du téléphone">Partager</button>
           <button class="del" id="tplSaveBtn" style="margin-left:0" title="Enregistrer comme modèle (réutilisable pour tes prochaines notes)">Modèle</button>
           <button class="del" id="delBtn" style="margin-left:0">Supprimer</button>
@@ -143,6 +144,7 @@
 <script src="js/eggs.js"></script>
 <script src="js/rain.js"></script>
 <script src="js/notes-graph.js"></script>
+<script src="js/circuit-core.js"></script>
 <script src="js/md.js"></script>
 <script src="js/attach.js"></script>
 <script src="js/notes.js"></script>

@@ -1,7 +1,7 @@
 /* notes-graph.js — le GRAPHE du carnet (v5 : sorti de notes.js et enrichi)
    - simulation « force-directed » : répulsion entre nœuds proches (grille de REP px, ~O(n)), ressorts sur les liens ;
      elle S'ARRÊTE quand c'est stable (plus aucun calcul), et repart si on glisse un nœud ou si les notes changent ;
-   - GROUPES : par tag (automatique) ou manuels (clic droit sur un nœud → Groupe), chacun avec sa forme
+   - GROUPES : par tag (automatique) ou manuels (clic droit sur un nœud -> Groupe), chacun avec sa forme
      (cercle, carré, triangle, losange, étoile) et sa couleur ; légende avec cases pour masquer / afficher ;
    - filtre par tag ; étiquettes seulement au survol / au zoom quand il y a beaucoup de nœuds ;
    - zoom : molette, boutons + / −, pincement à deux doigts sur mobile ; déplacement de la vue au doigt / à la souris ;
@@ -13,7 +13,7 @@ const G={canvas:null,ctx:null,nodes:[],edges:[],raf:0,alpha:0,dpr:1,scale:1,runn
   drag:null,down:null,hover:null,focus:null,panStart:null,off:{x:0,y:0},ptrs:new Map(),pinch:null,labels:0,keep:{}};
 const REP=300;                                              // au-delà, la répulsion (2600/d²) est négligeable
 const nodeSize=n=>10+Math.min(16,n.deg*3);
-const SHAPES={cercle:'circle',carré:'square',triangle:'triangle',losange:'diamond',étoile:'star'};   // libellé → code
+const SHAPES={cercle:'circle',carré:'square',triangle:'triangle',losange:'diamond',étoile:'star'};   // libellé -> code
 const SHAPE_KEYS=Object.values(SHAPES);
 const PALETTE=['#c7bce4','#7fd6c2','#f2b880','#f28b9b','#9ec3ff','#e6e07a','#b8f28b','#d79cf2'];
 const GKEY='averse-graph',LABEL_ZOOM=1.1,LABEL_MAX=120,FEW=40;
@@ -229,7 +229,7 @@ function renderFocus(){
 
 /* ===== LÉGENDE, FILTRE, ÉTIQUETTES ===== */
 function swatch(st,s){                                      // petite forme SVG (légende, carte de focus)
-  st={shape:st.shape,color:colOf(st.color)};                // v6 : « couleur du site » → l'accent actuel
+  st={shape:st.shape,color:colOf(st.color)};                // v6 : « couleur du site » -> l'accent actuel
   const r=s/2-1.5,c=s/2,p=[];
   if(st.shape==='circle')return'<svg width="'+s+'" height="'+s+'" aria-hidden="true"><circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="'+st.color+'"/></svg>';
   if(st.shape==='square')return'<svg width="'+s+'" height="'+s+'" aria-hidden="true"><rect x="2" y="2" width="'+(s-4)+'" height="'+(s-4)+'" fill="'+st.color+'"/></svg>';
@@ -249,10 +249,10 @@ function renderLegend(){
     '<button class="gl-name" data-gedit="'+i+'" title="Forme, couleur, nom">'+swatch(st,14)+'<span>'+esc(name)+'</span></button>'+
     '<span class="gl-n">'+(c[i]||0)+'</span></div>';
   L.classList.toggle('closed',!GS.legend);
-  L.innerHTML='<button class="gl-head" data-gl="toggle" aria-expanded="'+GS.legend+'">Groupes '+(GS.legend?'▾':'▸')+'</button>'+
+  L.innerHTML='<button class="gl-head" data-gl="toggle" aria-expanded="'+GS.legend+'">Groupes '+(GS.legend?'▾':'>')+'</button>'+
     (GS.legend?'<div class="gl-body">'+GS.groups.map((g,i)=>row(i,g,g.name)).join('')+row(-1,GS.other,'Sans groupe')+
     '<div class="gl-acts"><button class="ico-btn" data-gl="tags" title="Un groupe par tag fréquent">+ par tag</button>'+
-    '<button class="ico-btn" data-gl="new" title="Groupe manuel : clic droit sur un nœud → Groupe">+ groupe</button></div></div>':'');
+    '<button class="ico-btn" data-gl="new" title="Groupe manuel : clic droit sur un nœud -> Groupe">+ groupe</button></div></div>':'');
   const sel=$('graphTag');
   if(sel){const t=allTags(),keys=Object.keys(t).sort();
     sel.innerHTML='<option value="">tous les tags</option>'+keys.map(k=>'<option value="'+esc(k)+'"'+(k===GS.tag?' selected':'')+'>#'+esc(k)+' ('+t[k]+')</option>').join('')+
@@ -270,14 +270,14 @@ function editGroup(i){
     '<label class="ge-l">Nom <input id="geName" maxlength="40" value="'+esc(g.name)+'"></label>'+
     (g.kind==='tag'?'<label class="ge-l">Tag <select id="geTag">'+tags.map(t=>'<option'+(t===g.tag?' selected':'')+'>'+esc(t)+'</option>').join('')+
       (tags.includes(g.tag)?'':'<option selected>'+esc(g.tag)+'</option>')+'</select></label>':
-      '<p class="ge-p">'+g.ids.length+' note(s). Ajouter / retirer : clic droit sur un nœud → « Groupe ».</p>'+
+      '<p class="ge-p">'+g.ids.length+' note(s). Ajouter / retirer : clic droit sur un nœud -> « Groupe ».</p>'+
       '<button class="ico-btn" data-ge="addvis" title="Toutes les notes affichées (filtre de tag actuel)">+ notes affichées</button>'))+
     '<div class="ge-l">Forme <span class="ge-shapes">'+Object.entries(SHAPES).map(([lab,k])=>
       '<button data-shape="'+k+'" class="'+(g.shape===k?'on':'')+'" title="'+lab+'" aria-label="'+lab+'">'+swatch({shape:k,color:g.color},16)+'</button>').join('')+'</span></div>'+
     '<div class="ge-l">Couleur <span class="ge-cols">'+PALETTE.map((c,k)=>'<button data-col="'+c+'" class="'+(g.color===c?'on':'')+'" style="background:'+colOf(c)+'" aria-label="'+(k?c:'couleur du site')+'"'+(k?'':' title="Couleur d\'accent du site (suit le réglage « couleur »)"')+'></button>').join('')+
       '<input type="color" id="geCol" value="'+colOf(g.color)+'" aria-label="Autre couleur"></span></div>'+
-    (i<0?'':'<div class="ge-acts"><button class="ico-btn" data-ge="up" title="Priorité plus haute (une note dans 2 groupes prend le premier)">↑</button>'+
-      '<button class="ico-btn" data-ge="down">↓</button><button class="ico-btn danger" data-ge="del">Supprimer le groupe</button></div>');
+    (i<0?'':'<div class="ge-acts"><button class="ico-btn" data-ge="up" title="Priorité plus haute (une note dans 2 groupes prend le premier)">^</button>'+
+      '<button class="ico-btn" data-ge="down">v</button><button class="ico-btn danger" data-ge="del">Supprimer le groupe</button></div>');
 }
 function groupChanged(){saveGS();regraph();const b=$('graphEdit');if(b&&!b.hidden)editGroup(+b.dataset.g);if(view!=='graph')renderLegend();}
 function newManualGroup(name,ids){
@@ -289,7 +289,7 @@ function toggleInGroup(i,id){const g=GS.groups[i];if(!g||g.kind!=='manual')retur
   const p=g.ids.indexOf(id);if(p<0)g.ids.push(id);else g.ids.splice(p,1);groupChanged();}
 /* éléments du clic droit sur un nœud : « Groupe » (sous-menu) */
 function graphGroupItems(id){
-  return{label:'Groupe…',sub:()=>GS.groups.map((g,i)=>g.kind==='manual'?{label:(g.ids.includes(id)?'✓ ':'')+g.name,run:()=>toggleInGroup(i,id)}:null).filter(Boolean)
+  return{label:'Groupe…',sub:()=>GS.groups.map((g,i)=>g.kind==='manual'?{label:(g.ids.includes(id)?'[ok] ':'')+g.name,run:()=>toggleInGroup(i,id)}:null).filter(Boolean)
     .concat([{label:'Nouveau groupe avec cette note…',run:async()=>{const v=await CTX.ask('Nom du groupe','','Créer');if(v){newManualGroup(v,[id]);groupChanged();editGroup(0);}}}])};
 }
 

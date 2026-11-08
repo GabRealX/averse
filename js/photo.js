@@ -1,9 +1,9 @@
-/* photo.js — v9 : « Photo → note ». Prendre une photo (appareil photo du téléphone) ou choisir une image,
+/* photo.js — v9 : « Photo -> note ». Prendre une photo (appareil photo du téléphone) ou choisir une image,
    lire le texte SUR L'APPAREIL (Tesseract.js, déjà fourni pour l'outil OCR, français + anglais), et en faire une note.
    · « Mettre au propre avec l'IA » (facultatif) : ta clé, ton fournisseur, avec l'aperçu habituel de ce qui part
      (ai.js) — rien n'est envoyé sans ce clic, et seulement le TEXTE lu (jamais l'image).
    · « Garder la photo en pièce jointe » : l'image est jointe à la note (attach.js : chiffrée pour la synchro).
-   Pages : carnet (bouton, clic droit) et accueil (bouton 📷 de la barre). */
+   Pages : carnet (bouton, clic droit) et accueil (bouton photo de la barre). */
 (function(){
 const DIR='js/vendor/tesseract/';
 const abs=p=>new URL(DIR+p,location.href).href;
@@ -54,10 +54,10 @@ function open(file){
   close();prevFocus=document.activeElement;
   ov=document.createElement('div');ov.className='ctx-ov';ov.id='photoDlg';
   ov.innerHTML='<div class="ctx-dlg ph-dlg" role="dialog" aria-modal="true" aria-labelledby="phT">'+
-    '<div class="ph-head"><span class="ph-gl"></span><div><div class="ctx-dt" id="phT">Photo → note</div>'+
+    '<div class="ph-head"><span class="ph-gl"></span><div><div class="ctx-dt" id="phT">Photo -> note</div>'+
     '<div class="ph-sub">Lecture du texte sur ton appareil (français + anglais). Rien n\'est envoyé.</div></div></div>'+
     '<div class="ph-pick" id="phPick">'+
-      '<button type="button" class="tpl-b primary" data-ph="cam">📷 Prendre une photo</button>'+
+      '<button type="button" class="tpl-b primary" data-ph="cam">photo Prendre une photo</button>'+
       '<button type="button" class="tpl-b" data-ph="file">Choisir une image</button>'+
       '<div class="ph-hint">ou glisse-dépose / colle (Ctrl+V) une image ici</div></div>'+
     '<div class="ph-work" id="phWork" hidden><img class="ph-img" id="phImg" alt="photo à lire">'+
@@ -115,19 +115,19 @@ function open(file){
   if(file)take(file);else q('[data-ph="cam"]').focus({preventScroll:true});
   return ov;
 }
-/* clic droit : sur une image (déjà gérée par ctxmenu : « Envoyer vers… ») → aussi « Photo → note » ;
-   sur le fond de la liste du carnet → « Photo → note… » */
+/* clic droit : sur une image (déjà gérée par ctxmenu : « Envoyer vers… ») -> aussi « Photo -> note » ;
+   sur le fond de la liste du carnet -> « Photo -> note… » */
 if(typeof CTX!=='undefined'){
   CTX.add(t=>{
     if(!t.closest('#list, #side .side-foot, #blank'))return null;
     if(t.closest('#list [data-id]'))return null;               // une note : son propre menu
-    return{items:[{label:'📷 Photo → note…',run:()=>open()}],title:'Carnet'};
+    return{items:[{label:'photo Photo -> note…',run:()=>open()}],title:'Carnet'};
   },3);
 }
 /* boutons : carnet (#photoBtn) et accueil (#qPhoto) */
 ['photoBtn','qPhoto'].forEach(k=>{const b=document.getElementById(k);if(b){b.hidden=false;b.addEventListener('click',()=>open());}});
 if(/^#photo$/.test(location.hash)&&document.getElementById('photoBtn'))setTimeout(()=>open(),300);
-/* v10 : lire une image sans la fenêtre (partage → note : bouton « Lire le texte ») */
+/* v10 : lire une image sans la fenêtre (partage -> note : bouton « Lire le texte ») */
 const read=async(f,prog)=>tidy(await OCR(f,(l,p,pp)=>{if(prog)prog(l,p!=null?p:pp);}));
 window.PHOTO={open,close,makeNote,titleOf,read,setEngine:f=>{OCR=f;},stop:()=>{if(worker){worker.terminate().catch(()=>{});worker=null;}}};
 })();

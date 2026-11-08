@@ -1,5 +1,5 @@
 /* notes-share.js — v10 : « Partager vers AVERSE » crée une NOTE.
-   Android (Chrome, appli installée) : menu Partager d'une autre appli → AVERSE. sw.js reçoit le POST (manifest
+   Android (Chrome, appli installée) : menu Partager d'une autre appli -> AVERSE. sw.js reçoit le POST (manifest
    « share_target »), range titre / texte / lien / fichiers dans le cache « averse-share » et ouvre notes.html?share=1.
    Ici, on en fait une note (tag « partage ») :
    - un LIEN : le titre de la page s'il a été fourni AVEC le partage (Chrome l'envoie), sinon l'adresse elle-même.
@@ -13,7 +13,7 @@
 const MAXT=100000;
 const isUrl=s=>/^https?:\/\/[^\s]+$/i.test(String(s||'').trim());
 const firstUrl=s=>(String(s||'').match(/https?:\/\/[^\s<>"]+/i)||[''])[0];
-/* calcul pur (testé) : meta {title,text,url} + fichiers texte déjà lus → {title, body} */
+/* calcul pur (testé) : meta {title,text,url} + fichiers texte déjà lus -> {title, body} */
 function compose(meta,texts){
   meta=meta||{};const title0=String(meta.title||'').trim().slice(0,200),text=String(meta.text||'').trim().slice(0,MAXT);
   const link=String(meta.url||'').trim()||(isUrl(text)?text:firstUrl(text));
@@ -52,7 +52,7 @@ async function take(){
   for(const f of att){
     if(!window.ATT){bad.push(f.name);continue;}
     try{const m=await ATT.add(id,f);if(/^image\//.test(m.type))imgs.push({m,f});
-      notesApi.update(id,x=>{x.body=(x.body?x.body+'\n\n':'')+(/^image\//.test(m.type)?'!['+m.name.replace(/[\[\]()]/g,'')+'](att:'+m.id+')':'📎 '+m.name+' (pièce jointe)');});}
+      notesApi.update(id,x=>{x.body=(x.body?x.body+'\n\n':'')+(/^image\//.test(m.type)?'!['+m.name.replace(/[\[\]()]/g,'')+'](att:'+m.id+')':'[pj] '+m.name+' (pièce jointe)');});}
     catch(e){bad.push((f.name||'fichier')+' : '+(e&&e.message||e));}
   }
   notesApi.open(id);
@@ -68,7 +68,7 @@ function banner(id,imgs,bad){
   b.innerHTML='<span>Partage reçu : nouvelle note'+(imgs.length?' · '+imgs.length+' image'+(imgs.length>1?'s':'')+' jointe'+(imgs.length>1?'s':''):'')+'.</span>'+
     (bad.length?'<span class="bad">Non joint : '+esc(bad.join(' · '))+'</span>':'')+
     (imgs.length&&window.PHOTO&&PHOTO.read?'<button type="button" class="ico-btn" data-sh="ocr">Lire le texte de '+(imgs.length>1?'ces images':'l\'image')+' (OCR, sur l\'appareil)</button>':'')+
-    '<button type="button" class="ico-btn" data-sh="x" aria-label="Fermer">✕</button>';
+    '<button type="button" class="ico-btn" data-sh="x" aria-label="Fermer">x</button>';
   host.parentNode.insertBefore(b,host);
   b.addEventListener('click',async e=>{const k=e.target.closest('[data-sh]');if(!k)return;
     if(k.dataset.sh==='x'){b.remove();return;}

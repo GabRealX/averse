@@ -19,6 +19,22 @@ Il faut un petit serveur local (service worker, Worker et crypto ne marchent pas
 - **Autres outils** (`#/autres`) : réseau, électronique, texte & dates, aide-mémoire. Moins utilisés, mais toujours trouvables par la recherche.
 - **Pluie** : désactivée par défaut, lien « pluie : off/on » en bas de page. **Style ASCII** : lien « style » en bas (ou `?style=ascii`).
 
+## Nouveautés v11
+- **Simulateur de circuit** (Électronique) : écris un montage avec `+` (série), `|` (parallèle) et des parenthèses, avec de **vrais composants** : un nombre = résistance (`330`, `4k7`), `led` / `led:vert`, `d` (diode), `c:100n` (condensateur), `l:10m` (bobine), `sw` / `sw:off` (interrupteur), `lamp:47` (lampe). Schéma dessiné avec les symboles (la LED s'allume à sa couleur, les électrons défilent), tension / courant / puissance de **chaque** composant (LED et diodes = tension de seuil), alertes (LED qui grille, résistance trop chargée, circuit ouvert) et résistance conseillée pour une LED. Palette de boutons et 9 exemples.
+- **Les schémas dans le carnet** : un bloc ```` ```circuit ```` dans une note devient un vrai schéma dans l'aperçu (et dans les notes partagées / le PDF) :
+  ```
+  titre: LED en sécurité
+  V = 5
+  330 + led:rouge + sw
+  ```
+  Le menu **+ Circuit** (sous la note, à côté de « Dessin ») en insère un ; le bouton « Mettre le schéma dans le carnet » de l'outil aussi. Fichiers : `js/circuit-core.js` (calcul + dessin, sans dépendance, partagé par l'outil et le carnet), `js/tools/circuit.js` (l'outil), `css/circuit.css`.
+- **ESP32** (Électronique) : brochage filtrable (GPIO à éviter, ADC, I2C/SPI/UART, broches de démarrage), budget de courant + chaleur du régulateur, **autonomie sur batterie** avec veille, diviseur 5 V -> 3,3 V (3 couples E24 proposés), résistance de LED, ADC (plages par atténuation) et PWM (LEDC). Fichier : `js/tools/esp32.js`. Les valeurs sont des ordres de grandeur : vérifie la datasheet de ta carte.
+- `electronique.js` expose `NOXE.si` (parseSI, fmtSI, e24) pour l'outil ESP32 ; il doit donc être chargé **après** lui. `circuit-core.js` doit être chargé **avant** `md.js` (déjà fait dans `index.html`, `notes.html`, `share.html`, `tests.html`, `sw.js`).
+- **Interface en ASCII** : les symboles décoratifs (flèches, étoiles, appareil photo, croix, etc.) sont remplacés par du texte ou de l'ASCII (`->`, `[x]`, `[ok]`, `*`, `photo`…). Restent les signes mathématiques (× ≈ ≥ − ±), les points médians et les lettres accentuées.
+- **Bug des notes N0, N1… (corrigé)** : quitter la page de tests dans le même onglet laissait le drapeau de test levé, la copie de tes vraies notes n'était jamais remise et les 500 notes de test du graphe restaient dans le carnet. Maintenant : quitter `tests.html` (ou ouvrir n'importe quelle autre page) remet tes données, par **fusion** (rien de ce que tu as écrit entre-temps n'est perdu), et le carnet supprime tout seul les notes de test restantes.
+- **Test corrigé** : « Avant de partir (v9) » échouait quand un test précédent laissait un fichier lié en erreur (le garde-fou de fermeture de `notes.js` se déclenchait à juste titre). Le test délie maintenant le fichier avant de commencer.
+- Cache hors ligne : `averse-v21`. Tests : 221.
+
 ## Nouveautés v10
 - **IA plus rapide.** Modèle Gemini par défaut : `gemini-3.5-flash-lite` avec réflexion minimale (choix du modèle dans Réglages IA). L'IA locale se pré-charge quand la page est au repos, le Worker reste ouvert, l'index des notes est gardé sur l'appareil (IndexedDB : seules les notes modifiées sont recalculées), la question est préparée **pendant que tu tapes** (en local, rien ne part), la réponse s'affiche dès le 1er mot. Une question libre ne déclenche pas de recherche dans les notes.
   - Mesuré (Chrome, vrai modèle e5, 42 notes, **Gemini simulé** : 1,8 s avant le 1er mot pour 2.5-flash sans réglage de réflexion, 0,45 s pour flash-lite / réflexion minimale ; 2 essais × 4 cas) : question → notes trouvées ≈ 0,8 s → ≈ 0,04 s ; « Envoyer » → 1er mot ≈ 1,9 s → ≈ 0,5 s ; réponse complète ≈ 2,5 s → ≈ 1,2 s ; question libre → 1er mot ≈ 1,9 s → ≈ 0,5 s. Le gain sur Gemini dépend du vrai réseau et du vrai modèle (non mesurés ici).

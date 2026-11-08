@@ -21,7 +21,7 @@ register({
     const imp=async f=>{
       const r=await BACKUP.importFile(f);
       if(!$('sv_res'))return;
-      $('sv_res').innerHTML=r.ok?'✓ <b>'+r.notes+'</b> note(s) fusionnée(s)'+(r.full?', <b>'+r.fav+'</b> favori(s), <b>'+r.fields+'</b> champ(s)':'')+
+      $('sv_res').innerHTML=r.ok?'[ok] <b>'+r.notes+'</b> note(s) fusionnée(s)'+(r.full?', <b>'+r.fav+'</b> favori(s), <b>'+r.fields+'</b> champ(s)':'')+
         (r.rejected?' · <span class="bad">'+r.rejected+' entrée(s) refusée(s)</span>':''):'<span class="bad">'+esc(r.error)+'</span>';
       $('sv_sum').innerHTML=sum();
     };

@@ -72,7 +72,7 @@ async function setKey(p,k){await ready;if(!PROV[p])return false;if(k&&!okKey(k))
   await storeKeys(false,nk,at);KEYS=nk;KAT=at;                 // en mémoire seulement une fois enregistrée (chiffrée)
   if(window.cloudLater)cloudLater();return true;}
 const hasKey=p=>!!KEYS[p||cfg.provider];
-/* pour la synchro (notes.js → notesApi.payload, puis chiffré par cloud.js) */
+/* pour la synchro (notes.js -> notesApi.payload, puis chiffré par cloud.js) */
 function syncPart(){if(!KAT)return null;const keys={};Object.keys(KEYS).sort().forEach(p=>{keys[p]=KEYS[p];});return{at:KAT,keys};}
 function syncReceive(r){if(!r||typeof r!=='object'||!(+r.at>KAT))return;
   const keys={};for(const p in PROV)if(r.keys&&okKey(r.keys[p]))keys[p]=r.keys[p];
@@ -81,7 +81,7 @@ function syncReceive(r){if(!r||typeof r!=='object'||!(+r.at>KAT))return;
 /* ---------- B) appel du fournisseur (streaming) ---------- */
 let armed=false;                     // mis à true UNIQUEMENT par un clic sur « Envoyer » (voir dialogue) ; consommé par send()
 const stats={calls:0};
-/* v10 : hors ligne → erreur claire (l'IA locale, elle, marche sans réseau) */
+/* v10 : hors ligne -> erreur claire (l'IA locale, elle, marche sans réseau) */
 class OfflineError extends Error{constructor(){super('hors ligne : l\'IA par clé a besoin du réseau');this.name='OfflineError';}}
 const online=()=>navigator.onLine!==false;
 async function send(system,prompt,onText,signal,onPhase){
@@ -169,13 +169,13 @@ async function migrate(){
     for(const r of await c.keys())if(/all-MiniLM-L6-v2/.test(r.url))await c.delete(r);}catch(e){}}
   cfg.idx=IDX;saveCfg();
 }
-/* vecteurs des notes, gardés dans IndexedDB : {id → {h, v, c:[vecteurs des passages]}} ;
+/* vecteurs des notes, gardés dans IndexedDB : {id -> {h, v, c:[vecteurs des passages]}} ;
    h = empreinte des passages : seules les notes MODIFIÉES sont recalculées (aussi d'une visite à l'autre). */
 const VEC=new Map();let vecLoaded=false,VERS=0,vecModel='';   // vecModel : modèle qui a calculé les vecteurs gardés (IndexedDB)
 const fnv=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return(h>>>0).toString(36);};
 const notes=()=>{const d=getLS(NKEY,null);return d&&d.notes?Object.values(d.notes).filter(n=>n&&n.id):[];};
 const dot=(a,b)=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;};
-/* Markdown → texte simple (le modèle n'a que faire des #, **, liens, adresses, pièces jointes…) */
+/* Markdown -> texte simple (le modèle n'a que faire des #, **, liens, adresses, pièces jointes…) */
 function plain(md){
   return String(md||'').replace(/\r/g,'')
     .replace(/```[\w+-]*\n?/g,'')                                   // blocs de code : on garde le code, pas les clôtures
@@ -209,7 +209,7 @@ const mean=vs=>{const d=vs[0].length,m=new Float32Array(d);vs.forEach(v=>{for(le
 let indexing=null;const IXP={done:0,total:0};          // v9 : progression de l'indexation (affichée dans les réglages)
 async function loadVecs(){if(vecLoaded)return;
   try{const all=await idb('vec','readonly',s=>s.getAll()),ks=await idb('vec','readonly',s=>s.getAllKeys());
-    /* v10 : chaque vecteur garde le nom du modèle (r.m) → la calibration est la bonne MÊME si le Worker n'est pas encore lancé
+    /* v10 : chaque vecteur garde le nom du modèle (r.m) -> la calibration est la bonne MÊME si le Worker n'est pas encore lancé
        (index entièrement relu depuis IndexedDB). Un vecteur sans nom de modèle est recalculé (une seule fois). */
     ks.forEach((k,i)=>{const r=all[i];if(r&&r.v&&Array.isArray(r.c)&&r.m){VEC.set(k,r);if(!vecModel)vecModel=r.m;}});}catch(e){}
   vecLoaded=true;VERS++;}
@@ -243,7 +243,7 @@ async function indexNotes(onP){
    On n'affiche que ce qui est NETTEMENT au-dessus du lot (z ≥ seuil ET cosinus ≥ plancher), au plus 4, avec un libellé
    (« très proche » / « proche ») au lieu d'un faux pourcentage. Rien plutôt que du bruit. Même principe pour le RAG. */
 /* valeurs mesurées sur le jeu d'évaluation (25 notes FR/EN, README) : paires du carnet ≈ 0,779 ± 0,032 ;
-   question ↔ passages : la moyenne varie beaucoup d'une question à l'autre (0,70–0,79) → a priori faible (K=8) */
+   question <-> passages : la moyenne varie beaucoup d'une question à l'autre (0,70–0,79) -> a priori faible (K=8) */
 const CAL={'Xenova/multilingual-e5-small':{nn:{mu:.779,sd:.032,floor:.81,z:2.2,hi:3.2},qp:{mu:.745,sd:.032,floor:.76,z:1.9,gap:.04},tag:.6}};
 const CAL0={nn:{mu:0,sd:.15,floor:.25,z:2.0,hi:3.5},qp:{mu:0,sd:.12,floor:.2,z:2.0,gap:.2},tag:.6};   // autre modèle (faux Worker des tests)
 const calOf=()=>CAL[E.model||vecModel]||CAL0;
@@ -400,7 +400,7 @@ function run(task,o){
     if(!hasKey()){w.className='ai-warn none';w.innerHTML='Aucune clé d\'API enregistrée pour <b>'+esc(p.name)+'</b>. Rien n\'est envoyé tant que tu n\'en as pas mis une.';
       btns(B('x','Fermer')+B('cfg','Réglages IA…','primary'));return;}
     w.className='ai-warn';
-    w.innerHTML='⚠ En cliquant sur « Envoyer », <b>ce texte ('+txt.length+' caractères) part chez '+esc(p.name)+'</b> ('+esc(host())+', modèle '+esc(model())+') avec ta clé, '+
+    w.innerHTML='[!] En cliquant sur « Envoyer », <b>ce texte ('+txt.length+' caractères) part chez '+esc(p.name)+'</b> ('+esc(host())+', modèle '+esc(model())+') avec ta clé, '+
       'et y est traité selon ses conditions. AVERSE n\'envoie rien d\'autre, nulle part. Évite les données sensibles.'+
       '<details><summary>Voir exactement ce qui sera envoyé</summary><pre class="ai-pre" id="aiPre"></pre></details>';
     w.querySelector('#aiPre').textContent=txt||'(vide)';
@@ -424,7 +424,7 @@ function run(task,o){
     f.querySelectorAll('#aiWarn details').forEach(d=>d.open=false);     // place à la réponse
     g.set('think');btns(B('stop','Arrêter'));
     ctl=new AbortController();let tm=0;
-    armed=true;                                            // ← la SEULE porte d'entrée vers le réseau
+    armed=true;                                            // <- la SEULE porte d'entrée vers le réseau
     try{
       await send(sysFor(task),txt,(chunk,all)=>{result=all;g.token(chunk.length);
         if(!tm)tm=setTimeout(()=>{tm=0;out.innerHTML=md(result);out.scrollTop=out.scrollHeight;},70);},ctl.signal);
@@ -494,7 +494,7 @@ function settings(){
       '<option value="auto">Auto (celle de ta question / de la note)</option><option value="fr">Français</option><option value="en">English</option></select></div>'+
     '<label class="ai-chk"><input type="checkbox" id="aiSkip"> Questions libres de la barre d\'accueil : ne plus demander de confirmation <small>(l\'envoi d\'extraits de notes est toujours confirmé)</small></label>'+
     '<div class="ai-row"><span id="aiKeySt" class="ai-p"></span><span><button type="button" class="btn ghost" data-s="clear">Effacer la clé</button> <button type="button" class="btn primary" data-s="save">Enregistrer</button></span></div>'+
-    '<p class="ai-p ai-warn">⚠ La clé est <b>chiffrée</b> sur cet appareil (et dans la synchro, chiffrée de bout en bout) ; elle n\'est envoyée qu\'à '+
+    '<p class="ai-p ai-warn">[!] La clé est <b>chiffrée</b> sur cet appareil (et dans la synchro, chiffrée de bout en bout) ; elle n\'est envoyée qu\'à '+
     '<span id="aiHost"></span>. Quand tu cliques « Envoyer » dans une fenêtre IA, <b>le texte affiché part chez ce fournisseur</b>. '+
     'Avec l\'offre gratuite de Gemini, Google peut utiliser ces textes pour améliorer ses services : évite les données sensibles. '+
     '<a id="aiGet" target="_blank" rel="noopener noreferrer">Obtenir une clé</a>. Sur le carnet, la page n\'autorise que Gemini, OpenAI, OpenRouter, Mistral, Groq et localhost (CSP).</p>'+
@@ -514,8 +514,8 @@ function settings(){
     else if(s==='ready'){
       /* v9 : plus de « 0 note(s) indexée(s) » trompeur : on lance l'indexation et on montre où elle en est */
       if(!indexing&&!vecLoaded)indexNotes().catch(()=>{});
-      if(indexing||!vecLoaded){st.textContent='Prête ✓ — indexation de tes notes'+(IXP.total?' : '+IXP.done+' / '+IXP.total:'…');if(IXP.total)g.progress(IXP.done/IXP.total);}
-      else{const n=VEC.size;st.textContent='Prête ✓ ('+n+' note'+(n>1?'s':'')+' indexée'+(n>1?'s':'')+')';if(g.state()!=='done')g.set('done');}}
+      if(indexing||!vecLoaded){st.textContent='Prête [ok] — indexation de tes notes'+(IXP.total?' : '+IXP.done+' / '+IXP.total:'…');if(IXP.total)g.progress(IXP.done/IXP.total);}
+      else{const n=VEC.size;st.textContent='Prête [ok] ('+n+' note'+(n>1?'s':'')+' indexée'+(n>1?'s':'')+')';if(g.state()!=='done')g.set('done');}}
     else st.textContent='Activée (modèle chargé à la première utilisation)';
     bt.innerHTML=(s!=='ready'?'<button type="button" class="btn ghost" data-s="on">Charger</button> ':'')+'<button type="button" class="btn ghost" data-s="off">Désactiver et supprimer le modèle</button>';
   }
@@ -523,7 +523,7 @@ function settings(){
   /* v10 : ce qui marche sans réseau, dit clairement */
   function net(){const n=$i('aiNet');if(!n)return;const on=online(),ok=cfg.local&&(E.state==='ready'||vecLoaded);
     n.className='ai-net '+(on?'on':'off');
-    n.innerHTML=on?'● En ligne : tout est disponible.'
+    n.innerHTML=on?'* En ligne : tout est disponible.'
       :'○ Hors ligne · recherche par le sens : '+(cfg.local?(ok?'<b>marche</b> (modèle sur l\'appareil)':'marche si le modèle a déjà été téléchargé'):'désactivée')+
        ' · assistant par clé : <b>indisponible</b> (il a besoin du réseau).';}
   addEventListener('online',net);addEventListener('offline',net);E.subs.add(net);
@@ -580,7 +580,7 @@ function ctxItems(items){
     if(d==='json')out.push({label:'Expliquer ce JSON',run:()=>run('json',{text:t})});
     if(d==='regex')out.push({label:'Expliquer cette regex',run:()=>run('regexExplain',{text:t})});}
   out.push({label:'Demander à mes notes…',run:()=>run('ask',{})},{label:'Réglages IA…',run:settings});
-  return['-',{label:'IA ✦',sub:()=>out}];
+  return['-',{label:'IA *',sub:()=>out}];
 }
 if(typeof NOXE!=='undefined'&&NOXE.cmds)NOXE.cmds.push(
   {id:'ai-ask',title:'IA : demander à mes notes',words:'ia ai demander question notes rag assistant chercher sens',run:()=>run('ask',{})},

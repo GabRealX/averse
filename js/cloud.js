@@ -6,14 +6,14 @@
      au plus une fois toutes les 20 s) ; envoi 6 s après la DERNIÈRE frappe (au plus 60 s d'attente si tu tapes sans
      arrêt) ; en quittant l'onglet (page cachée) s'il reste des modifs ; et seulement toutes les 5 min si la page reste
      visible sans rien faire (rien du tout si elle est cachée). Rien n'est envoyé si rien n'a changé (empreinte du contenu),
-     et la lecture est conditionnelle (ETag → 304).
-   - Avant de partir (v9) : s'il reste des modifs pas encore envoyées → le navigateur demande confirmation (beforeunload),
+     et la lecture est conditionnelle (ETag -> 304).
+   - Avant de partir (v9) : s'il reste des modifs pas encore envoyées -> le navigateur demande confirmation (beforeunload),
      et un dernier envoi part en « keepalive » (pagehide) si le coffre fait moins de 60 Ko. Sur téléphone, beforeunload
-     est peu fiable : c'est l'envoi au passage en arrière-plan (visibilitychange → hidden) qui compte. Jamais de question
+     est peu fiable : c'est l'envoi au passage en arrière-plan (visibilitychange -> hidden) qui compte. Jamais de question
      si tout est synchronisé.
    - Pièces jointes (v9, attach.js) : leur liste voyage dans le coffre, les fichiers chiffrés dans un 2e Gist.
-   - Fusion : la même que le fichier lié (notes.js : syncMerge → la plus récente gagne, pierres tombales, copies de conflit).
-   - Anti-écrasement : lecture conditionnelle (ETag → 304 si rien n'a bougé), on relit TOUJOURS avant d'écrire, et après
+   - Fusion : la même que le fichier lié (notes.js : syncMerge -> la plus récente gagne, pierres tombales, copies de conflit).
+   - Anti-écrasement : lecture conditionnelle (ETag -> 304 si rien n'a bougé), on relit TOUJOURS avant d'écrire, et après
      l'écriture on vérifie dans l'historique du Gist que personne n'a écrit entre les deux ; sinon on récupère cette
      version, on fusionne et on renvoie.
    - Jamais de jeton / mot de passe / code dans la console ou dans les messages d'erreur.
@@ -45,12 +45,12 @@ const LABEL={busy:'synchro…',ok:'synchronisé',ext:'reçu d\'un autre appareil
 function ui(state,detail){
   M.state=state;M.detail=detail||'';
   const b=$('cloudBtn'),st=$('cloudState');
-  if(b){b.textContent=!CS?'Synchro':state==='lock'?'Synchro — déverrouiller':state==='err'?'Synchro ⚠':'Synchro ✓';b.classList.toggle('on',!!CS&&(state==='ok'||state==='ext'||state==='busy'));}
+  if(b){b.textContent=!CS?'Synchro':state==='lock'?'Synchro — déverrouiller':state==='err'?'Synchro [!]':'Synchro [ok]';b.classList.toggle('on',!!CS&&(state==='ok'||state==='ext'||state==='busy'));}
   if(!st)return;
   st.hidden=state==='off';st.dataset.state=state;
   const wait=(state==='ok'||state==='ext')&&M.dirty;          // v9 : modifs tapées, pas encore parties
   st.dataset.wait=wait?'1':'';
-  st.textContent=state==='off'?'':'☁ '+(wait?'modifs à envoyer':LABEL[state])+(detail?' : '+detail:'')+((state==='ok'||state==='ext')&&CS&&CS.at?' · '+hm(CS.at):'');
+  st.textContent=state==='off'?'':' '+(wait?'modifs à envoyer':LABEL[state])+(detail?' : '+detail:'')+((state==='ok'||state==='ext')&&CS&&CS.at?' · '+hm(CS.at):'');
   st.title='Synchro chiffrée (Gist GitHub secret)'+(CS&&CS.name?' — cet appareil : '+CS.name:'')+(M.conflicts?' — '+M.conflicts+' copie(s) de conflit':'')+
     (CS&&CS.at?'\nDernière synchro : '+new Date(CS.at).toLocaleString('fr-FR'):'')+(wait?'\nModifs pas encore envoyées (envoi quelques secondes après ta dernière frappe)':'');
   if(window.barScroll)barScroll.update();
@@ -78,7 +78,7 @@ async function gh(method,path,body,o){
   if(!r.ok)throw E('http','GitHub : erreur '+r.status);
   return{status:r.status,json:await r.json(),etag:r.headers.get('ETag')};
 }
-async function vaultOf(g){                                 // réponse « gist » → coffre (gros fichier : contenu complet via raw_url)
+async function vaultOf(g){                                 // réponse « gist » -> coffre (gros fichier : contenu complet via raw_url)
   const f=g&&g.files&&g.files[FILE];if(!f)throw E('format','ce Gist ne contient pas de carnet AVERSE');
   let txt=f.content;
   if(f.truncated||txt==null){
@@ -186,9 +186,9 @@ function sync(why){
       store();
       ui(attErr?'err':res.n?'ext':(M.state==='ext'&&why==='poll'?'ext':'ok'),attErr||(res.c?res.c+' conflit(s) gardé(s) en double':''));
     }catch(e){
-      if(M.first)M.first=Date.now();                         // v9 : hors ligne → pas de rafale d'essais à chaque frappe
+      if(M.first)M.first=Date.now();                         // v9 : hors ligne -> pas de rafale d'essais à chaque frappe
       ui('err',(e instanceof CloudError?e.message:'erreur inattendue').slice(0,140));
-      if(e&&e.code==='auth')ui('err','jeton GitHub refusé : Synchro → « Changer de jeton »');
+      if(e&&e.code==='auth')ui('err','jeton GitHub refusé : Synchro -> « Changer de jeton »');
     }finally{
       M.busy=null;
       if(M.again){M.again=false;setTimeout(()=>sync('again'),60);}
@@ -225,7 +225,7 @@ function later(){
   if(M.state==='ok'||M.state==='ext')ui(M.state,M.detail);
   clearTimeout(M.preT);M.preT=setTimeout(prepare,800);       // le dernier envoi possible, prêt au cas où la page se ferme
 }
-/* v9 : coffre chiffré prêt à partir (pagehide → fetch keepalive), si le coffre fait moins de 60 Ko */
+/* v9 : coffre chiffré prêt à partir (pagehide -> fetch keepalive), si le coffre fait moins de 60 Ko */
 async function prepare(){
   M.pre=null;if(!ready()||!M.vault||!changedHere())return;
   try{const out=JSON.parse(JSON.stringify(M.vault));out.by=CS.slotId;const h=hash(notesApi.text());
@@ -337,21 +337,21 @@ const VIEWS={
     '<li>Laisse <b>seulement « gist »</b> coché. Expiration : « No expiration », ou une date (il faudra alors en refaire un).</li>'+
     '<li>En bas : « Generate token », puis copie le code (il commence par <code>ghp_</code>) et colle-le ici.</li></ol>'+
     '<p class="cw-small">Ce jeton ne peut toucher qu\'à tes Gists (pas à tes dépôts). Il reste dans ce navigateur. Un jeton « fine-grained » avec seulement « Gists : Read and write » marche aussi.</p>'+
-    pwIn('cwToken','Jeton GitHub')+'<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('intro','← Retour'),B('tokenOk','Vérifier','primary')),
+    pwIn('cwToken','Jeton GitHub')+'<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('intro','<- Retour'),B('tokenOk','Vérifier','primary')),
   exists:()=>'<h2>Un coffre AVERSE existe déjà</h2><p>Ce compte GitHub a déjà une synchro AVERSE (dernière modif : '+esc(new Date(WS.found.updated).toLocaleString('fr-FR'))+'). '+
-    'Pour ne pas couper tes notes en deux, ajoute plutôt cet appareil :</p><ul class="cw-ol"><li>depuis un appareil déjà synchronisé : Synchro → « Ajouter un appareil » (QR code) ;</li>'+
-    '<li>sinon, avec ton code de secours.</li></ul>'+btns(B('intro','← Retour'),B('recover','Code de secours'),B('join','J\'ai un code d\'appairage','primary'))+
+    'Pour ne pas couper tes notes en deux, ajoute plutôt cet appareil :</p><ul class="cw-ol"><li>depuis un appareil déjà synchronisé : Synchro -> « Ajouter un appareil » (QR code) ;</li>'+
+    '<li>sinon, avec ton code de secours.</li></ul>'+btns(B('intro','<- Retour'),B('recover','Code de secours'),B('join','J\'ai un code d\'appairage','primary'))+
     '<p class="cw-small"><button type="button" class="cw-link" data-cw="password">Créer quand même un 2e coffre séparé</button></p>',
   password:()=>steps(1)+'<h2>2. Ton mot de passe de synchro</h2>'+
     '<p>Il chiffre tes notes. Choisis-en un <b>long</b> (au moins 10 caractères, une petite phrase c\'est très bien) et <b>différent</b> de celui de GitHub.</p>'+
     pwIn('cwPw','Mot de passe','new-password')+pwIn('cwPw2','Encore une fois','new-password')+
     '<p class="cw-warn">Personne ne peut le retrouver pour toi : ni GitHub, ni AVERSE. Sans lui (et sans code de secours), la copie sur GitHub serait illisible. '+
     'Tes notes resteraient quand même sur chacun de tes appareils.</p>'+
-    '<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('token','← Retour'),B('pwOk','Continuer','primary')),
+    '<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('token','<- Retour'),B('pwOk','Continuer','primary')),
   device:()=>steps(2)+'<h2>3. La passkey de cet appareil</h2>'+
     '<p>Ton appareil va te demander ton empreinte, ton visage ou ton code PIN : c\'est la « passkey ». Elle ne quitte jamais l\'appareil.</p>'+
     txtIn('cwName','Nom de cet appareil',WS.name||guessName())+'<div class="cw-err" id="cwErr" role="alert"></div>'+
-    btns(B(WS.mode==='first'?'password':WS.mode==='join'?'join':'recover','← Retour'),B('create','Créer la passkey et activer','primary')),
+    btns(B(WS.mode==='first'?'password':WS.mode==='join'?'join':'recover','<- Retour'),B('create','Créer la passkey et activer','primary')),
   recovery:()=>steps(3)+'<h2>4. Code de secours (fortement conseillé)</h2>'+
     '<p>Un code à <b>écrire sur papier</b> et ranger chez toi. Il ouvre le coffre <b>tout seul</b> : si tu perds tous tes appareils ou oublies le mot de passe, c\'est ta seule porte de sortie.</p>'+
     '<p class="cw-warn">Sans code de secours : mot de passe oublié OU tous les appareils perdus = la copie chiffrée sur GitHub est perdue pour toujours. Personne ne peut la déchiffrer.</p>'+
@@ -359,16 +359,16 @@ const VIEWS={
   showRec:()=>'<h2>Ton code de secours</h2><p>Recopie-le <b>maintenant</b> sur papier. Il ne sera <b>plus jamais affiché</b>. Ne le mets pas dans tes notes ni dans un mail.</p>'+
     '<div class="cw-code" id="cwCode">'+esc(WS.rec)+'</div>'+
     '<label class="cw-chk"><input type="checkbox" id="cwWrote"> Je l\'ai écrit sur papier</label>'+btns(B('recDone','Terminer','primary')),
-  done:()=>'<h2>Synchro activée ✓</h2><p>Cet appareil (« '+esc(CS&&CS.name)+' ») est synchronisé. Pour ajouter ton téléphone ou un autre PC : '+
-    'ouvre Synchro ici → « Ajouter un appareil », puis scanne le QR code avec l\'autre appareil.</p>'+(WS.noRec?'<p class="cw-warn">Pas de code de secours pour l\'instant : tu peux en créer un plus tard dans Synchro.</p>':'')+
+  done:()=>'<h2>Synchro activée [ok]</h2><p>Cet appareil (« '+esc(CS&&CS.name)+' ») est synchronisé. Pour ajouter ton téléphone ou un autre PC : '+
+    'ouvre Synchro ici -> « Ajouter un appareil », puis scanne le QR code avec l\'autre appareil.</p>'+(WS.noRec?'<p class="cw-warn">Pas de code de secours pour l\'instant : tu peux en créer un plus tard dans Synchro.</p>':'')+
     btns(B('x','Fermer','primary')),
-  join:()=>'<h2>Ajouter cet appareil</h2><p>Sur un appareil <b>déjà synchronisé</b> : Synchro → « Ajouter un appareil ». Scanne le QR code (il ouvre cette page directement), '+
+  join:()=>'<h2>Ajouter cet appareil</h2><p>Sur un appareil <b>déjà synchronisé</b> : Synchro -> « Ajouter un appareil ». Scanne le QR code (il ouvre cette page directement), '+
     'ou copie ici le code affiché.</p>'+txtIn('cwPair','Code d\'appairage',WS.pair||'','1a2b3c….ABCD-EFGH-JKMN-PQRS')+pwIn('cwPw','Mot de passe de synchro','current-password')+
-    '<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('intro','← Retour'),B('joinOk','Continuer','primary')),
+    '<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('intro','<- Retour'),B('joinOk','Continuer','primary')),
   recover:()=>'<h2>Récupérer avec le code de secours</h2><p>Il te faut : un jeton GitHub (<a href="'+TOKEN_URL+'" target="_blank" rel="noopener noreferrer">en créer un</a>, case « gist »), ton code de secours, et un <b>nouveau</b> mot de passe. '+
     'Les anciens appareils devront être ré-ajoutés (leurs passkeys sont liées à l\'ancien mot de passe).</p>'+
     pwIn('cwToken','Jeton GitHub')+txtIn('cwRec','Code de secours','','XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX')+pwIn('cwPw','Nouveau mot de passe','new-password')+pwIn('cwPw2','Encore une fois','new-password')+
-    '<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('intro','← Retour'),B('recOk','Continuer','primary')),
+    '<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('intro','<- Retour'),B('recOk','Continuer','primary')),
   settings:()=>{const v=M.vault,dev=v?v.slots.filter(s=>s.type==='device'):[],rec=v&&v.slots.some(s=>s.type==='recovery');
     return '<h2>Synchro</h2><p class="cw-state">'+esc(($('cloudState')||{}).textContent||'')+'</p>'+
     btns(B('syncNow','Synchroniser maintenant','primary'),B('pair','Ajouter un appareil'))+
@@ -384,7 +384,7 @@ const VIEWS={
     btns(B(CS&&M.key?'settings':'x','Annuler'),B('pwThen','Continuer (puis passkey)','primary')),
   pairShow:()=>'<h2>Ajouter un appareil</h2><p>Sur l\'autre appareil (téléphone…), <b>scanne ce QR code</b> avec l\'appareil photo : il ouvre AVERSE, demande le mot de passe, puis crée sa passkey.</p>'+
     '<div class="cw-qr"><img id="cwQr" alt="QR code d\'appairage" src="'+WS.qr+'"></div>'+
-    '<p class="cw-small">Ou, dans Synchro → « J\'ai déjà la synchro… » sur l\'autre appareil, colle ce code :</p><div class="cw-code small" id="cwPairCode">'+esc(WS.pairText)+'</div>'+
+    '<p class="cw-small">Ou, dans Synchro -> « J\'ai déjà la synchro… » sur l\'autre appareil, colle ce code :</p><div class="cw-code small" id="cwPairCode">'+esc(WS.pairText)+'</div>'+
     '<p class="cw-small" id="cwExp">Valable 15 minutes, une seule fois. Ce code seul ne suffit pas : il faut aussi le mot de passe.</p>'+
     btns(B('pairCancel','Annuler l\'appairage'),B('settings','OK','primary')),
   newToken:()=>'<h2>Changer de jeton</h2><p>Crée un nouveau jeton (<a href="'+TOKEN_URL+'" target="_blank" rel="noopener noreferrer">ici</a>, case « gist »), colle-le, puis révoque l\'ancien sur GitHub.</p>'+
@@ -401,7 +401,7 @@ function show(view){
   const box=W.firstChild;box.innerHTML=VIEWS[view]();box.dataset.view=view;
   const f=box.querySelector('input:not([type=checkbox])')||box.querySelector('.btn.primary');if(f)f.focus();
   if(view==='intro')prfSupport().then(s=>{const el=$('cwPrf');if(!el)return;WS.prf=s;el.dataset.s=s;
-    el.textContent=s==='yes'?'✓ Cet appareil sait utiliser une passkey pour chiffrer.':s==='no'?'✕ '+NOPRF:'? Compatibilité passkey à confirmer à l\'étape 3 (la plupart des navigateurs récents marchent).';
+    el.textContent=s==='yes'?'[ok] Cet appareil sait utiliser une passkey pour chiffrer.':s==='no'?'x '+NOPRF:'? Compatibilité passkey à confirmer à l\'étape 3 (la plupart des navigateurs récents marchent).';
     if(s==='no')box.querySelectorAll('[data-cw="first"],[data-cw="join"],[data-cw="recover"]').forEach(b=>b.disabled=true);});
 }
 function close(){if(W){W.remove();W=null;}if(WS.dk)WS.dk.fill(0);WS={};}   // on oublie tout ce qui a été tapé

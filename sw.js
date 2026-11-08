@@ -1,9 +1,9 @@
 /* sw.js — fait fonctionner le site hors-ligne, et reçoit les partages (share_target).
-   ⚠ À chaque modification d'un fichier, change le numéro de version ci-dessous
-   (averse-v14 → averse-v18…) pour que les visiteurs reçoivent la nouvelle version.
+   [!] À chaque modification d'un fichier, change le numéro de version ci-dessous
+   (averse-v14 -> averse-v18…) pour que les visiteurs reçoivent la nouvelle version.
    Tous les chemins sont RELATIFS à ce fichier : le site marche aussi dans un sous-dossier
    (ex. https://toi.github.io/averse/ sur GitHub Pages). */
-const CACHE = 'averse-v19';
+const CACHE = 'averse-v21';
 const SHARE = 'averse-share';          // contenu partagé en attente (lu puis vidé par app.js)
 /* OCR (v4) : Tesseract.js pèse ~11 Mo (moteur wasm + langues). Il n'est PAS dans ASSETS : sinon chaque visiteur
    téléchargerait 11 Mo à l'installation, même sans jamais utiliser l'OCR, et à chaque nouvelle version du site.
@@ -48,7 +48,7 @@ const ASSETS = [
   './js/theme.js', './js/eggs.js', './js/glyph.js', './js/ai.js', './js/ai-bar.js', './js/ai-notes.js', './js/ai-worker.js', './css/ai.css',   // v7
   './js/accent.js', './js/search.js', './js/templates.js', './js/notes-tpl.js', './js/md.js', './js/share.js', './js/share-view.js', './js/notes-share.js', './js/draw.js', './js/feedback.js',   // v6
   './js/tools/base.js', './js/tools/image.js', './js/tools/editeur.js', './js/tools/pdf.js', './js/tools/reseau.js',
-  './js/tools/electronique.js', './js/tools/dev.js', './js/tools/encodage.js', './js/tools/carnet.js', './js/tools/texte.js', './js/tools/memo.js',
+  './js/tools/electronique.js', './js/circuit-core.js', './css/circuit.css', './js/tools/circuit.js', './js/tools/esp32.js', './js/tools/dev.js', './js/tools/encodage.js', './js/tools/carnet.js', './js/tools/texte.js', './js/tools/memo.js',
   './js/tools/sauvegarde.js', './js/tools/ocr.js',
   './js/vendor/pdf-lib.min.js', './js/vendor/qrcode.js', './js/vendor/katex/katex.min.js', './js/vendor/katex/katex.min.css'
 ].concat(KATEX_FONTS);

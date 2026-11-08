@@ -11,7 +11,7 @@ let box=null,body=null,editing=null,query='',timer=null;
 function build(){
   box=document.createElement('aside');box.id='notePanel';box.className='npanel';
   box.setAttribute('aria-label','Carnet');box.hidden=true;
-  box.innerHTML='<div class="np-head"><b>Carnet</b><span class="np-keys">Ctrl+J · Échap</span><button class="np-x" aria-label="Fermer le panneau">✕</button></div><div class="np-body" id="npBody"></div>';
+  box.innerHTML='<div class="np-head"><b>Carnet</b><span class="np-keys">Ctrl+J · Échap</span><button class="np-x" aria-label="Fermer le panneau">x</button></div><div class="np-body" id="npBody"></div>';
   document.body.appendChild(box);
   body=box.querySelector('.np-body');
   box.querySelector('.np-x').onclick=close;
@@ -24,9 +24,9 @@ function list(){
   const notes=Object.values(d.notes).filter(n=>!q||((n.title||'')+' '+(n.body||'')+' '+(n.tags||[]).join(' ')).toLowerCase().includes(q))
     .sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||(b.updated||0)-(a.updated||0));   // épinglées d'abord
   body.innerHTML='<div class="np-tools"><input type="search" id="npQ" placeholder="Chercher une note…" value="'+esc(query)+'"><button class="btn primary" id="npNew">+ Note</button></div>'+
-    '<div class="np-list">'+notes.slice(0,60).map(n=>'<button class="np-item" data-id="'+esc(n.id)+'"><b>'+(n.pinned?'◆ ':'')+esc(n.title||'Sans titre')+'</b><small>'+esc(snippet(n))+'</small></button>').join('')+
+    '<div class="np-list">'+notes.slice(0,60).map(n=>'<button class="np-item" data-id="'+esc(n.id)+'"><b>'+(n.pinned?'* ':'')+esc(n.title||'Sans titre')+'</b><small>'+esc(snippet(n))+'</small></button>').join('')+
     (notes.length?'':'<p class="np-none">'+(q?'Aucune note ne correspond.':'Aucune note pour l\'instant.')+'</p>')+'</div>'+
-    '<a class="np-link" href="notes.html">Ouvrir le carnet complet ↗</a>';
+    '<a class="np-link" href="notes.html">Ouvrir le carnet complet -></a>';
   const qi=$('npQ');
   qi.oninput=()=>{query=qi.value;const pos=qi.selectionStart;list();const n=$('npQ');n.focus();n.setSelectionRange(pos,pos);};
   qi.onkeydown=e=>{if(e.key==='Enter'){const f=body.querySelector('.np-item');if(f)edit(f.dataset.id);}};
@@ -41,7 +41,7 @@ function create(){
 function edit(id){
   const n=read().notes[id];if(!n){list();return;}
   editing=id;
-  body.innerHTML='<div class="np-tools"><button class="btn ghost" id="npBack">← Notes</button><a class="btn ghost" href="notes.html#'+encodeURIComponent(id)+'">Carnet ↗</a><button class="btn ghost" id="npDel">Supprimer</button></div>'+
+  body.innerHTML='<div class="np-tools"><button class="btn ghost" id="npBack"><- Notes</button><a class="btn ghost" href="notes.html#'+encodeURIComponent(id)+'">Carnet -></a><button class="btn ghost" id="npDel">Supprimer</button></div>'+
     '<input class="np-title" id="npT" value="'+esc(n.title)+'" aria-label="Titre"><textarea class="np-text" id="npB" aria-label="Contenu (Markdown)" spellcheck="true">'+esc(n.body)+'</textarea>'+
     '<div class="np-st" id="npSt">Enregistré automatiquement</div>';
   $('npBack').onclick=list;
@@ -61,7 +61,7 @@ function saveNow(){
   const d=read(),n=d.notes[editing];
   if(!n){toast('Cette note a été supprimée dans un autre onglet');list();return;}
   n.title=$('npT').value;n.body=$('npB').value;n.updated=Date.now();
-  $('npSt').textContent=setLS(KEY,d)?'Enregistré':'⚠ Stockage plein : non enregistré';
+  $('npSt').textContent=setLS(KEY,d)?'Enregistré':'[!] Stockage plein : non enregistré';
 }
 
 function open(id){

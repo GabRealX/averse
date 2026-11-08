@@ -4,17 +4,17 @@
    (v2 : la « fenêtre » est maintenant une page entière, adresse #/clé — voir app.js pour le routage.)
 
    Un outil = { key, cat, title, desc, words?, run(conteneur, ...) }
-     image:true  → l'outil demande UNE image : run(conteneur, img, fichier)
-     multi:true  → l'outil demande PLUSIEURS images : run(conteneur, [fichiers])
-     (ni l'un ni l'autre) → run(conteneur) directement
+     image:true  -> l'outil demande UNE image : run(conteneur, img, fichier)
+     multi:true  -> l'outil demande PLUSIEURS images : run(conteneur, [fichiers])
+     (ni l'un ni l'autre) -> run(conteneur) directement
    Options v2 :
-     accept:'application/pdf,.pdf' → types de fichiers acceptés par la zone de dépôt (images par défaut)
-     input:'id'   → champ principal, rempli par le « collage malin » de l'accueil
-     mem:false    → ne pas mémoriser les champs de cet outil
+     accept:'application/pdf,.pdf' -> types de fichiers acceptés par la zone de dépôt (images par défaut)
+     input:'id'   -> champ principal, rempli par le « collage malin » de l'accueil
+     mem:false    -> ne pas mémoriser les champs de cet outil
    Options v3 :
-     data-main    → sur un bouton : c'est lui que Ctrl+Entrée « clique » (sinon Ctrl+Entrée relance le calcul)
-     data-result  → sur un élément : c'est LE résultat (copié par Ctrl+Maj+C, envoyé par « → Envoyer vers… »)
-     NOXE.setResult({files:[…]}) → le résultat est un (ou des) fichier(s) ; {get:async()=>({files})} s'il faut le fabriquer */
+     data-main    -> sur un bouton : c'est lui que Ctrl+Entrée « clique » (sinon Ctrl+Entrée relance le calcul)
+     data-result  -> sur un élément : c'est LE résultat (copié par Ctrl+Maj+C, envoyé par « -> Envoyer vers… »)
+     NOXE.setResult({files:[…]}) -> le résultat est un (ou des) fichier(s) ; {get:async()=>({files})} s'il faut le fabriquer */
 
 const NOXE={
   tools:[],
@@ -47,7 +47,7 @@ const NOXE={
   /* ---------- regex dans un Worker, avec délai maximum (v4 : partagé par « Regex » et « Rechercher / remplacer ») ----------
      Une expression « catastrophique » comme (a+)+$ ne peut pas figer la page : au-delà de NOXE.RX_TIMEOUT ms,
      on tue le Worker (terminate) et on en recrée un neuf au prochain essai.
-     const R=NOXE.rxRunner();  R.run({pat,flags,text,rep?,count?}) → Promise {ms:[…≤1000], count, rep}
+     const R=NOXE.rxRunner();  R.run({pat,flags,text,rep?,count?}) -> Promise {ms:[…≤1000], count, rep}
      Erreurs : e.code==='timeout' (trop long) ou 'abort' (un nouveau calcul a remplacé celui-ci, ou R.stop()). */
   NOXE.RX_TIMEOUT=1000;
   function rxWorker(){                                       // ce code est copié dans le Worker (il n'a pas accès à la page)
@@ -136,6 +136,7 @@ const NOXE={
     '<div class="line" data-copy="'+esc(r[1])+'"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>').join('')+'</div>';
   /* texte d'un panneau d'outil (entrées + résultats) en Markdown, pour le carnet */
   NOXE.extract=root=>{
+    const own=root.querySelector('[data-note-md]');if(own&&own.dataset.noteMd)return own.dataset.noteMd;   // v11 : un outil peut fournir lui-même le texte pour le carnet (ex. un schéma de circuit)
     const t=el=>el.textContent.replace(/\s+/g,' ').trim(),parts=[],ins=[];
     root.querySelectorAll('.field').forEach(f=>{
       const lab=f.querySelector('label'),inp=f.querySelector('input,select,textarea');
@@ -236,8 +237,8 @@ const NOXE={
   };
 
   /* ---------- le résultat principal d'un outil (v3) ----------
-     sert à Ctrl+Maj+C (copier) et au chaînage « → Envoyer vers… ».
-     Ordre : résultat donné par l'outil (fichiers) → [data-result] → zone de texte en lecture seule → codebox → première ligne copiable */
+     sert à Ctrl+Maj+C (copier) et au chaînage « -> Envoyer vers… ».
+     Ordre : résultat donné par l'outil (fichiers) -> [data-result] -> zone de texte en lecture seule -> codebox -> première ligne copiable */
   let given=null,files=null;
   NOXE.setResult=r=>{given=r||null;};
   /* les fichiers affichés par l'outil, pour le clic droit (ctxmenu.js) : les éléments portent data-fi="index"
@@ -290,10 +291,10 @@ const NOXE={
   NOXE.copyMain=async()=>{
     const r=await NOXE.result();
     if(!r){toast('Pas encore de résultat à copier');return false;}
-    if(r.files){toast('Le résultat est un fichier : utilise « → Envoyer vers… » ou Télécharger');return false;}
+    if(r.files){toast('Le résultat est un fichier : utilise « -> Envoyer vers… » ou Télécharger');return false;}
     copy(r.text,'Résultat copié');return true;
   };
-  /* le menu « → Envoyer vers… » */
+  /* le menu « -> Envoyer vers… » */
   function sendMenu(btn){
     let m=$('sendMenu');
     if(m){m.remove();btn.setAttribute('aria-expanded','false');return;}
@@ -347,10 +348,10 @@ const NOXE={
     const pre=Array.isArray(preset)?{files:preset}:preset||{};
     const cat=(NOXE.cats.find(c=>c[0]===t.cat)||['',''])[1],fav=NOXE.isFav(key);
     modal.innerHTML='<div class="modal-top"><div class="modal-eyebrow"><a href="#/">recherche</a> / '+esc(cat)+'</div><div class="modal-actions">'+
-      '<button class="modal-star'+(fav?' on':'')+'" id="toStar" aria-pressed="'+fav+'" title="Favori">'+(fav?'★':'☆')+'</button>'+
-      '<button class="modal-send" id="toSend" aria-haspopup="menu" aria-expanded="false" title="Envoyer le résultat vers un autre outil">→ Envoyer vers…</button>'+
-      '<button class="modal-note" id="toNote" title="Envoyer le résultat dans le carnet">→ Carnet</button>'+
-      '<button class="modal-close" aria-label="Retour à la recherche (Échap)" title="Retour à la recherche (Échap)">✕</button></div></div>'+
+      '<button class="modal-star'+(fav?' on':'')+'" id="toStar" aria-pressed="'+fav+'" title="Favori">'+(fav?'*':'+')+'</button>'+
+      '<button class="modal-send" id="toSend" aria-haspopup="menu" aria-expanded="false" title="Envoyer le résultat vers un autre outil">-> Envoyer vers…</button>'+
+      '<button class="modal-note" id="toNote" title="Envoyer le résultat dans le carnet">-> Carnet</button>'+
+      '<button class="modal-close" aria-label="Retour à la recherche (Échap)" title="Retour à la recherche (Échap)">x</button></div></div>'+
       '<h2>'+esc(t.title)+'</h2>'+
       '<p class="modal-description">'+esc(t.desc)+'</p><div id="toolBody"></div>';
     modal.querySelector('.modal-close').onclick=closeTool;
@@ -366,7 +367,7 @@ const NOXE={
     $('toSend').onclick=e=>sendMenu(e.currentTarget);
     $('toStar').onclick=e=>{
       const on=NOXE.toggleFav(key),b=e.currentTarget;
-      b.classList.toggle('on',on);b.textContent=on?'★':'☆';b.setAttribute('aria-pressed',on);
+      b.classList.toggle('on',on);b.textContent=on?'*':'+';b.setAttribute('aria-pressed',on);
       toast(on?'Ajouté aux favoris':'Retiré des favoris');
     };
     body.onclick=e=>{if(e.target.closest('[data-again]'))openTool(key);};     // bouton « Autre image »

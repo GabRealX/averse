@@ -11,6 +11,9 @@ try{const old=localStorage.getItem('averse-tests-backup');
   const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}
   localStorage.setItem('averse-tests-backup',JSON.stringify(o));sessionStorage.setItem('averse-tests','1');
 }catch(e){}
+/* v11 : si on QUITTE cette page avant la fin (lien « accueil », onglet fermé), les vraies données reviennent tout de suite */
+addEventListener('pagehide',()=>{try{const r=localStorage.getItem('averse-tests-backup');if(!r)return;
+  const o=JSON.parse(r);localStorage.clear();for(const k in o)if(k!=='averse-tests-backup')localStorage.setItem(k,o[k]);sessionStorage.removeItem('averse-tests');}catch(e){}});
 </script>
 <script src="js/core.js"></script><script src="js/theme.js"></script><script src="js/accent.js"></script><script src="js/templates.js"></script></head>
 <body>
@@ -19,12 +22,12 @@ try{const old=localStorage.getItem('averse-tests-backup');
 <div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
 <script src="js/tools/base.js"></script>
 <script>NOXE.noPersist=true;   /* les tests ne doivent pas écrire dans la mémoire des champs */</script>
-<script src="js/tools/reseau.js"></script><script src="js/tools/electronique.js"></script>
+<script src="js/tools/reseau.js"></script><script src="js/tools/electronique.js"></script><script src="js/circuit-core.js"></script><script src="js/tools/circuit.js"></script><script src="js/tools/esp32.js"></script>
 <script src="js/tools/dev.js"></script><script src="js/tools/texte.js"></script><script src="js/tools/memo.js"></script>
 <script src="js/tools/encodage.js"></script><script src="js/tools/pdf.js"></script><script src="js/tools/carnet.js"></script><script src="js/tools/image.js"></script><script src="js/tools/editeur.js"></script><script src="js/tools/ocr.js"></script>
 <script src="js/vault.js"></script><script src="js/attach.js"></script><script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
 <script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script><script src="js/glyph.js"></script>
-<link rel="stylesheet" href="css/ui.css">
+<link rel="stylesheet" href="css/ui.css"><link rel="stylesheet" href="css/circuit.css">
 <script>
 /* Ouvre chaque outil comme le ferait un clic, remplit les champs, et compare avec des résultats vérifiés à la main.
    Ouvre ce fichier via un serveur local (python3 -m http.server) puis va sur /tests.html */
@@ -33,7 +36,7 @@ const text=()=>$('modal').textContent.replace(/\s+/g,' ');
 function fill(id,v){const e=$(id);e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));}
 function tab(k){$('modal').querySelector('.tabs [data-v="'+k+'"]').click();}
 const tests=[];const T=(name,fn)=>tests.push([name,fn]);
-/* v5 : fonction absente de CE navigateur → « ignoré » (gris), pas « ✕ ». Seulement pour une API manquante, jamais pour un résultat faux. */
+/* v5 : fonction absente de CE navigateur -> « ignoré » (gris), pas « x ». Seulement pour une API manquante, jamais pour un résultat faux. */
 const SKIP=why=>{const e=new Error(why);e.skip=true;throw e;};
 const has=(s,...parts)=>{for(const p of parts)if(!(p instanceof RegExp?p.test(s):s.includes(p)))throw new Error('manque « '+p+' » dans : '+s.slice(0,160));};
 
@@ -42,19 +45,68 @@ T('IPv4 : masque pointé',async()=>{fill('nin','10.0.0.5 255.255.255.0');has(tex
 T('IPv4 : adresse invalide refusée',async()=>{fill('nin','300.1.1.1/24');if(!$('nin').classList.contains('bad'))throw new Error('pas signalé');});
 T('IPv4 : /31 et /32',async()=>{fill('nin','10.0.0.0/31');has(text(),'pas de broadcast');});
 T('VLSM 50/20/10/2',async()=>{tab('sub');has(text(),'192.168.10.0/26','192.168.10.64/27','192.168.10.96/28','192.168.10.112/30');});
-T('Ohm : I=20 mA, R=100 Ω → U=2 V',async()=>{NOXE.open('ohm');fill('o_I','20m');fill('o_R','100');
+T('Ohm : I=20 mA, R=100 Ω -> U=2 V',async()=>{NOXE.open('ohm');fill('o_I','20m');fill('o_R','100');
   if(Math.abs(parseFloat($('o_U').value.replace(',','.'))-2)>1e-9)throw new Error('U='+$('o_U').value);});
-T('Diviseur 5 V, 1k / 2k → 3,33 V',async()=>{tab('div');has(text(),/3[.,]33/);});
+T('Diviseur 5 V, 1k / 2k -> 3,33 V',async()=>{tab('div');has(text(),/3[.,]33/);});
+T('Circuit : 100 + (220 | 330) + 4k7 = 4,932 kΩ, schéma dessiné',async()=>{NOXE.open('circuit');await sleep(50);fill('ci_expr','100 + (220 | 330) + 4k7');fill('ci_v','5');has(text(),'4,932 kΩ','R1','R3');
+  if(!$('modal').querySelector('#ci_svg svg.circuit-svg'))throw new Error('pas de schéma');});
+T('Circuit : source 5 V -> courant total 1,014 mA',async()=>{has(text(),'1,014 mA');});
+T('Circuit : 100 | 220 = 68,75 Ω',async()=>{fill('ci_expr','100 | 220');has(text(),'68,75 Ω');});
+T('Circuit : pont (100+220) | (330+470) = 228,6 Ω',async()=>{fill('ci_expr','(100 + 220) | (330 + 470)');has(text(),'228,6 Ω');});
+T('Circuit : « || » accepté, erreurs lisibles',async()=>{fill('ci_expr','100 || 220');has(text(),'68,75 Ω');
+  fill('ci_expr','(100 + 220');has(text(),'parenthèse fermante');fill('ci_expr','100 +');has(text(),'Il manque une valeur');fill('ci_expr','100 220');has(text(),'Il manque');
+  fill('ci_expr','330 + xx');has(text(),'Composant inconnu');});
+T('Circuit : sans source -> pas de simulation, résistance seule',async()=>{fill('ci_expr','1k + 2k');fill('ci_v','');has(text(),'3 kΩ');if(/Courant total/.test(text()))throw new Error('simule sans source');});
+T('Circuit : LED rouge + 330 Ω sur 5 V -> 9,091 mA, 3 V dans R1, 2 V dans la LED, dessinée allumée',async()=>{fill('ci_expr','330 + led:rouge');fill('ci_v','5');
+  has(text(),'9,091 mA','D1','LED 2 V','550 Ω');if(!$('ci_svg').querySelector('polygon.glow'))throw new Error('LED pas allumée');
+  if($('ci_warn').textContent.trim())throw new Error('remarque inattendue : '+$('ci_warn').textContent);});
+T('Circuit : LED sans résistance -> alerte « va griller » + résistance conseillée',async()=>{fill('ci_expr','led');has($('ci_warn').textContent,'va griller','300 Ω');});
+T('Circuit : 2 LED en parallèle (vert 2,2 V / bleu 3 V) sur 5 V -> 14,55 mA',async()=>{fill('ci_expr','(330 + led:vert) | (330 + led:bleu)');has(text(),'14,55 mA','8,485 mA','6,06 mA');});
+T('Circuit : condensateur en continu -> circuit ouvert, charge 500 nC',async()=>{fill('ci_expr','1k + c:100n');has(text(),'circuit est ouvert','500 nC','1,25 µJ');});
+T('Circuit : interrupteur ouvert -> plus de courant ; fermé -> lampe 47 Ω sous 6 V = 127,7 mA',async()=>{fill('ci_expr','330 + sw:off');has(text(),'Aucun courant');
+  fill('ci_v','6');fill('ci_expr','sw + lamp:47');has(text(),'127,7 mA','dissipe');});
+T('Circuit : bobine = un fil en continu (100 Ω + L -> 50 mA sur 5 V)',async()=>{fill('ci_v','5');fill('ci_expr','100 + l:10m');has(text(),'50 mA','énergie 12,5 µJ');});
+T('Circuit : les boutons ajoutent les composants, les exemples chargent un montage',async()=>{fill('ci_expr','330');$('modal').querySelector('#ci_pal [data-p="1"]').click();
+  if($('ci_expr').value!=='330 + led:rouge')throw new Error($('ci_expr').value);$('modal').querySelector('#ci_ex [data-e="1"]').click();
+  if($('ci_expr').value!=='sw + lamp:47'||$('ci_v').value!=='6')throw new Error($('ci_expr').value+' / '+$('ci_v').value);});
+T('Circuit : « -> Carnet » envoie un bloc ```circuit (pas du texte)',async()=>{fill('ci_expr','330 + led:rouge');fill('ci_v','5');
+  const md=NOXE.extract($('toolBody'));if(md!=='```circuit\nV = 5\n330 + led:rouge\n```')throw new Error(JSON.stringify(md));});
+T('Circuit : « Mettre le schéma dans le carnet » crée une note avec le bloc',async()=>{const S=snap();try{localStorage.setItem('noxe-notes','{"notes":{},"openId":null}');$('ci_note').click();
+  const n=Object.values(getLS('noxe-notes').notes);if(n.length!==1||!/```circuit\nV = 5\n330 \+ led:rouge\n```/.test(n[0].body)||!/^Circuit/.test(n[0].title))throw new Error(JSON.stringify(n));}finally{restoreLS(S);}});
+T('Carnet (md.js) : un bloc ```circuit devient un schéma ; les autres blocs de code et les erreurs restent sûrs',async()=>{
+  let h=MD.render('avant\n\n```circuit\ntitre: <img src=x onerror=alert(1)>\nV = 5\n330 + led:rouge\n```\n\naprès');
+  has(h,'<figure class="circuit">','<svg','9,091 mA');if(/<img/.test(h))throw new Error('HTML non échappé dans le titre');
+  h=MD.render('```js\nlet a=1<2;\n```');has(h,'<pre><code>');if(/circuit/.test(h))throw new Error('bloc js touché');
+  h=MD.render('```circuit\n330 + xx\n```');has(h,'circuit-err','Composant inconnu');h=MD.render('```circuit\n```');has(h,'Circuit vide');
+  h=MD.render('```circuit\nV = 5\n330 + led\n```',{});has(h,'<svg');});
+T('Carnet : l\'aperçu d\'une note affiche le schéma, et « + Circuit » en insère un',async()=>{S4=snap();
+  try{await frame('notes.html',()=>W.notesApi&&W.CIRCUIT&&W.document.getElementById('list').children.length);
+    W.notesApi.create('Schéma','Un montage :\n\n```circuit\nV = 9\n1k + 2k\n```\n',[]);await sleep(150);
+    const pv=W.document.getElementById('preview');if(!pv.querySelector('figure.circuit svg.circuit-svg'))throw new Error('pas de schéma dans l\'aperçu');
+    has(pv.textContent,'R1','R2','3 mA');
+    const sel=W.document.getElementById('circAdd');if(!sel)throw new Error('pas de menu + Circuit');
+    sel.value='0';sel.dispatchEvent(new W.Event('change',{bubbles:true}));await sleep(150);
+    const v=W.document.getElementById('bodyIn').value;has(v,'```circuit','330 + led:rouge');
+    if(pv.querySelectorAll('figure.circuit').length!==2)throw new Error('2 schémas attendus');
+  }finally{F.remove();restoreLS(S4);}});
+T('ESP32 : brochage — recherche « i2c » -> GPIO 21 et 22, pas 4',async()=>{NOXE.open('esp32');fill('e_q','i2c');const t=$('e_rows').textContent;has(t,'SDA','SCL');if(/ADC2_CH0/.test(t))throw new Error('trop de lignes');});
+T('ESP32 : brochage — filtre « à éviter » = GPIO 6 à 11',async()=>{fill('e_q','');$('modal').querySelector('#e_f [data-v="no"]').click();const n=$('e_rows').querySelectorAll('tr').length;if(n!==6)throw new Error(n+' lignes au lieu de 6');});
+T('ESP32 : budget 271 mA sur 500 mA = 54,2 %, régulateur 460,7 mW',async()=>{tab('pow');has(text(),'271 mA','54,2 %','460,7 mW');});
+T('ESP32 : autonomie 2000 mAh, 80 mA 3 s / 600 s, 150 µA -> 0,549 mA, ~121 jours',async()=>{has(text(),'0,549 mA','121 jours');});
+T('ESP32 : LED 2,0 V à 5 mA sur 3,3 V -> 270 Ω (E24), 4,815 mA',async()=>{tab('lev');has(text(),'270 Ω','4,815 mA');});
+T('ESP32 : diviseur 5 V -> 3,3 V proposé avec écart < 2 %',async()=>{const m=[...$('d_out').querySelectorAll('tbody tr')].map(r=>Math.abs(parseFloat(r.children[3].textContent.replace(',','.'))));
+  if(!m.length||m.some(x=>!(x<2)))throw new Error('écarts : '+m);});
+T('ESP32 : ADC 2048 sur 3,3 V = 1,65 V ; PWM 5 kHz 10 bits 25 % = 256 sur 1023, 13 bits max',async()=>{tab('adc');has(text(),'1,65 V','256 sur 1023','13 bits');});
 T('SHA-256 de « abc »',async()=>{NOXE.open('encodage');fill('h_in','abc');await sleep(400);has(text(),'ba7816bf8f01cfea');});
 T('Aide-mémoire : recherche « ssh »',async()=>{NOXE.open('memo');fill('mq','ssh');has(text(),'22','ssh user@');});
 T('Aide-mémoire : table CIDR /26 = 255.255.255.192',async()=>{fill('mq','/26');has(text(),'255.255.255.192','62 hôtes');});
 T('Export vers le carnet (Markdown)',async()=>{NOXE.open('reseau');const md=NOXE.extract($('toolBody'));has(md,'## Résultat','192.168.1.128/26');});
 T('Bases : 0B en hexadécimal = 11',async()=>{NOXE.open('bases');const e=$('b_hex');e.value='0B';e.oninput();if($('b_dec').value!=='11')throw new Error('dec='+$('b_dec').value);});
-T('Dates : 31/01 → 01/03/2025 = 1 mois, 1 jour',async()=>{NOXE.open('dates');$('a_d').value='2025-01-31';$('a_f').value='2025-03-01';$('a_d').oninput();has(text(),'1 mois, 1 jour','29');});
+T('Dates : 31/01 -> 01/03/2025 = 1 mois, 1 jour',async()=>{NOXE.open('dates');$('a_d').value='2025-01-31';$('a_f').value='2025-03-01';$('a_d').oninput();has(text(),'1 mois, 1 jour','29');});
 T('Mot de passe : symboles présents par défaut',async()=>{NOXE.open('mdp');for(let i=0;i<20;i++){$('g_go').click();const s=$('g_out').textContent;if(!/[^A-Za-z0-9]/.test(s))throw new Error('pas de symbole : '+s);if(/[0O1lI]/.test(s))throw new Error('ambigu : '+s);}});
 /* ---- v2 : encodages, JWT, UUID, QR, regex dans un Worker ---- */
 const JWT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MiIsIm5hbWUiOiLDiWzDqHZlIiwiZXhwIjo0MTAyNDQ0ODAwfQ.c2lnbmF0dXJl';
-T('Base64 : « Bonjour é » → Qm9uam91ciDDqQ==',async()=>{NOXE.open('base64');fill('b_in','Bonjour é');has(text(),'Qm9uam91ciDDqQ==');
+T('Base64 : « Bonjour é » -> Qm9uam91ciDDqQ==',async()=>{NOXE.open('base64');fill('b_in','Bonjour é');has(text(),'Qm9uam91ciDDqQ==');
   if(NOXE.b64enc(new TextEncoder().encode('Bonjour é'))!=='Qm9uam91ciDDqQ==')throw new Error('b64enc');
   if(new TextDecoder().decode(NOXE.b64dec('Qm9uam91ciDDqQ'))!=='Bonjour é')throw new Error('b64dec sans « = »');});
 T('Base64 : décodage + variante URL',async()=>{tab('dec');fill('b_dec','Qm9uam91ciDDqQ==');has(text(),'Bonjour é');
@@ -90,14 +142,14 @@ T('PDF : intervalles de pages',async()=>{const j=x=>JSON.stringify(x);
 
 /* ---- v2 : collage intelligent (detect.js) ---- */
 const D=s=>NOXE.detect(s).map(x=>x.key);
-const dt=(s,k,extra)=>T('Collage : '+s.slice(0,34)+' → '+k,async()=>{const r=NOXE.detect(s);if(!r.length||r[0].key!==k)throw new Error('obtenu '+JSON.stringify(D(s)));
+const dt=(s,k,extra)=>T('Collage : '+s.slice(0,34)+' -> '+k,async()=>{const r=NOXE.detect(s);if(!r.length||r[0].key!==k)throw new Error('obtenu '+JSON.stringify(D(s)));
   if(extra)for(const[a,b]of Object.entries(extra))if(r[0][a]!==b)throw new Error(a+'='+r[0][a]);});
 dt('{"a":1,"b":[true,null]}','json');dt(JWT,'jwt');dt('https://exemple.fr/?q=1','url');dt('#ff8800','couleurs',{text:'#ff8800'});
 dt('#f80','couleurs',{text:'#ff8800'});dt('1700000000','dates',{tab:'unix'});dt('1700000000123','dates');dt('192.168.1.10/24','reseau');
 dt('550e8400-e29b-41d4-a716-446655440000','uuid');dt('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad','encodage');
 dt('Qm9uam91ciDDqQ==','base64',{tab:'dec'});dt('data:image/png;base64,iVBORw0KGgo=','base64');dt('caf%C3%A9%20noir','url');
-T('Collage : texte ordinaire → rien proposé',async()=>{for(const s of['Bonjour tout le monde','ceci est une phrase.','password','12345','deadbeef'])
-  if(D(s).length)throw new Error(s+' → '+D(s));});
+T('Collage : texte ordinaire -> rien proposé',async()=>{for(const s of['Bonjour tout le monde','ceci est une phrase.','password','12345','deadbeef'])
+  if(D(s).length)throw new Error(s+' -> '+D(s));});
 
 /* ---- v2 : mémoire des champs ---- */
 T('Les champs se souviennent de leur valeur',async()=>{NOXE.noPersist=false;try{NOXE.open('json');fill('j_in','{"souvenir":1}');NOXE.close();
@@ -110,7 +162,7 @@ const until=async(f,ms=3000)=>{const t0=performance.now();while(!(await f())){if
 const key=(k,o={})=>W.document.dispatchEvent(new W.KeyboardEvent('keydown',Object.assign({key:k,bubbles:true,cancelable:true},o)));
 T('Accueil : chargement',async()=>{F=document.createElement('iframe');F.style.cssText='width:900px;height:600px;border:1px solid #333;margin-top:20px';
   document.body.appendChild(F);await new Promise(r=>{F.onload=r;F.src='index.html#/';});W=F.contentWindow;await until(()=>{try{N=W.eval('NOXE');return !!N.search;}catch(e){return false;}});});
-T('Recherche floue : « jsn » → JSON, « fusion » → PDF',async()=>{if(N.search('jsn')[0].key!=='json')throw new Error(N.search('jsn')[0].key);
+T('Recherche floue : « jsn » -> JSON, « fusion » -> PDF',async()=>{if(N.search('jsn')[0].key!=='json')throw new Error(N.search('jsn')[0].key);
   if(N.search('fusion')[0].key!=='pdfoutils')throw new Error(N.search('fusion')[0].key);});
 T('Recherche + Entrée ouvre l\'outil (#/jwt)',async()=>{const q=W.document.getElementById('q');q.value='jwt';q.dispatchEvent(new W.Event('input',{bubbles:true}));
   q.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await until(()=>W.location.hash==='#/jwt');
@@ -130,29 +182,29 @@ const png=(w=2,h=2,name='img.png')=>new Promise(r=>{const c=document.createEleme
   c.toBlob(b=>r(new File([b],name,{type:'image/png'})),'image/png');});
 const keys=t=>t.map(x=>x[0]).join(',');
 const ctxAt=(el,o={})=>{const r=el.getBoundingClientRect();const e=new MouseEvent('contextmenu',Object.assign({bubbles:true,cancelable:true,clientX:r.left+5,clientY:r.top+5},o));el.dispatchEvent(e);return e;};
-const ctxLabels=()=>[...document.querySelectorAll('#ctxMenu button')].map(b=>b.textContent.replace('▸','').trim());
+const ctxLabels=()=>[...document.querySelectorAll('#ctxMenu button')].map(b=>b.textContent.replace(/\s*>$/,'').trim());
 const ctxClick=lab=>{const b=[...document.querySelectorAll('#ctxMenu button')].find(b=>b.textContent.includes(lab));if(!b)throw new Error('pas d\'entrée « '+lab+' » : '+ctxLabels().join(' | '));b.click();};
 const kd=(el,k,o={})=>{const e=new KeyboardEvent('keydown',Object.assign({key:k,bubbles:true,cancelable:true},o));el.dispatchEvent(e);return e;};
 
-/* ---- v3 : chaînage « → Envoyer vers… » ---- */
-T('Chaînage : Base64 → résultat texte → Hash',async()=>{NOXE.open('base64',{tab:'enc'});fill('b_in','Bonjour');
+/* ---- v3 : chaînage « -> Envoyer vers… » ---- */
+T('Chaînage : Base64 -> résultat texte -> Hash',async()=>{NOXE.open('base64',{tab:'enc'});fill('b_in','Bonjour');
   const r=await NOXE.result();if(!r||r.text!=='Qm9uam91cg==')throw new Error(JSON.stringify(r));
   const t=keys(NOXE.chainTargets(r));has(t,'json','url','encodage','regex','qr','carnet');if(t.includes('base64'))throw new Error('vers soi-même : '+t);
   await NOXE.sendTo('encodage');if(NOXE.current()!=='encodage'||$('h_in').value!=='Qm9uam91cg==')throw new Error('h_in='+$('h_in').value);});
-T('Chaînage : JWT → le résultat est le contenu (payload)',async()=>{NOXE.open('jwt');fill('w_in',JWT);const r=await NOXE.result();has(r.text,'"sub": "42"');if(/HS256/.test(r.text))throw new Error('en-tête pris');});
-T('Chaînage : QR → image PNG → Optimiser',async()=>{NOXE.open('qr');fill('q_in','https://averse.example/');await until(()=>/modules/.test($('q_info').textContent));
+T('Chaînage : JWT -> le résultat est le contenu (payload)',async()=>{NOXE.open('jwt');fill('w_in',JWT);const r=await NOXE.result();has(r.text,'"sub": "42"');if(/HS256/.test(r.text))throw new Error('en-tête pris');});
+T('Chaînage : QR -> image PNG -> Optimiser',async()=>{NOXE.open('qr');fill('q_in','https://averse.example/');await until(()=>/modules/.test($('q_info').textContent));
   const r=await NOXE.result();if(!r.files||r.files[0].type!=='image/png')throw new Error('pas une image');
   const t=keys(NOXE.chainTargets(r));if(t!=='optimiser,convertir,editeur,ocr,pdf')throw new Error(t);
   await NOXE.sendTo('optimiser',r);await until(()=>$('orows')&&/qrcode/.test($('orows').textContent)&&$('orows').querySelector('[data-i]'));});
-T('Chaînage : images → PDF → outils PDF',async()=>{NOXE.open('pdf',{files:[await png(),await png(3,2,'b.png')]});await until(()=>$('plist'));
+T('Chaînage : images -> PDF -> outils PDF',async()=>{NOXE.open('pdf',{files:[await png(),await png(3,2,'b.png')]});await until(()=>$('plist'));
   const r=await NOXE.result();if(!r.files||r.files[0].type!=='application/pdf')throw new Error('pas un PDF');if(keys(NOXE.chainTargets(r))!=='pdfoutils')throw new Error(keys(NOXE.chainTargets(r)));
   await NOXE.sendTo('pdfoutils',r);await until(()=>$('pd_tabs'),6000);has(text(),'images.pdf','2 p.');});
-T('Chaînage : bouton « → Envoyer vers… » (menu, Échap)',async()=>{NOXE.open('url');fill('u_in','café noir');$('toSend').click();await until(()=>$('sendMenu')&&$('sendMenu').querySelector('[data-send]'));
+T('Chaînage : bouton « -> Envoyer vers… » (menu, Échap)',async()=>{NOXE.open('url');fill('u_in','café noir');$('toSend').click();await until(()=>$('sendMenu')&&$('sendMenu').querySelector('[data-send]'));
   const ks=[...$('sendMenu').querySelectorAll('[data-send]')].map(b=>b.dataset.send).join(',');has(ks,'json','base64','qr');if(ks.includes('url'))throw new Error(ks);
   kd(document.activeElement,'Escape');if($('sendMenu'))throw new Error('menu encore ouvert');if(NOXE.current()!=='url')throw new Error('outil fermé');
   $('toSend').click();await until(()=>$('sendMenu')&&$('sendMenu').querySelector('[data-send="base64"]'));$('sendMenu').querySelector('[data-send="base64"]').click();
   await until(()=>NOXE.current()==='base64');if($('b_in').value!=='caf%C3%A9%20noir')throw new Error('b_in='+$('b_in').value);});
-T('Chaînage : sans résultat → « Pas encore de résultat »',async()=>{NOXE.open('json');$('toSend').click();await until(()=>$('sendMenu')&&/Pas encore/.test($('sendMenu').textContent));$('toSend').click();});
+T('Chaînage : sans résultat -> « Pas encore de résultat »',async()=>{NOXE.open('json');$('toSend').click();await until(()=>$('sendMenu')&&/Pas encore/.test($('sendMenu').textContent));$('toSend').click();});
 T('Ctrl+Entrée (runMain) : UUID régénéré',async()=>{NOXE.open('uuid');const a=$('modal').textContent;NOXE.runMain();await sleep(20);if($('modal').textContent===a)throw new Error('rien n\'a changé');});
 
 /* ---- v3 : sauvegarde complète ---- */
@@ -178,7 +230,7 @@ T('Sauvegarde : aller-retour complet, secrets exclus',async()=>{const S=snap(),t
     /* 2e import du même fichier : rien en double, la note n'est pas écrasée par plus ancien */
     BACKUP.apply(BACKUP.validate(JSON.parse(txt)).clean);if(getLS('averse-fav').length!==2)throw new Error('favoris en double');
   }finally{restoreLS(S);if(theme)document.documentElement.dataset.style=theme;else delete document.documentElement.dataset.style;}});
-T('Sauvegarde : fichier piégé → entrées refusées',async()=>{
+T('Sauvegarde : fichier piégé -> entrées refusées',async()=>{
   const v=BACKUP.validate(JSON.parse('{"app":"averse","kind":"sauvegarde","version":1,'+
     '"notes":{"a":{"id":"<img src=x onerror=alert(1)>","title":"t"},"b":{"id":"ok1","title":{}},"c":{"id":"ok2","title":"<b>x</b>","body":5,"tags":[{},"a"],"updated":9e15},"d":{"id":"__proto__","title":"p"}},'+
     '"deleted":{"__proto__":1,"zz":"x"},"fav":["json","../evil","outil_inconnu",3],"recent":"pas une liste",'+
@@ -210,13 +262,13 @@ T('KaTeX : pas d\'XSS (\\href javascript:, HTML, \\htmlData, marqueurs forgés)'
   if(window.__xss)throw new Error('script exécuté');if(!d.querySelector('.katex'))throw new Error('rien rendu');d.remove();});
 
 /* ---- v3 : clic droit (ctxmenu.js) ---- */
-T('Clic droit : sur un résultat → copier / envoyer / carnet / outil associé',async()=>{NOXE.open('base64',{tab:'enc'});fill('b_in','Bonjour');
+T('Clic droit : sur un résultat -> copier / envoyer / carnet / outil associé',async()=>{NOXE.open('base64',{tab:'enc'});fill('b_in','Bonjour');
   const cb=$('toolBody').querySelector('.codebox');const e=ctxAt(cb);if(!e.defaultPrevented||!$('ctxMenu'))throw new Error('pas de menu');
   has(ctxLabels().join('|'),'Copier','Envoyer vers…','Ajouter au carnet','Ouvrir l\'outil associé : Base64');
-  kd(document.activeElement,'ArrowDown');if(document.activeElement!==$('ctxMenu').querySelectorAll('button')[1])throw new Error('↓ ne bouge pas');
+  kd(document.activeElement,'ArrowDown');if(document.activeElement!==$('ctxMenu').querySelectorAll('button')[1])throw new Error('v ne bouge pas');
   kd(document.activeElement,'Escape');if($('ctxMenu'))throw new Error('Échap ne ferme pas');if(NOXE.current()!=='base64')throw new Error('Échap a fermé l\'outil');});
 T('Clic droit : « Envoyer vers… » (sous-menu) et « Copier »',async()=>{const cb=$('toolBody').querySelector('.codebox');ctxAt(cb);ctxClick('Envoyer vers');
-  await until(()=>/JSON/.test(ctxLabels().join()));has(ctxLabels().join('|'),'← Retour','URL','Hash');ctxClick('URL');await until(()=>NOXE.current()==='url');
+  await until(()=>/JSON/.test(ctxLabels().join()));has(ctxLabels().join('|'),'<- Retour','URL','Hash');ctxClick('URL');await until(()=>NOXE.current()==='url');
   if($('u_in').value!=='Qm9uam91cg==')throw new Error('u_in='+$('u_in').value);
   const old=window.copy;let got=null;window.copy=t=>{got=t;};try{ctxAt($('toolBody').querySelector('.out .line[data-copy]'));ctxClick('Copier');await sleep(20);}finally{window.copy=old;}
   if(!got)throw new Error('rien copié');});
@@ -225,7 +277,7 @@ T('Clic droit : natif avec Maj, et dans un champ sans sélection',async()=>{cons
   if(ctxAt($('toolBody').querySelector('.out .line[data-copy]'),{shiftKey:true}).defaultPrevented)throw new Error('Maj ignoré');
   i.focus();i.setSelectionRange(0,4);if(!ctxAt(i).defaultPrevented)throw new Error('sélection ignorée');has($('ctxMenu').textContent,'Sélection · 4 car.');
   ctxClick('Ajouter au carnet');});
-T('Clic droit : fichier dans Optimiser → renommer, infos, copier, retirer',async()=>{NOXE.open('optimiser',{files:[await png(2,2,'un.png'),await png(5,3,'deux.png')]});
+T('Clic droit : fichier dans Optimiser -> renommer, infos, copier, retirer',async()=>{NOXE.open('optimiser',{files:[await png(2,2,'un.png'),await png(5,3,'deux.png')]});
   await until(()=>$('orows')&&$('orows').querySelectorAll('[data-i]').length===2);
   ctxAt($('orows').querySelector('tr[data-fi="0"]'));
   const L=ctxLabels().join('|');has(L,'Ouvrir dans un autre outil','Renommer pour l\'export…','Télécharger','Copier l\'image','Retirer de la liste','Infos');
@@ -239,7 +291,7 @@ T('Clic droit : fichier dans Optimiser → renommer, infos, copier, retirer',asy
   ctxAt($('orows').querySelector('tr[data-fi="0"]'));ctxClick('Ouvrir dans un autre outil');await until(()=>/Éditer|Éditeur|Mettre en PDF|Images en PDF/.test(ctxLabels().join()));
   kd(document.activeElement,'ArrowLeft');await until(()=>/Retirer/.test(ctxLabels().join()));ctxClick('Retirer');
   await until(()=>$('orows').querySelectorAll('tr[data-fi]').length===1);has($('orows').textContent,'deux');});
-T('Clic droit : PDF dans la liste → infos (pages) et renommer',async()=>{await NOXE.lib('js/vendor/pdf-lib.min.js');const {PDFDocument}=PDFLib;
+T('Clic droit : PDF dans la liste -> infos (pages) et renommer',async()=>{await NOXE.lib('js/vendor/pdf-lib.min.js');const {PDFDocument}=PDFLib;
   const mk=async(n,name)=>{const d=await PDFDocument.create();for(let i=0;i<n;i++)d.addPage();return new File([await d.save()],name,{type:'application/pdf'});};
   NOXE.open('pdfoutils',{files:[await mk(3,'a.pdf'),await mk(1,'b.pdf')]});await until(()=>$('pd_list'),6000);
   ctxAt($('pd_list').querySelector('[data-fi="0"]'));ctxClick('Infos');await until(()=>document.querySelector('.ctx-info'));has(document.querySelector('.ctx-info').textContent,'Pages','3');
@@ -247,7 +299,7 @@ T('Clic droit : PDF dans la liste → infos (pages) et renommer',async()=>{await
   ctxAt($('pd_list').querySelector('[data-fi="1"]'));ctxClick('Renommer');await until(()=>$('ctxIn'));$('ctxIn').value='annexe';$('ctxIn').form.requestSubmit();
   await until(()=>/annexe\.pdf/.test($('pd_list').textContent));
   ctxAt($('pd_list').querySelector('[data-fi="1"]'));ctxClick('Ouvrir dans un autre outil');await until(()=>/Fusionner/.test(ctxLabels().join()));kd(document.activeElement,'Escape');});
-T('Clic droit : miniature d\'Images en PDF → retirer',async()=>{NOXE.open('pdf',{files:[await png(),await png(4,4,'z.png')]});await until(()=>$('pprev')&&$('pprev').querySelector('[data-fi="1"] img'));
+T('Clic droit : miniature d\'Images en PDF -> retirer',async()=>{NOXE.open('pdf',{files:[await png(),await png(4,4,'z.png')]});await until(()=>$('pprev')&&$('pprev').querySelector('[data-fi="1"] img'));
   ctxAt($('pprev').querySelector('[data-fi="1"] img'));has(ctxLabels().join('|'),'Retirer de la liste','Infos');ctxClick('Retirer');await until(()=>$('plist').querySelectorAll('[data-fi]').length===1);});
 
 
@@ -282,11 +334,11 @@ T('« Ouvrir avec » (launchQueue simulé) : PDF, JSON, texte, images',async()=>
   if(await N.routeFiles([pdf],'open')!=='pdfoutils')throw new Error('pdf');
   if(await N.routeFiles([new W.File(['{"a":[1,2]}'],'d.json',{type:'application/json'})],'open')!=='json'||!/"a"/.test(W.document.getElementById('j_in').value))throw new Error('json');
   if(await N.routeFiles([new W.File([JWT],'jeton.txt',{type:'text/plain'})],'open')!=='jwt')throw new Error('txt jwt');
-  if(await N.routeFiles([new W.File(['Penser à acheter du pain'],'courses.txt',{type:'text/plain'})],'open')!=='carnet'||W.document.getElementById('nq_t').value!=='courses')throw new Error('txt → carnet');
+  if(await N.routeFiles([new W.File(['Penser à acheter du pain'],'courses.txt',{type:'text/plain'})],'open')!=='carnet'||W.document.getElementById('nq_t').value!=='courses')throw new Error('txt -> carnet');
   if(await N.routeFiles([await png()],'open')!=='images')throw new Error('image');
   await until(()=>!W.document.getElementById('suggest').hidden);has(W.document.getElementById('suggest').textContent,'Ouvert : img.png','Optimiser');
   if(typeof W.launchQueue==='undefined')console.info('launchQueue absent ici (normal hors appli installée)');});
-T('Partage (share_target simulé : cache « averse-share ») → bon outil',async()=>{const c=await W.caches.open('averse-share');
+T('Partage (share_target simulé : cache « averse-share ») -> bon outil',async()=>{const c=await W.caches.open('averse-share');
   await c.put('./__share/meta',new Response(JSON.stringify({title:'Lien',text:'',url:'https://exemple.fr/?q=café',files:0})));
   if(await N.takeShare()!=='url')throw new Error('url');if(W.document.getElementById('u_in').value!=='https://exemple.fr/?q=café')throw new Error('u_in');
   if((await c.keys()).length)throw new Error('cache pas vidé');
@@ -297,7 +349,7 @@ T('Partage (share_target simulé : cache « averse-share ») → bon outil',asyn
 T('Installer : bouton caché, affiché sur beforeinstallprompt, prompt() au clic',async()=>{const b=W.document.querySelector('[data-install]');if(!b.hidden)throw new Error('visible trop tôt');
   const e=new W.Event('beforeinstallprompt',{cancelable:true});let asked=0;e.prompt=()=>{asked++;};e.userChoice=Promise.resolve({outcome:'accepted'});W.dispatchEvent(e);
   if(b.hidden||!e.defaultPrevented)throw new Error('pas affiché');b.click();await sleep(20);if(asked!==1||!b.hidden)throw new Error('prompt '+asked);});
-T('Clic droit : note du panneau Ctrl+J → épingler, renommer',async()=>{
+T('Clic droit : note du panneau Ctrl+J -> épingler, renommer',async()=>{
   const d=getLS('noxe-notes',{notes:{}})||{notes:{}};d.notes.n_ctx={id:'n_ctx',title:'Note clic droit',body:'x',tags:[],created:1,updated:2};setLS('noxe-notes',d);
   W.notePanel.open();await until(()=>W.document.querySelector('.np-item[data-id="n_ctx"]'));
   const it=W.document.querySelector('.np-item[data-id="n_ctx"]'),r=it.getBoundingClientRect();
@@ -305,7 +357,7 @@ T('Clic droit : note du panneau Ctrl+J → épingler, renommer',async()=>{
   const L=()=>[...W.document.querySelectorAll('#ctxMenu button')].map(b=>b.textContent);await until(()=>L().length);
   has(L().join('|'),'Ouvrir','Renommer…','Dupliquer','Épingler en haut','Ajouter un tag…','Exporter .md','Exporter PDF','Supprimer…');
   [...W.document.querySelectorAll('#ctxMenu button')].find(b=>/Épingler/.test(b.textContent)).click();
-  await until(()=>getLS('noxe-notes').notes.n_ctx.pinned===true);await until(()=>/◆ Note clic droit/.test(W.document.querySelector('.np-item').textContent));
+  await until(()=>getLS('noxe-notes').notes.n_ctx.pinned===true);await until(()=>/\* Note clic droit/.test(W.document.querySelector('.np-item').textContent));
   W.notePanel.close();F.remove();});
 
 /* ---- v3 : le carnet (notes.html) : formules, impression PDF, clic droit sur une note ---- */
@@ -324,7 +376,7 @@ const wL=()=>[...W.document.querySelectorAll('#ctxMenu button')].map(b=>b.textCo
 const wClick=lab=>{const b=[...W.document.querySelectorAll('#ctxMenu button')].find(b=>b.textContent.includes(lab));if(!b)throw new Error('pas de « '+lab+' » : '+wL().join('|'));b.click();};
 const wAsk=async v=>{await until(()=>W.document.getElementById('ctxIn'));const i=W.document.getElementById('ctxIn');i.value=v;i.form.requestSubmit();};
 const nd=()=>W.notesDebug.data;
-T('Carnet : clic droit sur une note → les 8 actions',async()=>{const item=()=>W.document.querySelector('#list [data-id="n_b"]');
+T('Carnet : clic droit sur une note -> les 8 actions',async()=>{const item=()=>W.document.querySelector('#list [data-id="n_b"]');
   wctx(item());has(wL().join('|'),'Ouvrir','Renommer…','Dupliquer','Épingler en haut','Ajouter un tag…','Exporter .md','Exporter PDF','Supprimer…');
   wClick('Renommer');await wAsk('Autre renommée');await until(()=>nd().notes.n_b.title==='Autre renommée');
   wctx(item());wClick('Ajouter un tag');await wAsk('important');await until(()=>nd().notes.n_b.tags.includes('important'));
@@ -377,13 +429,13 @@ T('Images : pas de fuite d\'URL d\'aperçu (relances, fermeture)',async()=>{cons
   NOXE.open('optimiser',{files:fs});await until(()=>$('orows')&&$('orows').querySelectorAll('img').length===3);
   const n0=NOXE.liveUrls();
   for(const q of [60,70,80,90,50]){$('oqr').value=q;$('oqr').dispatchEvent(new Event('input',{bubbles:true}));await sleep(300);await until(()=>$('orows').querySelectorAll('img').length===3);}
-  const n1=NOXE.liveUrls();if(n1>n0+1)throw new Error(n0+' → '+n1+' URL vivantes');
+  const n1=NOXE.liveUrls();if(n1>n0+1)throw new Error(n0+' -> '+n1+' URL vivantes');
   NOXE.close();if(NOXE.liveUrls()!==0)throw new Error(NOXE.liveUrls()+' après fermeture');return n0+' URL vivantes, '+n1+' après 5 relances, 0 après fermeture';});
 
 /* ---- v4 : synchro par fichier (fichier OPFS = « dossier OneDrive » simulé ; un autre appareil écrit dedans) ---- */
 let S4,FH;
 /* v5 : fichier OPFS si possible ; sinon (Safari, navigation privée…) un faux fichier en mémoire avec la même interface
-   (getFile → File avec lastModified, createWritable → write/close). La logique testée est exactement la même. */
+   (getFile -> File avec lastModified, createWritable -> write/close). La logique testée est exactement la même. */
 function memHandle(name){let f=new File([''],name,{lastModified:Date.now()}),gone=false;
   const nf=()=>{const e=new Error('introuvable');e.name='NotFoundError';return e;};
   return{kind:'file',name,mem:true,getFile:async()=>{if(gone)throw nf();return f;},
@@ -400,7 +452,7 @@ const fread=async()=>(await FH.getFile()).text();
 const fwrite=async t=>{await sleep(15);const w=await FH.createWritable();await w.write(typeof t==='string'?t:JSON.stringify(t));await w.close();};   // « l'autre appareil »
 const fjson=async()=>JSON.parse(await fread());
 const sst=()=>W.document.getElementById('syncState');
-T('Synchro : lier un fichier → écrit, état « synchro OK »',async()=>{S4=snap();localStorage.removeItem('noxe-sync');
+T('Synchro : lier un fichier -> écrit, état « synchro OK »',async()=>{S4=snap();localStorage.removeItem('noxe-sync');
   const t=Date.now()-60000;
   setLS('noxe-notes',{notes:{s_a:{id:'s_a',title:'Alpha',body:'a1',tags:[],created:t,updated:t},s_b:{id:'s_b',title:'Bravo',body:'b1',tags:[],created:t,updated:t}},openId:'s_a',deleted:{}});
   await frame('notes.html',()=>W.notesSync&&W.document.getElementById('list').children.length);
@@ -409,7 +461,7 @@ T('Synchro : lier un fichier → écrit, état « synchro OK »',async()=>{S4=sn
   if(W.notesSync.state()!=='ok')throw new Error(W.notesSync.state());has(sst().textContent,'synchro OK');
   const d=await fjson();if(d.app!=='averse'||!d.notes.s_a||!d.notes.s_b||d.openId)throw new Error('contenu');
   const before=(await FH.getFile()).lastModified;await W.notesSync.sync('poll');if((await FH.getFile()).lastModified!==before)throw new Error('réécrit sans raison');});
-T('Synchro : modif sur l\'autre appareil (ajout, modif, suppression) → fusionnée, « modifié ailleurs »',async()=>{
+T('Synchro : modif sur l\'autre appareil (ajout, modif, suppression) -> fusionnée, « modifié ailleurs »',async()=>{
   const d=await fjson(),t=Date.now();d.notes.s_a.body='a2 (autre PC)';d.notes.s_a.updated=t;
   d.notes.s_c={id:'s_c',title:'Charlie',body:'c1',tags:[],created:t,updated:t};delete d.notes.s_b;d.deleted.s_b=t;await fwrite(d);
   await W.notesSync.sync('poll');const n=nd().notes;
@@ -422,11 +474,11 @@ T('Synchro : détectée toute seule (intervalle) et au retour sur l\'onglet (foc
   await until(()=>nd().notes.s_c.body==='c2',3000);W.notesSync.setPoll(60000);
   const d2=await fjson();d2.notes.s_c.body='c3';d2.notes.s_c.updated=Date.now();await fwrite(d2);
   W.dispatchEvent(new W.Event('focus'));await until(()=>nd().notes.s_c.body==='c3',3000);});
-T('Synchro : modif locale → écrite dans le fichier (Ctrl+S implicite)',async()=>{
+T('Synchro : modif locale -> écrite dans le fichier (Ctrl+S implicite)',async()=>{
   W.document.querySelector('#list [data-id="s_a"]').click();await until(()=>W.document.getElementById('titleIn').value==='Alpha');
   const b=W.document.getElementById('bodyIn')||W.document.querySelector('textarea');b.value='a3 tapé ici';b.dispatchEvent(new W.Event('input',{bubbles:true}));
   await until(async()=>(await fjson()).notes.s_a.body==='a3 tapé ici',4000);await until(()=>W.notesSync.state()==='ok',2000);});
-T('Synchro : CONFLIT (modifiée des deux côtés) → les deux versions gardées',async()=>{
+T('Synchro : CONFLIT (modifiée des deux côtés) -> les deux versions gardées',async()=>{
   const t=Date.now(),l=nd().notes.s_c;l.body='version ICI';l.updated=t;            // modif locale pas encore écrite
   const d=await fjson();d.notes.s_c.body='version LÀ-BAS';d.notes.s_c.updated=t+5;await fwrite(d);
   await W.notesSync.sync('poll');
@@ -436,22 +488,22 @@ T('Synchro : CONFLIT (modifiée des deux côtés) → les deux versions gardées
   const f=await fjson();if(!f.notes[cp.id]||f.notes.s_c.body!=='version LÀ-BAS')throw new Error('fichier');
   await W.notesSync.sync('poll');if(Object.values(nd().notes).filter(n=>(n.tags||[]).includes('conflit')).length!==1)throw new Error('copie en double');
   return 'copie : « '+cp.title+' »';});
-T('Synchro : supprimée ici mais modifiée là-bas → gardée en copie',async()=>{
+T('Synchro : supprimée ici mais modifiée là-bas -> gardée en copie',async()=>{
   const d0=await fjson();d0.notes.s_c.body='c rédigée là-bas';d0.notes.s_c.updated=Date.now();
   await sleep(5);const td=Date.now()+50;delete nd().notes.s_c;nd().deleted.s_c=td;               // suppression locale, après la modif distante
   await fwrite(d0);await W.notesSync.sync('poll');
   if(nd().notes.s_c)throw new Error('ressuscitée');
   const cp=Object.values(nd().notes).find(n=>n.body==='c rédigée là-bas');if(!cp||!cp.tags.includes('conflit'))throw new Error('modif perdue');
   const f=await fjson();if(f.notes.s_c||!f.deleted.s_c)throw new Error('pierre tombale pas écrite');});
-T('Synchro : fichier illisible (synchro OneDrive en cours) → erreur, fichier PAS écrasé, puis reprise',async()=>{
+T('Synchro : fichier illisible (synchro OneDrive en cours) -> erreur, fichier PAS écrasé, puis reprise',async()=>{
   const ok=await fread(),bad=ok.slice(0,Math.floor(ok.length/2));await fwrite(bad);
   await W.notesSync.sync('poll');if(W.notesSync.state()!=='err')throw new Error(W.notesSync.state());has(sst().textContent,'erreur','illisible');
   if(await fread()!==bad)throw new Error('fichier écrasé');if(!nd().notes.s_a)throw new Error('notes perdues');
   const d=JSON.parse(ok);d.notes.s_a.title='Alpha bis';d.notes.s_a.updated=Date.now();await fwrite(d);
   await W.notesSync.sync('poll');if(!/^(ok|ext)$/.test(W.notesSync.state())||nd().notes.s_a.title!=='Alpha bis')throw new Error('pas repris : '+W.notesSync.state());});
-T('Synchro : fichier supprimé → erreur claire',async()=>{await dropTestFile();
+T('Synchro : fichier supprimé -> erreur claire',async()=>{await dropTestFile();
   await W.notesSync.sync('poll');if(W.notesSync.state()!=='err')throw new Error(W.notesSync.state());has(sst().textContent,'introuvable');});
-T('Synchro : navigateur sans l\'API (Firefox / Safari) → message Sauvegarde / Restaurer',async()=>{W.notesSync.unlink();W.notesDebug.FS.ok=false;
+T('Synchro : navigateur sans l\'API (Firefox / Safari) -> message Sauvegarde / Restaurer',async()=>{W.notesSync.unlink();W.notesDebug.FS.ok=false;
   W.document.getElementById('fileBtn').click();await until(()=>W.document.querySelector('.ctx-dlg'));
   has(W.document.querySelector('.ctx-dlg').textContent,'Firefox','Sauvegarde','Restaurer','OneDrive');W.document.querySelector('.ctx-dlg [data-x]').click();
   F.remove();restoreLS(S4);localStorage.removeItem('noxe-sync');});
@@ -459,7 +511,7 @@ T('Synchro : navigateur sans l\'API (Firefox / Safari) → message Sauvegarde / 
 /* ---- graphe à 500 notes ----
    v5 : tests DÉTERMINISTES. Avant, on attendait que l'animation (requestAnimationFrame) se calme toute seule : sur un
    téléphone lent, ou un cadre hors écran / onglet en arrière-plan, le navigateur ralentit rAF à quelques images par
-   seconde → « délai dépassé » alors que tout marchait. Maintenant on fait les pas de calcul nous-mêmes (même code),
+   seconde -> « délai dépassé » alors que tout marchait. Maintenant on fait les pas de calcul nous-mêmes (même code),
    et on vérifie seulement ensuite que la boucle rAF s'arrête bien d'elle-même. */
 const GT=['cours','réseau','linux','tp','stage'];
 const gD=()=>W.notesDebug,gS=()=>W.graphStats(),gC=()=>W.document.getElementById('graph');
@@ -485,13 +537,13 @@ T('Graphe : glisser un nœud relance, puis ça se rearrête',async()=>{const {x,
   gpe('pointerdown',x,y);gpe('pointermove',x+30,y+20);gpe('pointermove',x+60,y+40);
   if(!gS().running)throw new Error('pas relancé');gpe('pointerup',x+60,y+40);
   gSettle();await until(()=>!gS().running,8000);});
-T('Graphe : groupes « par tag » → une forme et une couleur par groupe, légende',async()=>{
+T('Graphe : groupes « par tag » -> une forme et une couleur par groupe, légende',async()=>{
   W.document.querySelector('[data-gl="tags"]').click();const S=gD().settings;
   if(S.groups.length!==5)throw new Error(S.groups.length+' groupes');
   const shapes=new Set(S.groups.map(g=>g.shape)),cols=new Set(S.groups.map(g=>g.color));
   if(shapes.size!==5||cols.size!==5)throw new Error('formes/couleurs pas distinctes');
   const sc=gD().styleOf('g0');if(sc!==S.groups.find(g=>g.tag===GT[0]))throw new Error('g0 pas dans #'+GT[0]);
-  if(gD().styleOf('g9')!==S.other)throw new Error('note sans tag → « Sans groupe »');
+  if(gD().styleOf('g9')!==S.other)throw new Error('note sans tag -> « Sans groupe »');
   const rows=W.document.querySelectorAll('#graphLegend [data-gtog]');if(rows.length!==6)throw new Error(rows.length+' lignes de légende');
   has(W.document.getElementById('graphLegend').textContent,'#cours','Sans groupe','100');
   if(JSON.parse(localStorage.getItem('averse-graph')).groups.length!==5)throw new Error('pas enregistré');});
@@ -503,7 +555,7 @@ T('Graphe : changer la forme et la couleur d\'un groupe (fenêtre d\'édition)',
   if(gD().styleOf('g2').shape!=='star')throw new Error('note pas mise à jour');
   if(JSON.parse(localStorage.getItem('averse-graph')).groups[i].shape!=='star')throw new Error('pas enregistré');
   box.querySelector('[data-ge="x"]').click();if(!box.hidden)throw new Error('pas fermée');});
-T('Graphe : légende → masquer / réafficher un groupe ; filtre par tag',async()=>{
+T('Graphe : légende -> masquer / réafficher un groupe ; filtre par tag',async()=>{
   const i=gD().settings.groups.findIndex(g=>g.tag==='cours'),cb=()=>W.document.querySelector('#graphLegend [data-gtog="'+i+'"]');
   cb().click();if(gS().nodes!==400)throw new Error(gS().nodes+' nœuds (attendu 400)');if(gD().G.nodes.some(n=>n.id==='g0'))throw new Error('g0 visible');
   cb().click();if(gS().nodes!==500)throw new Error('pas réaffiché');
@@ -523,7 +575,7 @@ T('Graphe : molette et pincement à deux doigts zooment',async()=>{const D=gD(),
   s0=D.G.scale;const t={pointerType:'touch'};
   gpe('pointerdown',cx-40,cy,11,t);gpe('pointerdown',cx+40,cy,12,t);gpe('pointermove',cx-120,cy,11,t);gpe('pointermove',cx+120,cy,12,t);
   gpe('pointerup',cx-120,cy,11,t);gpe('pointerup',cx+120,cy,12,t);
-  if(!(D.G.scale>s0*2))throw new Error('pincement : '+s0.toFixed(2)+' → '+D.G.scale.toFixed(2));
+  if(!(D.G.scale>s0*2))throw new Error('pincement : '+s0.toFixed(2)+' -> '+D.G.scale.toFixed(2));
   W.document.querySelector('[data-zoom="fit"]').click();if(!(D.G.scale<s0))throw new Error('« tout voir »');});
 T('Graphe : clic = focus (voisins en avant), 2e clic = ouvrir la note',async()=>{const D=gD();gSettle();D.fit();
   const {x,y}=gZoomOn('g5');gpe('pointerdown',x,y);gpe('pointerup',x,y);
@@ -583,7 +635,7 @@ function fakePasskeys(opt){const keys={};opt=opt||{};const b=u=>VAULT.b64(new Ui
     get:async({publicKey:o})=>{const id=b(o.allowCredentials[0].id),k=keys[id];if(!k)throw new DOMException('aucune passkey','NotAllowedError');
       const hk=await crypto.subtle.importKey('raw',k,{name:'HMAC',hash:'SHA-256'},false,['sign']);
       const out=await crypto.subtle.sign('HMAC',hk,new Uint8Array(o.extensions.prf.eval.first));return{getClientExtensionResults:()=>({prf:{results:{first:out}}})};}};}
-T('Coffre (vault.js) : mot de passe ET passkey nécessaires ; mauvais l\'un ou l\'autre → refus',async()=>{
+T('Coffre (vault.js) : mot de passe ET passkey nécessaires ; mauvais l\'un ou l\'autre -> refus',async()=>{
   const {vault:v,dk}=await VAULT.create({iter:100000}),prf=VAULT.rnd(32);
   const s=await VAULT.addDevice(v,dk,'bon mot de passe',prf,{name:'x',credId:'c',prfSalt:'s'});
   const back=await VAULT.openDevice(v,s,'bon mot de passe',prf);if(VAULT.b64(back)!==VAULT.b64(dk))throw new Error('aller-retour');
@@ -607,12 +659,12 @@ let GH,PK,S5,DKT;
 const cd=()=>W.cloudDebug,cst=()=>W.cloudSync.state();
 async function otherDevice(fn){                              // « l'autre appareil » : ouvre le coffre avec la clé, modifie, réécrit
   const v=GH.vault(),k=await VAULT.dkKey(DKT),d=await VAULT.openData(v,k);await fn(d);await VAULT.sealData(v,k,d);GH.write(v);}
-T('Synchro Gist : mode test → réseau coupé tant qu\'aucun faux GitHub n\'est branché',async()=>{S5=snap();const t=Date.now()-60000;
+T('Synchro Gist : mode test -> réseau coupé tant qu\'aucun faux GitHub n\'est branché',async()=>{S5=snap();const t=Date.now()-60000;
   setLS('noxe-notes',{notes:{k_a:{id:'k_a',title:'Kilo',body:'k1',tags:[],created:t,updated:t},k_b:{id:'k_b',title:'Lima',body:'l1',tags:[],created:t,updated:t}},openId:'k_a',deleted:{}});
   await frame('notes.html',()=>W.cloudDebug&&W.document.getElementById('list').children.length);
   if(cst()!=='off')throw new Error(cst());let e=null;cd().setCreds(fakePasskeys());cd().setIter(100000);
   try{await cd().setup(GTOK,GPW,'PC test');}catch(x){e=x;}if(!e||!/réseau coupé/.test(e.message))throw new Error('réseau pas coupé');});
-T('Synchro Gist : 1er appareil → Gist SECRET, notes chiffrées ; rien de neuf → 304',async()=>{GH=fakeGitHub();PK=fakePasskeys();
+T('Synchro Gist : 1er appareil -> Gist SECRET, notes chiffrées ; rien de neuf -> 304',async()=>{GH=fakeGitHub();PK=fakePasskeys();
   cd().setFetch(GH.fetch);cd().setCreds(PK);cd().setTimes(600000,150);
   const r=await cd().setup(GTOK,GPW,'PC test');DKT=r.dk.slice();await W.cloudSync.sync('t');
   const g=GH.one();if(!g||g.public!==false)throw new Error('pas secret');const txt=g.hist[0].files['averse-carnet.json'];
@@ -620,16 +672,16 @@ T('Synchro Gist : 1er appareil → Gist SECRET, notes chiffrées ; rien de neuf 
   if(cst()!=='ok')throw new Error(cst());has(W.document.getElementById('cloudState').textContent,'synchronisé');
   const n=GH.log.length;await W.cloudSync.sync('t');const l=GH.log.slice(n);if(l.length!==1||!l[0].inm)throw new Error(JSON.stringify(l));
   if(JSON.stringify(localStorage).includes(GPW))throw new Error('mot de passe enregistré !');});
-T('Synchro Gist : modif sur l\'autre appareil → fusionnée ; modif ici → envoyée seule',async()=>{
+T('Synchro Gist : modif sur l\'autre appareil -> fusionnée ; modif ici -> envoyée seule',async()=>{
   await otherDevice(d=>{const t=Date.now();d.notes.k_a.body='k2 (téléphone)';d.notes.k_a.updated=t;d.notes.k_c={id:'k_c',title:'Mike',body:'m',tags:[],created:t,updated:t};});
   await W.cloudSync.sync('t');if(nd().notes.k_a.body!=='k2 (téléphone)'||!nd().notes.k_c)throw new Error('pas fusionné');if(cst()!=='ext')throw new Error(cst());
   W.document.querySelector('#list [data-id="k_b"]').click();await until(()=>W.document.getElementById('titleIn').value==='Lima');
   const b=W.document.getElementById('bodyIn');b.value='l2 tapé ici';b.dispatchEvent(new W.Event('input',{bubbles:true}));
   await until(async()=>{const k=await VAULT.dkKey(DKT);return(await VAULT.openData(GH.vault(),k)).notes.k_b.body==='l2 tapé ici';},5000);});
-T('Synchro Gist : CONFLIT → les deux versions gardées',async()=>{
+T('Synchro Gist : CONFLIT -> les deux versions gardées',async()=>{
   /* v6 : « l'autre appareil » du test écrit dans le faux Gist SANS vérifier l'historique (un vrai AVERSE le ferait).
      Si une synchro de fond (focus de la fenêtre, surtout WebKit) envoyait notre « Mike ICI » PENDANT qu'il préparait son
-     écriture, il l'écrasait à l'aveugle : plus un conflit vu d'ici → pas de copie (échec ~1 fois sur 3 sur WebKit).
+     écriture, il l'écrasait à l'aveugle : plus un conflit vu d'ici -> pas de copie (échec ~1 fois sur 3 sur WebKit).
      Donc : synchro au repos, l'autre appareil écrit d'abord, puis la modif locale et la synchro, d'un seul coup. */
   const CM=W.cloudDebug.M;clearTimeout(CM.t);
   for(let i=0;i<5;i++){await W.cloudSync.sync('t');await sleep(150);if(!CM.busy&&!CM.again)break;}
@@ -642,23 +694,23 @@ T('Synchro Gist : CONFLIT → les deux versions gardées',async()=>{
   /* v6 : si une synchro était déjà en cours (focus, envoi différé), sync() rend CELLE-LÀ et la nôtre suit 60 ms après (M.again) :
      on attend donc que la copie arrive dans le Gist au lieu de la vérifier à l'instant (échec aléatoire ~1 fois sur 4 sur mobile) */
   const k=await VAULT.dkKey(DKT);await until(async()=>!!(await VAULT.openData(GH.vault(),k)).notes[cp.id],4000).catch(()=>{throw new Error('copie pas envoyée');});});
-T('Synchro Gist : écriture de l\'autre appareil PENDANT la nôtre → récupérée (historique), rien perdu',async()=>{await W.cloudSync.sync('t');
+T('Synchro Gist : écriture de l\'autre appareil PENDANT la nôtre -> récupérée (historique), rien perdu',async()=>{await W.cloudSync.sync('t');
   nd().notes.k_a.body='k3 ici';nd().notes.k_a.updated=Date.now();
   GH.beforePatch(()=>otherDevice(d=>{d.notes.k_b.body='l3 là-bas';d.notes.k_b.updated=Date.now();}));
   await W.cloudSync.sync('t');await sleep(200);await until(()=>!W.cloudDebug.M.busy,4000);
   const k=await VAULT.dkKey(DKT),d=await VAULT.openData(GH.vault(),k);
   if(d.notes.k_a.body!=='k3 ici'||d.notes.k_b.body!=='l3 là-bas'||nd().notes.k_b.body!=='l3 là-bas')throw new Error('écriture perdue : '+d.notes.k_a.body+' / '+d.notes.k_b.body);});
-T('Synchro Gist : mauvais mot de passe / passkey absente → refus clair',async()=>{let e=null;
+T('Synchro Gist : mauvais mot de passe / passkey absente -> refus clair',async()=>{let e=null;
   try{await cd().fullUnlock('pas le bon');}catch(x){e=x;}if(!e||e.code!=='pw'||!/incorrect/.test(e.message))throw new Error('mauvais mot de passe : '+(e&&e.message));
   cd().setCreds(fakePasskeys());e=null;try{await cd().fullUnlock(GPW);}catch(x){e=x;}
   if(!e||e.code!=='passkey')throw new Error('passkey absente : '+(e&&e.message));cd().setCreds(PK);
   const u=await cd().fullUnlock(GPW);if(VAULT.b64(u.dk)!==VAULT.b64(DKT))throw new Error('déverrouillage');});
-T('Synchro Gist : appairage → le nouvel appareil reçoit clé + jeton (mot de passe exigé)',async()=>{
+T('Synchro Gist : appairage -> le nouvel appareil reçoit clé + jeton (mot de passe exigé)',async()=>{
   const p=await cd().startPair(GPW);has(p.link,'#pair='+GH.one().id+'.');
   const o=await VAULT.openPair(GH.vault(),p.code,GPW);if(o.token!==GTOK||VAULT.b64(o.dk)!==VAULT.b64(DKT))throw new Error('contenu');
   let e=null;try{await VAULT.openPair(GH.vault(),p.code,'faux');}catch(x){e=x;}if(!e)throw new Error('sans mot de passe');
   if(!W.cloudSync.parsePair(p.link)||W.cloudSync.parsePair('n\'importe quoi'))throw new Error('lecture du code');});
-T('Synchro Gist (v6) : un modèle de note part chiffré avec les notes ; rien de neuf → 304 ; modèle de l\'autre appareil reçu',async()=>{await W.cloudSync.sync('t');
+T('Synchro Gist (v6) : un modèle de note part chiffré avec les notes ; rien de neuf -> 304 ; modèle de l\'autre appareil reçu',async()=>{await W.cloudSync.sync('t');
   const t=W.TPL.save({name:'Modèle synchro',title:'S {{date}}',body:'corps'});await W.cloudSync.sync('t');
   const k=await VAULT.dkKey(DKT);let d=await VAULT.openData(GH.vault(),k);if(!d.templates||!d.templates.items[t.id])throw new Error('modèle pas envoyé');
   if(/Modèle synchro/.test(JSON.stringify(GH.vault())))throw new Error('modèle en clair');
@@ -668,7 +720,7 @@ T('Synchro Gist (v6) : un modèle de note part chiffré avec les notes ; rien de
   await W.cloudSync.sync('t');if(!W.TPL.get('tel'))throw new Error('modèle distant pas reçu');});
 /* ---- v9 : synchro moins fréquente, avant de partir, pièces jointes chiffrées, conflit à la même milliseconde ---- */
 const idle=async()=>{const CM=W.cloudDebug.M;clearTimeout(CM.t);for(let i=0;i<12;i++){await W.cloudSync.sync('t');await sleep(120);if(!CM.busy&&!CM.again&&!W.cloudSync.pending())return;}throw new Error('synchro jamais au repos ('+W.cloudSync.status()+')');};
-T('Synchro Gist (v9) : rien n\'a changé → AUCUNE requête (ouvrir/relire des notes) ; coup d\'œil = lecture conditionnelle (304)',async()=>{await idle();
+T('Synchro Gist (v9) : rien n\'a changé -> AUCUNE requête (ouvrir/relire des notes) ; coup d\'œil = lecture conditionnelle (304)',async()=>{await idle();
   const n=GH.log.length;
   for(const id of ['k_a','k_b','k_a']){W.document.querySelector('#list [data-id="'+id+'"]').click();await sleep(60);}
   W.cloudLater();await sleep(700);                            // envoi différé = 150 ms ici : rien ne doit partir
@@ -677,14 +729,14 @@ T('Synchro Gist (v9) : rien n\'a changé → AUCUNE requête (ouvrir/relire des 
   cd().M.checked=0;cd().setTimes(250,150);await until(()=>GH.log.length>n,3000);await sleep(150);cd().setTimes(600000,150);
   const l=GH.log.slice(n);if(!l.length||l.some(x=>x.m!=='GET'||!x.inm))throw new Error('coup d\'œil : '+JSON.stringify(l));
   has(W.document.getElementById('cloudState').title,'Dernière synchro');return l.length+' GET conditionnel(s), 0 PATCH';});
-T('Synchro Gist (v9) : envoi groupé (debounce) — 5 frappes → 1 seul PATCH',async()=>{await idle();cd().setTimes(600000,400);
+T('Synchro Gist (v9) : envoi groupé (debounce) — 5 frappes -> 1 seul PATCH',async()=>{await idle();cd().setTimes(600000,400);
   W.document.querySelector('#list [data-id="k_b"]').click();await until(()=>W.document.getElementById('titleIn').value==='Lima');
   const n=GH.log.length,b=W.document.getElementById('bodyIn');
   for(let i=0;i<5;i++){b.value='l4 frappe '+i;b.dispatchEvent(new W.Event('input',{bubbles:true}));await sleep(120);}
   if(GH.log.slice(n).some(x=>x.m==='PATCH'))throw new Error('envoyé pendant la frappe');
   const k=await VAULT.dkKey(DKT);await until(async()=>(await VAULT.openData(GH.vault(),k)).notes.k_b.body==='l4 frappe 4',4000);
   const p=GH.log.slice(n).filter(x=>x.m==='PATCH').length;cd().setTimes(600000,150);if(p!==1)throw new Error(p+' PATCH');});
-T('Avant de partir (v9) : confirmation SEULEMENT si des modifs ne sont pas synchronisées ; pagehide → dernier envoi keepalive',async()=>{await idle();
+T('Avant de partir (v9) : confirmation SEULEMENT si des modifs ne sont pas synchronisées ; pagehide -> dernier envoi keepalive',async()=>{await idle();W.notesSync.unlink();                       // un fichier lié resté « en erreur » par un test précédent bloquerait beforeunload à juste titre
   const bu=()=>{const e=new W.Event('beforeunload',{cancelable:true});W.dispatchEvent(e);return e.defaultPrevented;};
   if(bu())throw new Error('demande alors que tout est synchronisé');
   cd().setTimes(600000,600000);                               // l'envoi différé n'arrivera pas pendant le test
@@ -695,7 +747,7 @@ T('Avant de partir (v9) : confirmation SEULEMENT si des modifs ne sont pas synch
   const l=GH.log.slice(n);if(l.length!==1||l[0].m!=='PATCH'||!l[0].ka)throw new Error('pagehide : '+JSON.stringify(l));
   const k=await VAULT.dkKey(DKT);if((await VAULT.openData(GH.vault(),k)).notes.k_b.body!=='l5 pas encore envoyé')throw new Error('keepalive pas écrit');
   cd().setTimes(600000,150);await idle();if(bu())throw new Error('demande encore après la synchro');});
-T('Conflit (v9) : modifiées à la MÊME milliseconde, textes différents → une copie, les deux appareils convergent',async()=>{await idle();
+T('Conflit (v9) : modifiées à la MÊME milliseconde, textes différents -> une copie, les deux appareils convergent',async()=>{await idle();
   const t=Date.now()-1000;
   await otherDevice(d=>{d.notes.k_c.body='Même ms LÀ-BAS';d.notes.k_c.updated=t;});
   const l=nd().notes.k_c;l.body='Même ms ICI';l.updated=t;
@@ -706,7 +758,7 @@ T('Conflit (v9) : modifiées à la MÊME milliseconde, textes différents → un
   const cps=Object.values(nd().notes).filter(n=>(n.tags||[]).includes('conflit')&&/Même ms/.test(n.body));
   if(cps.length!==1||cps[0].body===win)throw new Error('copies : '+JSON.stringify(cps.map(c=>c.body)));
   if(!d.notes[cps[0].id])throw new Error('copie pas envoyée');});
-T('Conflit (v9) : vue côte à côte — diff ligne par ligne, Garder l\'autre → copie supprimée (pierre tombale synchronisée)',async()=>{
+T('Conflit (v9) : vue côte à côte — diff ligne par ligne, Garder l\'autre -> copie supprimée (pierre tombale synchronisée)',async()=>{
   const D=W.CONFLICT.diff('a\nb\nc\nd','a\nB\nc\nd\ne').map(o=>o.t).join('');if(D!=='=-+=='+'+'&&D!=='=+-==+')throw new Error('diff '+D);
   const R=W.CONFLICT.rows(W.CONFLICT.diff('a\nb\nc','a\nB\nc'));if(R.length!==3||R[1].t!=='~'||R[1].a!=='b'||R[1].b!=='B')throw new Error('lignes '+JSON.stringify(R));
   const mt=W.CONFLICT.mergeText('x\ny','x\nz');if(!W.CONFLICT.hasMarkers(mt)||!/<<<<<<< la mienne\ny\n=======\nz\n>>>>>>> l'autre/.test(mt))throw new Error('fusion '+mt);
@@ -719,7 +771,7 @@ T('Conflit (v9) : vue côte à côte — diff ligne par ligne, Garder l\'autre �
   const g=W.document.querySelector('#cfDlg .cf-grid');
   if(g.querySelector('.cf-del').textContent!=='ligne 2 ici'||g.querySelector('.cf-add').textContent!=='ligne 2 LÀ-BAS')throw new Error('surlignage : '+g.querySelector('.cf-del').textContent+' / '+g.querySelector('.cf-add').textContent);
   if(g.querySelectorAll('.cf-c.cf-a').length!==3)throw new Error('colonnes pas alignées');
-  /* fusion : marqueurs laissés → avertissement d'abord */
+  /* fusion : marqueurs laissés -> avertissement d'abord */
   W.document.querySelector('#cfDlg [data-cf="merge"]').click();const ta=W.document.getElementById('cfTxt');has(ta.value,'<<<<<<< la mienne');
   W.document.querySelector('#cfDlg [data-cf="save"]').click();if(W.document.getElementById('cfWarn').hidden)throw new Error('pas d\'avertissement');
   ta.value='ligne 1\nligne 2 fusionnée\nligne 3';W.document.querySelector('#cfDlg [data-cf="save"]').click();
@@ -747,11 +799,11 @@ T('Pièces jointes (v9) : chiffrées dans un 2e Gist secret, JAMAIS en clair ; r
   const k=await VAULT.dkKey(DKT),d=await VAULT.openData(GH.vault(),k);if(!d.att||!d.att.items[m.id]||d.att.items[m.id].name!==m.name)throw new Error('liste pas dans le coffre chiffré');
   const back=await W.ATT._unseal(k,m.id,files[fn]);if(new TextDecoder().decode(back.slice(-MARK.length))!==MARK)throw new Error('déchiffrement');
   let e=null;try{await W.ATT._unseal(k,'aautreid1234',files[fn]);}catch(x){e=x;}if(!e)throw new Error('AAD : fichier recopié sous un autre id accepté');
-  /* « autre appareil » : le fichier n'est pas là → téléchargé et déchiffré */
+  /* « autre appareil » : le fichier n'est pas là -> téléchargé et déchiffré */
   await W.ATT._dropBlob(m.id);setLS('averse-att-sync',{});if((await W.ATT.haveIds()).has(m.id))throw new Error('drop');
   await idle();if(!(await W.ATT.haveIds()).has(m.id))throw new Error('pas reçue');
   const got=new Uint8Array(await(await W.ATT.getBlob(m.id)).arrayBuffer());if(got.length!==m.size)throw new Error('taille reçue');
-  /* rien de neuf → aucune requête pour les pièces */
+  /* rien de neuf -> aucune requête pour les pièces */
   const n=GH.log.length;await W.cloudSync.sync('t');const l=GH.log.slice(n);if(l.length!==1||!l[0].inm)throw new Error('requêtes en trop : '+JSON.stringify(l));
   /* suppression : pierre tombale dans le coffre + fichier retiré du Gist */
   await W.ATT.remove(m.id);await idle();
@@ -767,14 +819,14 @@ T('Pièces jointes (v9) : limites refusées proprement (5 Mo, type), sauvegarde 
   const v=W.ATT.validate(JSON.parse(JSON.stringify(ex)));await W.ATT._dropBlob(m.id);const k=await W.ATT.importAll(v);
   if(k!==1||!(await W.ATT.haveIds()).has(m.id))throw new Error('restauration');
   const bad=W.ATT.validate({items:{x:{id:'<img>',name:'a',type:'text/html',size:1}},blobs:{'<img>':'@@'}});if(Object.keys(bad.items).length||!bad.rejected)throw new Error('sauvegarde piégée acceptée');
-  /* aperçu : ![](att:ID) → image ; partage : texte « non partagée » */
+  /* aperçu : ![](att:ID) -> image ; partage : texte « non partagée » */
   const h=W.MD.render('![doc](att:'+m.id+')',{att:true}),hs=W.MD.render('![doc](att:'+m.id+')',{});
   if(!/<img class="att-img" data-att="/.test(h)||/<img/.test(hs)||!/non partagée/.test(hs))throw new Error('rendu '+h+' / '+hs);
   W.notesApi.open('k_b');W.document.getElementById('shareBtn').click();await until(()=>W.document.getElementById('shAtt'));
   has(W.document.getElementById('shAtt').textContent,'pas incluses');W.document.querySelector('#shareDlg [data-a="close"],#shareDlg .tpl-b:not(.primary)');
   W.document.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(50);
   await W.ATT.remove(m.id);await idle();});
-T('Synchro Gist : code de secours sur un appareil « neuf » → tout récupéré',async()=>{
+T('Synchro Gist : code de secours sur un appareil « neuf » -> tout récupéré',async()=>{
   const code=await cd().addRecoveryNow(DKT.slice());await cd().reset();if(W.cloudSync.configured())throw new Error('pas désactivé');
   delete nd().notes.k_c;
   const PK2=fakePasskeys();cd().setCreds(PK2);let e=null;
@@ -782,9 +834,9 @@ T('Synchro Gist : code de secours sur un appareil « neuf » → tout récupér�
   const gone=await cd().recover(GTOK,GH.one().id,code,'nouvelle phrase de test','Neuf');await W.cloudSync.sync('t');
   if(!nd().notes.k_c||cst()==='err')throw new Error('pas récupéré : '+W.cloudSync.status());
   if(GH.vault().slots.filter(s=>s.type==='device').length!==1)throw new Error('anciennes cases');return gone+' ancienne(s) case(s) retirée(s)';});
-T('Synchro Gist : appareil retiré ailleurs → s\'arrête ici, notes gardées',async()=>{const v=GH.vault();v.slots=v.slots.filter(s=>s.type!=='device');GH.write(v);
+T('Synchro Gist : appareil retiré ailleurs -> s\'arrête ici, notes gardées',async()=>{const v=GH.vault();v.slots=v.slots.filter(s=>s.type!=='device');GH.write(v);
   await W.cloudSync.sync('t');if(cst()!=='removed'||W.cloudSync.configured())throw new Error(cst());if(!nd().notes.k_a)throw new Error('notes perdues');});
-T('Synchro Gist : navigateur sans PRF → refus clair, aucun Gist créé',async()=>{const n=Object.keys(GH.G).length;cd().setCreds(fakePasskeys({noprf:true}));let e=null;
+T('Synchro Gist : navigateur sans PRF -> refus clair, aucun Gist créé',async()=>{const n=Object.keys(GH.G).length;cd().setCreds(fakePasskeys({noprf:true}));let e=null;
   try{await cd().setup(GTOK,GPW,'Vieux');}catch(x){e=x;}if(!e||e.code!=='noprf')throw new Error(e&&e.message);has(e.message,'PRF');
   if(Object.keys(GH.G).length!==n)throw new Error('Gist créé');});
 T('Synchro Gist : assistant (lien jeton « gist », champ masqué)',async()=>{W.cloudSync.open();await until(()=>W.document.querySelector('.cw[data-view="intro"]'));
@@ -801,7 +853,7 @@ const ocrImage=()=>new Promise(r=>{const c=document.createElement('canvas');c.wi
   x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle='#111';x.font='34px "DejaVu Sans", Arial, sans-serif';x.textBaseline='top';
   OCR_TXT.forEach((l,i)=>x.fillText(l,30,30+i*56));c.toBlob(b=>r(new File([b],'texte-accents.png',{type:'image/png'})),'image/png');});
 T('OCR : pas chargé avant d\'ouvrir l\'outil',async()=>{if(window.Tesseract||document.querySelector('script[src*="tesseract"]'))throw new Error('chargé trop tôt');
-  if(!NOXE.tools.find(t=>t.key==='ocr').image)throw new Error('outil');if(!NOXE.chainTargets({files:[await png()]}).some(x=>x[0]==='ocr'))throw new Error('chaînage image → OCR');});
+  if(!NOXE.tools.find(t=>t.key==='ocr').image)throw new Error('outil');if(!NOXE.chainTargets({files:[await png()]}).some(x=>x[0]==='ocr'))throw new Error('chaînage image -> OCR');});
 T('OCR : texte français avec accents lu sur une image générée',async()=>{const f=await ocrImage();const t0=performance.now();
   NOXE.open('ocr',{files:[f]});await until(()=>$('ocr_out')&&$('ocr_out').value,90000);const ms=performance.now()-t0;
   const norm=s=>s.normalize('NFC').replace(/\s+/g,' ').trim(),ref=norm(OCR_TXT.join(' ')),got=norm($('ocr_out').value);
@@ -811,7 +863,7 @@ T('OCR : texte français avec accents lu sur une image générée',async()=>{con
   if(!/é|è|à|ç|ô|ë|œ/.test(got))throw new Error('accents perdus');
   if((await NOXE.result()).text!==$('ocr_out').value)throw new Error('résultat principal');
   return 'précision '+(acc*100).toFixed(1)+' % (caractères), '+okW+'/'+words.length+' mots exacts, '+(ms/1000).toFixed(1)+' s';});
-T('OCR : → Carnet et chaînage du texte',async()=>{const n0=Object.keys((getLS('noxe-notes',{notes:{}})||{notes:{}}).notes).length,S=snap();
+T('OCR : -> Carnet et chaînage du texte',async()=>{const n0=Object.keys((getLS('noxe-notes',{notes:{}})||{notes:{}}).notes).length,S=snap();
   $('ocr_nb').click();const d=getLS('noxe-notes');if(Object.keys(d.notes).length!==n0+1||!Object.values(d.notes).some(n=>/château/.test(n.body)&&n.tags.includes('ocr')))throw new Error('carnet');
   restoreLS(S);const r=await NOXE.result();has(NOXE.chainTargets(r).map(x=>x[0]).join(','),'carnet','base64');
   let got=null;const old=window.copy;window.copy=t=>{got=t;};try{$('ocr_cp').click();}finally{window.copy=old;}if(!got||!/château/.test(got))throw new Error('copie');});
@@ -828,8 +880,8 @@ T('Accent : 8 couleurs prêtes, toutes lisibles (contraste ≥ 4,5:1 même en te
   if(bad.length)throw new Error('peu lisible : '+bad.map(b=>b[0]).join(','));
   if(ACCENT.PRESETS.some(([n,c])=>ACCENT.readable(c)!==c))throw new Error('une couleur prête serait modifiée');
   return ACCENT.PRESETS.map(([n,c])=>n+' '+ACCENT.check(c).soft.toFixed(1)).join(' · ');});
-T('Accent : couleur trop sombre → éclaircie automatiquement jusqu\'au contraste minimal',async()=>{
-  for(const c of ['#1a1a6e','#400000','#000000','#0a3d0a']){const r=ACCENT.readable(c);if(ACCENT.check(r).soft<4.5)throw new Error(c+' → '+r);if(r===c)throw new Error(c+' pas éclaircie');}
+T('Accent : couleur trop sombre -> éclaircie automatiquement jusqu\'au contraste minimal',async()=>{
+  for(const c of ['#1a1a6e','#400000','#000000','#0a3d0a']){const r=ACCENT.readable(c);if(ACCENT.check(r).soft<4.5)throw new Error(c+' -> '+r);if(r===c)throw new Error(c+' pas éclaircie');}
   if(ACCENT.readable('rouge')!==ACCENT.DEF||ACCENT.readable('#12345')!==ACCENT.DEF)throw new Error('valeur invalide acceptée');});
 T('Accent : appliquée via les variables CSS (--fg, --acc-rgb), theme-color, mémorisée ; violet = rien de stocké',async()=>{const S=snap();
   try{
@@ -893,9 +945,9 @@ T('Recherche : rapide avec 600 notes ; seule la note modifiée est recalculée',
 T('Recherche : fiches du mémo (sans accents) + outil Mémo insensible aux accents',async()=>{
   const r=SEARCH.memo('hote');if(!r.total||!/hôte/.test(r.list[0].title))throw new Error('mémo : '+JSON.stringify(r.list[0]));
   has(r.list[0].titleHtml,'<mark>hôte</mark>');
-  if(!SEARCH.memo('ssh').list.some(m=>m.value==='22'))throw new Error('ssh → 22');
+  if(!SEARCH.memo('ssh').list.some(m=>m.value==='22'))throw new Error('ssh -> 22');
   NOXE.open('memo');fill('mq','hote');has(text(),'hôte');NOXE.close();});
-T('Recherche (accueil) : résultats groupés Outils / Notes / Mémo, extraits, clavier ↓ Entrée',async()=>{const S=snap();
+T('Recherche (accueil) : résultats groupés Outils / Notes / Mémo, extraits, clavier v Entrée',async()=>{const S=snap();
   try{
     sNotes([{id:'q1',title:'Mémo SSH perso',body:'Pour se connecter : ssh -p 2222 admin@routeur, puis vérifier la clé.'}]);
     await frame('index.html#/',()=>{try{N=W.eval('NOXE');return !!N.search&&W.SEARCH;}catch(e){return false;}});
@@ -1041,7 +1093,7 @@ T('Partage : page de lecture (share.html) — rendu Markdown en lecture seule, X
     if(Object.keys(getLS('noxe-notes').notes).length!==n0+1)throw new Error('importée deux fois');has(d.getElementById('svImport').textContent,'Déjà');
     if(window.__xss)throw new Error('XSS exécuté !');
   }finally{if(F)F.remove();restoreLS(S);delete window.__xss;}});
-T('Partage : lien sans clé → la page demande la clé ; mauvais lien → message clair',async()=>{
+T('Partage : lien sans clé -> la page demande la clé ; mauvais lien -> message clair',async()=>{
   const r=await SHARE.encode({title:'Secret',body:'contenu',tags:[]},true);
   await frame('share.html#'+r.frag,()=>W.document&&W.document.getElementById('svKeyForm')&&!W.document.getElementById('svKeyForm').hidden);
   const d=W.document;if(d.getElementById('svKey').type!=='password')throw new Error('champ clé visible');
@@ -1051,7 +1103,7 @@ T('Partage : lien sans clé → la page demande la clé ; mauvais lien → messa
   if(d.getElementById('svTitle').textContent!=='Secret')throw new Error('titre');
   W.location.hash='#n1.abc';await until(()=>d.getElementById('svState').classList.contains('bad'));has(d.getElementById('svState').textContent,'incomplet');
   F.remove();});
-T('Partage (carnet) : fenêtre « Partager » — lien, clé à part, limite de taille → fichier .md',async()=>{const S=snap();
+T('Partage (carnet) : fenêtre « Partager » — lien, clé à part, limite de taille -> fichier .md',async()=>{const S=snap();
   try{
     const t=Date.now(),rnd=n=>{let s='';const a='abcdefghijklmnopqrstuvwxyz0123456789 ';for(let o=0;o<n;o+=50000){const u=crypto.getRandomValues(new Uint8Array(Math.min(50000,n-o)));for(const x of u)s+=a[x%a.length];}return s;};
     setLS('noxe-notes',{notes:{p1:{id:'p1',title:'Petite',body:'Bonjour **toi**',tags:[],created:t,updated:t},
@@ -1071,7 +1123,7 @@ T('Partage (carnet) : fenêtre « Partager » — lien, clé à part, limite de 
     d.getElementById('shareBtn').click();await until(()=>d.getElementById('shInfo')&&d.getElementById('shInfo').classList.contains('bad'));
     has(d.getElementById('shInfo').textContent,'trop longue','.md');if(!d.getElementById('shCopy').disabled)throw new Error('copie possible');W.SHARE.close();
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Carnet : Ctrl+K → recherche globale de l\'accueil ; le graphe suit la couleur d\'accent',async()=>{const S=snap();
+T('Carnet : Ctrl+K -> recherche globale de l\'accueil ; le graphe suit la couleur d\'accent',async()=>{const S=snap();
   try{
     await frame('notes.html',()=>W.notesDebug&&W.ACCENT);
     W.ACCENT.set('#f5b26b');if(W.notesDebug.acc!=='#f5b26b')throw new Error('graphe : '+W.notesDebug.acc);
@@ -1093,7 +1145,7 @@ T('Signaler : adresse GitHub exacte, titre / texte / étiquette bien échappés 
   for(const [t,l] of [['bug','bug'],['demande','demande'],['n_importe','bug']])if(new URL(W.FEEDBACK.url({type:t,title:'x'}).url).searchParams.get('labels')!==l)throw new Error('type '+t);
   has(new URL(W.FEEDBACK.url({type:'bug',title:'x',message:'plante'}).url).searchParams.get('body'),'Étapes pour reproduire');
   F.remove();});
-T('Signaler : message énorme → adresse < 6000 car., raccourcie proprement (emoji non coupé) ; infos techniques sans notes ni jeton ni #',async()=>{const S=snap();
+T('Signaler : message énorme -> adresse < 6000 car., raccourcie proprement (emoji non coupé) ; infos techniques sans notes ni jeton ni #',async()=>{const S=snap();
   try{
     setLS('noxe-notes',{notes:{z1:{id:'z1',title:'SECRETTITRE',body:'SECRETNOTE',tags:[],created:1,updated:1}},openId:'z1',deleted:{}});
     await frame('index.html#/json',()=>W.FEEDBACK&&W.eval('NOXE.current()')==='json');
@@ -1164,7 +1216,7 @@ T('Thèmes : texte lisible (≥ 4,5:1, texte secondaire compris) dans chaque th�
   try{const out=[],cols=ACCENT.PRESETS.map(p=>p[1]).concat(['#000000','#ffffff','#808080','#ffff00','#0000ff']);let min=99;
     for(const id of THEME.ids()){THEME.set(id);
       for(const c of cols){const e=ACCENT.effective(c),k=ACCENT.check(e);min=Math.min(min,k.soft);
-        if(k.soft<4.5||k.fg<4.5)throw new Error(id+' × '+c+' → '+e+' : '+k.fg.toFixed(2)+' / '+k.soft.toFixed(2));}
+        if(k.soft<4.5||k.fg<4.5)throw new Error(id+' × '+c+' -> '+e+' : '+k.fg.toFixed(2)+' / '+k.soft.toFixed(2));}
       /* le vrai calcul du navigateur : couleur du texte principal sur le fond de la page */
       ACCENT.set(ACCENT.DEF);const cs=getComputedStyle(document.body),rgb=s=>s.match(/[\d.]+/g).map(Number);
       const L=([r,g,b])=>{const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);};return .2126*f(r)+.7152*f(g)+.0722*f(b);};
@@ -1206,7 +1258,7 @@ T('Thèmes : vraies pages (accueil, carnet, graphe) en Papier et Terminal ; thè
     await until(()=>W.document.documentElement.dataset.theme==='neon');
     return hb;
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Thèmes : Nuit d\'orage → pluie par défaut, plus dense, éclair discret ; coupée si l\'utilisateur l\'a coupée',async()=>{const S=snap();
+T('Thèmes : Nuit d\'orage -> pluie par défaut, plus dense, éclair discret ; coupée si l\'utilisateur l\'a coupée',async()=>{const S=snap();
   try{localStorage.removeItem('averse-rain');localStorage.setItem('averse-theme','orage');
     await frame('index.html#/',()=>W.rainOn&&W.THEME);
     if(!W.rainOn())throw new Error('pluie pas activée par défaut en orage');if(W.THEME.def().rain<=1)throw new Error('densité');
@@ -1216,7 +1268,7 @@ T('Thèmes : Nuit d\'orage → pluie par défaut, plus dense, éclair discret ; 
     await frame('index.html#/',()=>W.rainOn&&W.THEME);if(W.rainOn())throw new Error('le choix « pluie coupée » est ignoré');
   }finally{if(F)F.remove();restoreLS(S);}});
 
-T('Easter egg : code Konami → confettis, puis canvas retiré et boucle arrêtée ; ignoré en tapant du texte',async()=>{
+T('Easter egg : code Konami -> confettis, puis canvas retiré et boucle arrêtée ; ignoré en tapant du texte',async()=>{
   await frame('index.html#/',()=>W.EGGS&&W.document.getElementById('q'));const d=W.document;
   const seq=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
   const ta=d.createElement('textarea');d.body.appendChild(ta);seq.forEach(k=>wkey(ta,k));ta.remove();
@@ -1231,7 +1283,7 @@ T('Easter egg : code Konami → confettis, puis canvas retiré et boucle arrêt�
   await until(()=>!W.EGGS.active(),6000);if(d.querySelector('.egg-confetti')||W.EGGS.raf()!==0)throw new Error('reste un canvas ou une boucle');
   W.EGGS.confetti();W.EGGS.stop();if(W.EGGS.active()||W.EGGS.raf())throw new Error('stop()');
   F.remove();});
-T('Easter egg : « pluie » dans la recherche → grosse averse temporaire puis retour à l\'état d\'avant (pluie coupée = arrêtée)',async()=>{const S=snap();
+T('Easter egg : « pluie » dans la recherche -> grosse averse temporaire puis retour à l\'état d\'avant (pluie coupée = arrêtée)',async()=>{const S=snap();
   try{localStorage.setItem('averse-rain','off');
     await frame('index.html#/',()=>W.EGGS&&W.rainBurst&&W.document.getElementById('q'));const d=W.document,q=d.getElementById('q');
     if(W.rainRunning())throw new Error('pluie au départ');
@@ -1243,7 +1295,7 @@ T('Easter egg : « pluie » dans la recherche → grosse averse temporaire puis 
     q.value='pluies';q.dispatchEvent(new W.Event('input',{bubbles:true}));if(W.rainBursting())throw new Error('déclenché par un autre mot');
     if(W.rainBurst(999999)>12000)throw new Error('durée non bornée');W.rainBurst(10);await until(()=>!W.rainBursting(),2000);
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Easter egg : 5 clics sur le titre AVERSE (grand titre ou logo ASCII) → les lettres coulent une fois, puis le titre revient intact',async()=>{
+T('Easter egg : 5 clics sur le titre AVERSE (grand titre ou logo ASCII) -> les lettres coulent une fois, puis le titre revient intact',async()=>{
   await frame('index.html#/',()=>W.EGGS&&W.document.querySelector('.home-head h1'));const d=W.document,hd=d.querySelector('.home-head');
   const a=hd.querySelector('.ascii-logo'),t=a&&a.getClientRects().length&&a.getBoundingClientRect().width>2?a:hd.querySelector('h1'),txt=t.textContent;
   for(let i=0;i<4;i++)t.click();if(t.querySelector('.egg-drip'))throw new Error('déclenché trop tôt');
@@ -1257,12 +1309,12 @@ T('Glyph : disque de carrés, états (think, search, download %, write, error, d
     if(g.cells.length<180||g.cells.length>289)throw new Error(g.cells.length+' cases');      // disque, pas carré
     for(const s of ['think','search','write','error','done','idle']){g.set(s);if(g.el.dataset.state!==s||g.state()!==s)throw new Error(s);if(!g.el.getAttribute('aria-label'))throw new Error('aria '+s);}
     const lit=()=>g.cells.filter(k=>k.b>.8).length/g.cells.length;
-    g.progress(.25);const a=lit();g.progress(.75);const b=lit();if(g.state()!=='download'||!(b>a+.3))throw new Error('remplissage '+a.toFixed(2)+' → '+b.toFixed(2));
+    g.progress(.25);const a=lit();g.progress(.75);const b=lit();if(g.state()!=='download'||!(b>a+.3))throw new Error('remplissage '+a.toFixed(2)+' -> '+b.toFixed(2));
     g.progress(1);if(lit()<.6)throw new Error('100 % pas plein');
     const k1=GLYPH.create({kind:'regex'}),k2=GLYPH.create({kind:'json'});k1.set('idle');k2.set('idle');
     if(k1.cells.map(c=>c.b>.3?1:0).join('')===k2.cells.map(c=>c.b>.3?1:0).join('')&&k1.cells.length)throw new Error('motifs identiques');
     g.set('error');g.frame(1);const bar=g.cells.filter(k=>k.i===k.j);if(bar.some(k=>k.b<.2*k.crater&&k.crater===1))throw new Error('barre');
-    g.token(30);if(g.state()!=='write')throw new Error('token → write');
+    g.token(30);if(g.state()!=='write')throw new Error('token -> write');
   }finally{g.destroy();}});
 T('Glyph : UNE seule boucle pour tous, arrêtée quand c\'est fini (done, error), retiré de la page ou idle',async()=>{
   const red=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1294,7 +1346,7 @@ function aiNet(){                         // remplace W.fetch : enregistre tout,
     return new W.Response(sse(/googleapis/.test(url)?'gemini':'openai'),{status:200,headers:{'content-type':'text/event-stream'}});};
   return{log,set status(s){status=s;},set parts(p){parts=p;},set delay(v){delay=v;}};
 }
-function aiWorker(model){                 // faux worker : « sac de mots » → vecteur normé de 64 cases (model : nom annoncé, v8)
+function aiWorker(model){                 // faux worker : « sac de mots » -> vecteur normé de 64 cases (model : nom annoncé, v8)
   const log=[],texts=[];const fold=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const vec=t=>{const v=new Array(64).fill(0);(fold(t).match(/[a-z]{4,}/g)||[]).forEach(w=>{let h=0x811c9dc5;for(const ch of w.slice(0,5)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}v[(h>>>0)%64]+=1;});
     const n=Math.hypot(...v)||1;return v.map(x=>x/n);};
@@ -1319,9 +1371,9 @@ T('IA : AUCUNE requête sans action (pages ouvertes, clé enregistrée, notes, r
     if(net.log.length||W.AI.stats.calls||wk.log.length)throw new Error('requête partie : '+JSON.stringify(net.log)+' '+wk.log);
     const r=aiReq();if(r.length)throw new Error('ressource IA chargée : '+r.join(' '));
     W.document.getElementById('aiBtn').click();await until(()=>W.document.getElementById('ctxMenu'));has(W.document.getElementById('ctxMenu').textContent,'Résumer cette note','Demander à mes notes');
-    W.document.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));if(net.log.length)throw new Error('menu → requête');
+    W.document.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));if(net.log.length)throw new Error('menu -> requête');
   }finally{if(F){if(F.contentWindow.AI)F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
-T('IA : « Envoyer » → UN appel Gemini (clé en en-tête, sans cookies, texte affiché = texte envoyé), flux affiché, Glyph écrit puis terminé',async()=>{const S=snap();
+T('IA : « Envoyer » -> UN appel Gemini (clé en en-tête, sans cookies, texte affiché = texte envoyé), flux affiché, Glyph écrit puis terminé',async()=>{const S=snap();
   try{await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;const net=aiNet();await W.AI.setKey('gemini',AIKEY);
     const o=W.AI.run('summary',{text:'Texte à résumer : la pluie tombe.',title:'Pluie'}),d=W.document;
     const states=[];const g=o.glyph,st0=g.set.bind(g);g.set=(s,x)=>{states.push(s);return st0(s,x);};
@@ -1339,7 +1391,7 @@ T('IA : « Envoyer » → UN appel Gemini (clé en en-tête, sans cookies, texte
     /* et sans nouveau clic : plus rien */
     await sleep(200);if(net.log.length!==1||W.AI.stats.calls!==1)throw new Error('appel en trop');
   }finally{if(F){F.contentWindow.AI&&F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
-T('IA : OpenAI-compatible (Bearer, adresse perso, [DONE]) ; erreurs 401/429 lisibles → Glyph erreur ; adresse non https refusée',async()=>{const S=snap();
+T('IA : OpenAI-compatible (Bearer, adresse perso, [DONE]) ; erreurs 401/429 lisibles -> Glyph erreur ; adresse non https refusée',async()=>{const S=snap();
   try{setLS('averse-ai',{provider:'openai',base:'https://ai.test/v1',model:{openai:'mon-modele'}});
     await frame('index.html#/',()=>W.AI&&W.document.getElementById('q'));await W.AI.ready;const net=aiNet();await W.AI.setKey('openai',OAKEY);const d=W.document;
     W.AI.run('rewrite',{text:'je suis aller a la plage'});d.querySelector('[data-ai="send"]').click();await until(()=>d.querySelector('[data-ai="copy"]'),5000);
@@ -1361,7 +1413,7 @@ T('IA : clé JAMAIS en clair (localStorage, Sauvegarde, carnet), chiffrée ; rel
     if(JSON.stringify(BACKUP.build()).includes(AIKEY))throw new Error('clé dans la Sauvegarde');
     if(localStorage.getItem('noxe-notes')&&localStorage.getItem('noxe-notes').includes(AIKEY))throw new Error('clé dans les notes');
     F.remove();await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;if(!W.AI.hasKey('gemini'))throw new Error('pas relue');
-    /* boîte abîmée → oubliée proprement (pas d'erreur, pas de clé) */
+    /* boîte abîmée -> oubliée proprement (pas d'erreur, pas de clé) */
     F.remove();localStorage.setItem('averse-ai-sec',JSON.stringify({iv:box.iv,ct:box.ct.slice(0,-4)+'AAAA'}));
     await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;if(W.AI.hasKey('gemini'))throw new Error('boîte abîmée acceptée');
     localStorage.setItem('averse-ai-sec',JSON.stringify(box));F.remove();await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;
@@ -1380,7 +1432,7 @@ T('IA : clé synchronisée CHIFFRÉE dans le Gist (faux GitHub) et reçue par l\
     await W.cloudSync.sync('t');await until(()=>W.AI.hasKey('openai'),5000);
     const net=aiNet();W.AI.run('summary',{text:'abc'});W.document.querySelector('[data-ai="send"]').click();await until(()=>net.log.length);
     if(net.log[0].headers['x-goog-api-key']!=='AIzaTEST_ONLY_second_key_000000000000')throw new Error('clé reçue pas utilisée');W.AI.close();
-    /* plus ancienne → ignorée */
+    /* plus ancienne -> ignorée */
     W.AI.syncReceive({at:1,keys:{gemini:'AIzaTEST_ONLY_old_key_00000000000000000'}});if(!W.AI.hasKey('openai'))throw new Error('ancienne clé a gagné');
     if(JSON.stringify(Object.assign({},localStorage)).includes('second_key'))throw new Error('clé reçue en clair');
   }finally{if(F)F.remove();restoreLS(S);}});
@@ -1430,7 +1482,7 @@ T('IA « demander à mes notes » (RAG) : extraits trouvés SUR l\'appareil, pui
     has(sent,'Piton de la Fournaise');if(sent!==d.getElementById('aiPre').textContent)throw new Error('envoyé ≠ montré');
     has(d.querySelector('.ai-src').textContent,'[1] Volcans');
   }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
-T('IA : clic droit (sous-menu IA ✦ : JSON, regex), palette (« ia regex »), outils JSON et Regex ; « Utiliser » remplit la regex',async()=>{const S=snap();
+T('IA : clic droit (sous-menu IA * : JSON, regex), palette (« ia regex »), outils JSON et Regex ; « Utiliser » remplit la regex',async()=>{const S=snap();
   try{await frame('index.html#/',()=>W.AI&&W.document.getElementById('q'));await W.AI.ready;const d=W.document,N=W.eval('NOXE'),net=aiNet();
     const ids=N.search('ia regex').map(r=>r.cmd);if(!ids.includes('ai-regex'))throw new Error('palette : '+ids);
     if(!N.search('reglages ia').some(r=>r.cmd==='ai-settings'))throw new Error('palette réglages');
@@ -1438,7 +1490,7 @@ T('IA : clic droit (sous-menu IA ✦ : JSON, regex), palette (« ia regex »), o
     fill2(d.getElementById('j_in'),'{"a":[1,2]}');d.getElementById('j_ai').click();await until(()=>W.AI.isOpen());
     has(d.getElementById('aiT').textContent,'Expliquer le JSON');W.AI.close();
     const ta=d.getElementById('j_in');ta.focus();ta.setSelectionRange(0,ta.value.length);wctx(ta);await until(()=>d.getElementById('ctxMenu'));
-    const ai=[...d.querySelectorAll('#ctxMenu button')].find(b=>/IA ✦/.test(b.textContent));if(!ai)throw new Error('pas de sous-menu IA');
+    const ai=[...d.querySelectorAll('#ctxMenu button')].find(b=>/IA \*/.test(b.textContent));if(!ai)throw new Error('pas de sous-menu IA');
     ai.click();await until(()=>[...d.querySelectorAll('#ctxMenu button')].some(b=>/Expliquer ce JSON/.test(b.textContent)),2000);
     [...d.querySelectorAll('#ctxMenu button')].find(b=>/Expliquer ce JSON/.test(b.textContent)).click();await until(()=>W.AI.isOpen());
     if(d.getElementById('aiPre')&&d.getElementById('aiPre').textContent!=='{"a":[1,2]}'&&!d.querySelector('[data-ai="cfg"]'))throw new Error('texte');W.AI.close();
@@ -1461,7 +1513,7 @@ T('Barre IA : option en tête pour une question, « ? », Tab ou bouton ; Entré
     /* recherche ordinaire : pas d'IA */
     for(const v of ['json','qr','pdf','couleur','base64']){qType(v);if(d.querySelector('#results .res-ai'))throw new Error('IA proposée pour « '+v+' »');}
     qType('json');const first=resItems()[0];if(!first||!/JSON/i.test(first.textContent))throw new Error('1er résultat : '+(first&&first.textContent));
-    /* question : option en tête, mais la sélection reste sur le 1er outil → Entrée ouvre l'outil */
+    /* question : option en tête, mais la sélection reste sur le 1er outil -> Entrée ouvre l'outil */
     const q=qType('json ?');const it=resItems();
     if(!it[0].classList.contains('res-ai-free')||!it[1].classList.contains('res-ai-notes'))throw new Error('options : '+it.slice(0,3).map(x=>x.className));
     has(it[0].textContent,'Demander à l\'IA','json ?');has(d.querySelector('#results .res-group').textContent,'IA');
@@ -1485,7 +1537,7 @@ T('Barre IA : option en tête pour une question, « ? », Tab ou bouton ; Entré
     /* détection de question */
     const iq=W.AIBAR.isQuestion;for(const [v,e] of [['comment ça marche',true],['what is DNS',true],['json',false],['qr code',false],['convertir des images en png',true],['quiche',false],['ip ?',true]])if(iq(v)!==e)throw new Error('isQuestion('+v+')');
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Barre IA : question libre → confirmation (texte exact) → UN appel, flux Markdown, Glyph think/write/done dans la barre ; enregistrer, Échap ; « ne plus demander »',async()=>{const S=snap();
+T('Barre IA : question libre -> confirmation (texte exact) -> UN appel, flux Markdown, Glyph think/write/done dans la barre ; enregistrer, Échap ; « ne plus demander »',async()=>{const S=snap();
   try{await homeAi();const d=W.document,net=aiNet();await W.AI.setKey('gemini',AIKEY);
     const g=W.AIBAR.glyph,sts=[],st0=g.set.bind(g);g.set=(s,x)=>{sts.push(s);return st0(s,x);};
     if(!d.querySelector('.qbar #qAi canvas.glyph'))throw new Error('glyph pas dans la barre');
@@ -1504,7 +1556,7 @@ T('Barre IA : question libre → confirmation (texte exact) → UN appel, flux M
     /* Échap : ferme le panneau, la recherche reste */
     const e=wkey(q,'Escape');if(!e.defaultPrevented||W.AIBAR.open())throw new Error('Échap');if(q.value!=='? Pourquoi la pluie tombe ?')throw new Error('recherche effacée par Échap');
     if(g.state()!=='idle')throw new Error('glyph pas revenu au repos');
-    /* « ne plus demander » : coché puis Envoyer → la fois suivante, Entrée sur l'option envoie (action explicite) */
+    /* « ne plus demander » : coché puis Envoyer -> la fois suivante, Entrée sur l'option envoie (action explicite) */
     qType('? Et la neige ?');wkey(q,'Enter');await until(()=>W.AIBAR.open());P.querySelector('#aipSkip').checked=true;P.querySelector('[data-p="send"]').click();
     await until(()=>net.log.length===2&&P.querySelector('[data-p="note"]'),5000);if(!W.AI.cfg().skipFree)throw new Error('préférence');
     wkey(q,'Escape');qType('? Et la grêle ?');await sleep(100);if(net.log.length!==2)throw new Error('envoyé en tapant');
@@ -1513,13 +1565,13 @@ T('Barre IA : question libre → confirmation (texte exact) → UN appel, flux M
     net.parts=Array(30).fill('mot ');qType('? Long ?');wkey(q,'Enter');await until(()=>g.state()==='write',3000);wkey(q,'Escape');
     if(W.AIBAR.open())throw new Error('pas fermé pendant le flux');await sleep(200);if(g.state()!=='idle')throw new Error('glyph après abandon');
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Barre IA : mes notes → recherche locale (Glyph search) puis confirmation TOUJOURS, seuls les extraits partent ; sans clé → réglages ; sens local sans clé',async()=>{const S=snap();let ids=[];
+T('Barre IA : mes notes -> recherche locale (Glyph search) puis confirmation TOUJOURS, seuls les extraits partent ; sans clé -> réglages ; sens local sans clé',async()=>{const S=snap();let ids=[];
   try{const base=[{id:'b_a',title:'Volcans',body:'Un volcan rejette du magma.\n\nLe Piton de la Fournaise est très actif.'},{id:'b_b',title:'SECRET bancaire',body:'Code carte 9999, ne jamais partager.'},
       {id:'b_c',title:'Liste de courses',body:'pain, lait, tomates'}];ids=base.map(n=>n.id);sNotes(base);
     setLS('averse-ai',{local:true,idx:'e5s-1',skipFree:true});const wk=aiWorker();
     await homeAi(()=>{W.AI.workerFactory=wk.make;});const d=W.document,net=aiNet(),P=d.getElementById('aiPanel'),g=W.AIBAR.glyph;
     if(W.AI.hasKey())throw new Error('clé ?');
-    /* sans clé : une option → réglages ; + recherche par le sens (locale) */
+    /* sans clé : une option -> réglages ; + recherche par le sens (locale) */
     const q=qType('? Quel volcan est actif');const it=resItems();
     if(!it[0].classList.contains('res-ai-setup')||!it.some(x=>x.classList.contains('res-ai-sem')))throw new Error('options sans clé : '+it.map(x=>x.className));
     wkey(q,'Enter');await until(()=>W.AI.isOpen()).catch(()=>{throw new Error('S1 '+d.querySelector('#results').innerHTML.slice(0,300));});if(!d.querySelector('.ai-set'))throw new Error('pas les réglages');W.AI.close();
@@ -1534,11 +1586,11 @@ T('Barre IA : mes notes → recherche locale (Glyph search) puis confirmation TO
     has(P.textContent,'Extraits retenus','les extraits ci-dessus');
     P.querySelector('[data-p="send"]').click();await until(()=>P.querySelector('[data-p="note"]'),5000).catch(e=>{throw new Error('U2 '+(W.document.getElementById('aiPanel').innerHTML.slice(0,300)))});
     const sent=net.log[0].body.contents[0].parts[0].text;if(sent!==pre)throw new Error('envoyé ≠ montré');has(P.querySelector('.ai-src').textContent,'[1] Volcans');
-    /* aucune note qui parle de ça → rien n'est envoyé */
+    /* aucune note qui parle de ça -> rien n'est envoyé */
     wkey(q,'Escape');const r0=W.AI.retrieve;W.AI.retrieve=async()=>[];qType('? zygomatique xylophone');d.querySelector('#results .res-ai-notes').click();await until(()=>P.querySelector('.ai-err'),5000).catch(e=>{throw new Error('U3 '+(W.document.getElementById('aiPanel').innerHTML.slice(0,300)))});
     if(g.state()!=='error')throw new Error('glyph erreur');W.AI.retrieve=r0;if(net.log.length!==1)throw new Error('envoi sans extrait');has(P.textContent,'Aucune note');
   }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
-T('Barre IA : réponse piégée (HTML, script, javascript:) affichée comme du texte ; erreur 401 → Glyph erreur ; panneau tient sur mobile',async()=>{const S=snap();
+T('Barre IA : réponse piégée (HTML, script, javascript:) affichée comme du texte ; erreur 401 -> Glyph erreur ; panneau tient sur mobile',async()=>{const S=snap();
   try{await homeAi();const d=W.document,net=aiNet(),P=d.getElementById('aiPanel');await W.AI.setKey('gemini',AIKEY);W.AI.setPref('skipFree',true);W.parent.__xss=0;
     net.parts=['<img src=x onerror="parent.__xss=1">',' <script>parent.__xss=2<\/script>',' [clic](javascript:parent.__xss=3) ','<a href="javascript:parent.__xss=4">x</a> **ok** <iframe src="about:blank"></iframe> <svg onload="parent.__xss=5">'];
     const q=qType('? piège');wkey(q,'Enter');await until(()=>P.querySelector('[data-p="note"]'),5000);await sleep(100);
@@ -1567,7 +1619,7 @@ T('IA : langue des réponses — Auto (question / note), Français, English ; re
     const net=aiNet();await A.setKey('gemini',AIKEY);A.setPref('lang','en');A.run('flashcards',{text:'Le transistor amplifie.',title:'T'});d.querySelector('[data-ai="send"]').click();
     await until(()=>net.log.length);has(net.log[0].body.systemInstruction.parts[0].text,'Answer in English.','Q:');A.close();
   }finally{if(F){F.contentWindow.AI&&F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
-T('IA locale v8 : changement de modèle → anciens vecteurs effacés et recalculés, ancien modèle retiré du cache ; préfixes E5 query/passage',async()=>{const S=snap();let ids=[];
+T('IA locale v8 : changement de modèle -> anciens vecteurs effacés et recalculés, ancien modèle retiré du cache ; préfixes E5 query/passage',async()=>{const S=snap();let ids=[];
   const OLD='https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/test/onnx/model_quantized.onnx',OTHER='https://huggingface.co/Xenova/autre-modele/resolve/test/x.onnx';
   try{const base=[{id:'m_a',title:'Transistor',body:'Le transistor amplifie le courant.'},{id:'m_b',title:'Crêpes',body:'Farine, oeufs, lait.'}];ids=base.map(n=>n.id);sNotes(base);
     const c=await caches.open('transformers-cache');await c.put(OLD,new Response('vieux'));await c.put(OTHER,new Response('autre'));
@@ -1589,13 +1641,13 @@ T('IA locale v8 : changement de modèle → anciens vecteurs effacés et recalcu
   }finally{try{(await caches.open('transformers-cache')).delete(OTHER);}catch(e){}
     if(F){const w=F.contentWindow;try{if(w.AI){await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
 
-/* ---- v9 : Photo → note, menu ⋯, Glyph agrandi, progression de l'indexation ---- */
+/* ---- v9 : Photo -> note, menu ..., Glyph agrandi, progression de l'indexation ---- */
 const wpng=async(w,h)=>{const b=await(await png(w||40,h||20)).arrayBuffer();return new W.File([b],'photo-test.png',{type:'image/png'});};
-T('Photo → note (v9) : OCR (simulé) → note + photo jointe ; « Mettre au propre » : aperçu, AUCUN envoi sans clic, puis note Markdown',async()=>{const S=snap();const made=[];
+T('Photo -> note (v9) : OCR (simulé) -> note + photo jointe ; « Mettre au propre » : aperçu, AUCUN envoi sans clic, puis note Markdown',async()=>{const S=snap();const made=[];
   try{sNotes([{id:'ph_a',title:'Existante',body:'x'}]);await frame('notes.html',()=>W.PHOTO&&W.notesApi&&W.AI);await W.AI.ready;const d=W.document,net=aiNet();
     const OCRT='Chapitre 1 : énergie\n\nE = mc2\n- la masse\n- la lumière';let calls=0;
     W.PHOTO.setEngine(async(f,prog)=>{calls++;prog('lecture du texte',.5,.5);await sleep(60);return '  '+OCRT+'  \n\n\n';});
-    const pb=d.getElementById('photoBtn');if(!pb||pb.hidden)throw new Error('bouton 📷 du carnet');pb.click();await until(()=>d.getElementById('photoDlg'));
+    const pb=d.getElementById('photoBtn');if(!pb||pb.hidden)throw new Error('bouton photo du carnet');pb.click();await until(()=>d.getElementById('photoDlg'));
     const cam=d.getElementById('phCam');if(cam.getAttribute('capture')!=='environment'||cam.accept!=='image/*')throw new Error('entrée caméra');
     W.document.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await until(()=>!d.getElementById('photoDlg'));
     W.PHOTO.open(await wpng());await until(()=>d.getElementById('phTxt')&&d.getElementById('phTxt').value);
@@ -1605,7 +1657,7 @@ T('Photo → note (v9) : OCR (simulé) → note + photo jointe ; « Mettre au pr
     await until(()=>Object.values(nd().notes).some(n=>n.title==='Chapitre 1 : énergie'&&/\(att:a/.test(n.body)),3000);
     const n1=Object.values(nd().notes).find(n=>n.title==='Chapitre 1 : énergie');made.push(n1.id);
     if(!(n1.tags||[]).includes('photo')||W.ATT.list(n1.id).length!==1)throw new Error('tag / pièce jointe');
-    /* IA : sans clé → rien n'est envoyé ; avec clé → aperçu exact, envoi seulement au clic */
+    /* IA : sans clé -> rien n'est envoyé ; avec clé -> aperçu exact, envoi seulement au clic */
     await W.AI.setKey('gemini',AIKEY);
     W.PHOTO.open(await wpng());await until(()=>d.querySelector('#photoDlg [data-ph="ai"]'));d.getElementById('phKeep').checked=false;
     d.querySelector('#photoDlg [data-ph="ai"]').click();await until(()=>d.querySelector('.ai-dlg #aiPre'));
@@ -1621,10 +1673,10 @@ T('Photo → note (v9) : OCR (simulé) → note + photo jointe ; « Mettre au pr
     const n2=Object.values(nd().notes).find(n=>/\$\$E=mc\^2\$\$/.test(n.body));made.push(n2.id);
     if(W.ATT.list(n2.id).length)throw new Error('photo jointe alors que décoché');if(!d.getElementById('preview').querySelector('.katex,.math'))return'(rendu KaTeX non vérifié ici)';
   }finally{if(F){const w=F.contentWindow;for(const id of made)try{await w.ATT.removeNote(id);}catch(e){}w.AI&&w.AI.close();w.PHOTO&&w.PHOTO.close();F.remove();}restoreLS(S);}});
-T('Carnet (v9) : menu « ⋯ » (actions secondaires) au clavier ; pièces jointes : panneau + glisser-déposer',async()=>{const S=snap();
+T('Carnet (v9) : menu « ... » (actions secondaires) au clavier ; pièces jointes : panneau + glisser-déposer',async()=>{const S=snap();
   try{sNotes([{id:'mn_a',title:'Menu',body:'x'}]);await frame('notes.html',()=>W.barMore&&W.notesAtt);const d=W.document;
     const mb=d.getElementById('moreBtn'),mm=d.getElementById('moreMenu');
-    for(const id of ['exportBtn','importBtn','bakOut','bakIn','styleBtn'])if(!mm.querySelector('#'+id))throw new Error(id+' pas dans ⋯');
+    for(const id of ['exportBtn','importBtn','bakOut','bakIn','styleBtn'])if(!mm.querySelector('#'+id))throw new Error(id+' pas dans ...');
     mb.click();if(!W.barMore.isOpen()||mb.getAttribute('aria-expanded')!=='true')throw new Error('ouverture');
     d.dispatchEvent(new W.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));if(W.barMore.isOpen())throw new Error('Échap');
     await until(()=>/\+ Joindre/.test(d.getElementById('attBox').textContent)).catch(()=>{throw new Error('panneau : '+d.getElementById('attBox').outerHTML.slice(0,200));});has(d.getElementById('attBox').textContent,'n\'incluent pas');
@@ -1634,7 +1686,7 @@ T('Carnet (v9) : menu « ⋯ » (actions secondaires) au clavier ; pièces joint
     await until(()=>W.ATT.list('mn_a').length===1).catch(()=>{throw new Error('ajout');});await until(()=>/\(att:a/.test(nd().notes.mn_a.body)).catch(()=>{throw new Error('référence : '+nd().notes.mn_a.body);});
     await until(()=>d.querySelector('#preview img.att-img[src^="blob:"]'),3000).catch(()=>{throw new Error('aperçu de l\'image');});
     if(!d.querySelector('#attBox .att-it'))throw new Error('liste');
-    /* supprimer la note → ses pièces jointes aussi (pierre tombale) */
+    /* supprimer la note -> ses pièces jointes aussi (pierre tombale) */
     const id=W.ATT.list('mn_a')[0].id;d.getElementById('delBtn').click();await until(()=>d.querySelector('.modal-overlay [data-ok]')).catch(()=>{throw new Error('confirmation');});
     d.querySelector('.modal-overlay [data-ok]').click();
     await until(()=>!nd().notes.mn_a).catch(()=>{throw new Error('suppression note');});await until(()=>!W.ATT.get(id)).catch(()=>{throw new Error('suppression PJ');});
@@ -1658,16 +1710,16 @@ T('Accueil (v9) : au repos, AUCUN outil affiché — titre AVERSE, grand Glyph (
     await sleep(400);if(!W.GLYPH.running()||N.homeState().motif!=='alive')throw new Error('Glyph immobile au repos ('+N.homeState().motif+')');
     const c=d.querySelector('#homeGlyph canvas');const a=c.toDataURL();await sleep(500);if(c.toDataURL()===a)throw new Error('aucune image ne bouge (idle vivant)');
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Accueil (v9) : clic sur le Glyph, « / », Ctrl+K, taper au clavier ou Tab → la barre ; Échap / barre vide quittée → le Glyph seul',async()=>{const S=snap();
+T('Accueil (v9) : clic sur le Glyph, « / », Ctrl+K, taper au clavier ou Tab -> la barre ; Échap / barre vide quittée -> le Glyph seul',async()=>{const S=snap();
   try{const d=await homeV9();const hv=d.getElementById('homeView'),q=d.getElementById('q'),b=d.getElementById('homeGlyph');
     const isOpen=()=>hv.dataset.home==='open'&&visible(q);
     b.focus();b.click();await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('clic');});if(b.getAttribute('aria-expanded')!=='true')throw new Error('aria-expanded');
     await until(()=>gW(d)<100,4000).catch(()=>{throw new Error('le Glyph ne se réduit pas : '+gW(d)+' '+hv.dataset.home+' '+W.getComputedStyle(d.querySelector('#homeGlyph canvas')).width+' '+W.getComputedStyle(d.getElementById('homeGlyph')).getPropertyValue('--gz')+' vw='+W.innerWidth);});
     if(![...d.querySelectorAll('#homeBlocks .tool')].some(visible)||!visible(d.querySelector('#homeBlocks .more-link')))throw new Error('barre vide : la liste complète des outils doit apparaître');
-    wkey(q,'Escape');await until(()=>hv.dataset.home==='rest'&&d.activeElement===b).catch(()=>{throw new Error('Échap → repos + focus sur le Glyph');});
+    wkey(q,'Escape');await until(()=>hv.dataset.home==='rest'&&d.activeElement===b).catch(()=>{throw new Error('Échap -> repos + focus sur le Glyph');});
     await until(()=>gW(d)>200,4000);
     wkey(d.body,'/');await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('« / »');});
-    q.blur();await until(()=>hv.dataset.home==='rest').catch(()=>{throw new Error('barre vide quittée → repos');});
+    q.blur();await until(()=>hv.dataset.home==='rest').catch(()=>{throw new Error('barre vide quittée -> repos');});
     wkey(d.body,'k',{ctrlKey:true});await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('Ctrl+K');});wkey(q,'Escape');await until(()=>hv.dataset.home==='rest');
     b.focus();wkey(b,'j');await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('taper au clavier');});wkey(q,'Escape');await until(()=>hv.dataset.home==='rest');
     q.focus();await until(()=>isOpen()).catch(()=>{throw new Error('Tab jusqu\'à la barre');});
@@ -1678,28 +1730,28 @@ T('Accueil (v9) : clic sur le Glyph, « / », Ctrl+K, taper au clavier ou Tab �
 T('Accueil (v9) : le motif du Glyph suit l\'intention pendant la frappe (PDF, image, code, note, synchro, IA…)',async()=>{const S=snap();
   try{const d=await homeV9();d.getElementById('homeGlyph').click();
     const want={'fusionner pdf':'pdf','convertir image':'image','json':'code','regex':'code','photo':'ocr','note':'note','synchro':'sync','conflit':'conflict','? pourquoi le ciel est bleu':'think','zzqx':'search','':'alive'};
-    const got=[];for(const [v,m] of Object.entries(want)){qType(v);await sleep(30);const st=N.homeState().motif;got.push(v+'→'+st);if(st!==m)throw new Error('« '+v+' » → '+st+' (attendu '+m+')');}
+    const got=[];for(const [v,m] of Object.entries(want)){qType(v);await sleep(30);const st=N.homeState().motif;got.push(v+'->'+st);if(st!==m)throw new Error('« '+v+' » -> '+st+' (attendu '+m+')');}
     if(!W.GLYPH.MOTIFS.includes('absorb'))throw new Error('motifs');
     /* chaque motif dessine autre chose */
     const g=N.homeGlyph,img={};for(const m of ['pdf','image','code','note','sync','conflict','ocr','search']){g.set(m);for(let i=0;i<40;i++)g.frame(.05);img[m]=g.cells.map(c=>c.b.toFixed(1)).join('');}
     const u=new Set(Object.values(img));if(u.size!==8)throw new Error('motifs identiques');
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Accueil (v9) : glisser un fichier → le Glyph aspire ; déposer → le bon outil (JSON → JSON, PDF → outils PDF, image → OCR / Photo → note)',async()=>{const S=snap();
+T('Accueil (v9) : glisser un fichier -> le Glyph aspire ; déposer -> le bon outil (JSON -> JSON, PDF -> outils PDF, image -> OCR / Photo -> note)',async()=>{const S=snap();
   try{const d=await homeV9();const hv=d.getElementById('homeView');
     const drag=async f=>{const dt=new W.DataTransfer();dt.items.add(f);
       d.body.dispatchEvent(new W.DragEvent('dragenter',{bubbles:true,cancelable:true,dataTransfer:dt}));d.body.dispatchEvent(new W.DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));
       if(N.homeState().motif!=='absorb'||!hv.classList.contains('h-drag'))throw new Error('survol : '+N.homeState().motif);
       d.body.dispatchEvent(new W.DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));return dt;};
     await drag(new W.File(['{"depose":42}'],'d.json',{type:'application/json'}));
-    await until(()=>W.location.hash==='#/json'&&d.getElementById('j_in')&&/depose/.test(d.getElementById('j_in').value)).catch(()=>{throw new Error('JSON → '+W.location.hash);});
+    await until(()=>W.location.hash==='#/json'&&d.getElementById('j_in')&&/depose/.test(d.getElementById('j_in').value)).catch(()=>{throw new Error('JSON -> '+W.location.hash);});
     if(hv.classList.contains('h-drag'))throw new Error('état survol resté');
     key('Escape');await until(()=>!N.current());
-    await drag(new W.File(['%PDF-1.4\n%%EOF'],'doc.pdf',{type:'application/pdf'}));await until(()=>W.location.hash==='#/pdfoutils').catch(()=>{throw new Error('PDF → '+W.location.hash);});
+    await drag(new W.File(['%PDF-1.4\n%%EOF'],'doc.pdf',{type:'application/pdf'}));await until(()=>W.location.hash==='#/pdfoutils').catch(()=>{throw new Error('PDF -> '+W.location.hash);});
     key('Escape');await until(()=>!N.current());
     await drag(await wpng(30,30));const sg=d.getElementById('suggest');await until(()=>!sg.hidden);
     if(hv.dataset.home!=='open')throw new Error('la barre doit s\'ouvrir avec les propositions');if(N.homeState().motif!=='image')throw new Error('motif '+N.homeState().motif);
-    has(sg.textContent,'Lire le texte (OCR)','Photo → note','Optimiser');
-    [...sg.querySelectorAll('[data-sug]')].find(x=>/Photo → note/.test(x.textContent)).click();await until(()=>d.getElementById('photoDlg'));W.PHOTO.close();
+    has(sg.textContent,'Lire le texte (OCR)','Photo -> note','Optimiser');
+    [...sg.querySelectorAll('[data-sug]')].find(x=>/Photo -> note/.test(x.textContent)).click();await until(()=>d.getElementById('photoDlg'));W.PHOTO.close();
   }finally{if(F)F.remove();restoreLS(S);}});
 T('Accueil (v9) : une seule boucle d\'animation, arrêtée quand l\'onglet est caché ou qu\'un outil couvre l\'accueil',async()=>{const S=snap();
   try{const d=await homeV9();await sleep(300);if(!W.GLYPH.running())throw new Error('pas animé au repos');
@@ -1725,13 +1777,13 @@ T('Glyph (v9) : plus grand (barre 46 px, réponse 64, fenêtres 64) avec une gri
 
 /* ==================== v10 ==================== */
 const offNet=(w,off)=>{Object.defineProperty(w.navigator,'onLine',{get:()=>!off,configurable:true});w.dispatchEvent(new w.Event(off?'offline':'online'));};
-T('IA v10 : Gemini rapide par défaut (flash-lite, réflexion minimale), choix du modèle dans les réglages ; ancien modèle 2.5 → budget 0',async()=>{const S=snap();
+T('IA v10 : Gemini rapide par défaut (flash-lite, réflexion minimale), choix du modèle dans les réglages ; ancien modèle 2.5 -> budget 0',async()=>{const S=snap();
   try{await homeAi();const A=W.AI;
     if(A.PROV.gemini.model!=='gemini-3.5-flash-lite')throw new Error('défaut '+A.PROV.gemini.model);
     const tf=m=>JSON.stringify(A.thinkFor(m));
     const exp={'gemini-3.5-flash-lite':'{"thinkingLevel":"minimal"}','gemini-3.6-flash':'{"thinkingLevel":"minimal"}','gemini-3.8-flash':'{"thinkingLevel":"low"}',
       'gemini-2.5-flash':'{"thinkingBudget":0}','gemini-2.5-flash-lite':'{"thinkingBudget":0}','mon-modele':'null'};
-    for(const k in exp)if(tf(k)!==exp[k])throw new Error(k+' → '+tf(k));
+    for(const k in exp)if(tf(k)!==exp[k])throw new Error(k+' -> '+tf(k));
     if(!A.MODELS.gemini.length||!/rapide/.test(A.MODELS.gemini[0][1]||A.MODELS.gemini[0].label||JSON.stringify(A.MODELS.gemini[0])))throw new Error('liste des modèles');
     A.settings();await until(()=>W.document.getElementById('aiModel'));const m=W.document.getElementById('aiModel'),dl=W.document.getElementById('aiModels');
     if(m.getAttribute('list')!=='aiModels'||!dl||dl.options.length<3)throw new Error('choix du modèle (datalist)');
@@ -1746,9 +1798,9 @@ T('IA v10 hors ligne : rien ne part, message clair + indicateur ; file d\'attent
     wkey(q,'Enter');await until(()=>P.querySelector('[data-p="queue"]'),3000).catch(()=>{throw new Error('pas de proposition : '+P.innerHTML.slice(0,300));});
     has(P.textContent,'rien n\'a été envoyé');if(net.log.length)throw new Error('envoyé hors ligne');
     if(W.AIBAR.state()!=='offline')throw new Error('état '+W.AIBAR.state());
-    /* retour du réseau SANS avoir cliqué → rien */
+    /* retour du réseau SANS avoir cliqué -> rien */
     offNet(W,false);await sleep(150);if(net.log.length)throw new Error('envoyé sans consentement');
-    /* consentement → envoi au retour */
+    /* consentement -> envoi au retour */
     offNet(W,true);P.querySelector('[data-p="queue"]').click();has(P.textContent,'En attente du réseau');await sleep(100);if(net.log.length)throw new Error('envoyé avant le réseau');
     offNet(W,false);await until(()=>P.querySelector('[data-p="note"]'),5000).catch(()=>{throw new Error('pas envoyé au retour : '+P.innerHTML.slice(0,300));});
     if(net.log.length!==1)throw new Error(net.log.length+' appels');has(P.querySelector('.aip-out').textContent,'trois morceaux');
@@ -1804,7 +1856,7 @@ T('IA v10 : question préparée pendant la frappe (local, aucun réseau) ; index
     /* index relu du disque (Worker pas forcément prêt) : la calibration doit rester celle du modèle qui a calculé les vecteurs */
     if(!(W.AI._nn().cal&&W.AI._nn().cal.nn.mu>.5))throw new Error('index relu : mauvaise calibration (modèle inconnu) mu='+(W.AI._nn().mu).toFixed(3));
     F.remove();
-    /* une note modifiée → elle seule */
+    /* une note modifiée -> elle seule */
     const nd0=getLS('noxe-notes');nd0.notes.ix_b.body='farine levure pain brioche';nd0.notes.ix_b.updated=Date.now();setLS('noxe-notes',nd0);
     wk=aiWorker(E5);await homeAi(()=>{W.AI.workerFactory=wk.make;});await W.AI.indexNotes();
     if(W.AI.timing().indexed!==1)throw new Error('note modifiée : '+W.AI.timing().indexed);
@@ -1824,7 +1876,7 @@ T('Notes liées v10 : calibrées — « très proche / proche » (jamais de %), 
     if(/%/.test(box().textContent))throw new Error('% affiché : '+box().textContent);has(box().textContent,'proche');
     W.notesApi.open('rl_d');await until(()=>box()&&/Aucune note vraiment proche/.test(box().textContent),5000).catch(()=>{throw new Error('note isolée : '+(box()&&box().textContent));});
   }finally{if(F){const w=F.contentWindow;try{await w.AI.forget(ids);}catch(e){}F.remove();}restoreLS(S);}});
-T('Partager vers AVERSE (v10) : lien → note titrée SANS requête vers le lien ; texte, JSON ; image jointe + OCR au clic',async()=>{const S=snap();const made=[];
+T('Partager vers AVERSE (v10) : lien -> note titrée SANS requête vers le lien ; texte, JSON ; image jointe + OCR au clic',async()=>{const S=snap();const made=[];
   if(!('caches' in window))throw Object.assign(new Error('Cache API absente'),{skip:true});
   const put=async(meta,files)=>{const c=await caches.open('averse-share');for(const k of await c.keys())await c.delete(k);
     for(let i=0;i<(files||[]).length;i++)await c.put('./__share/'+i,new Response(files[i],{headers:{'content-type':files[i].type,'x-name':encodeURIComponent(files[i].name)}}));
@@ -1922,7 +1974,7 @@ T('Petit écran (v10) : carnet, accueil, IA, dessin à 320 px — cibles ≥ 44 
     run++;let msg='',info='',sk=false;
     try{const r=await fn();if(typeof r==='string')info=r;ok++;}catch(e){if(e&&e.skip){sk=true;skip++;info=e.message;}else msg=e&&e.message||String(e);}   // un test peut renvoyer une mesure
     box.insertAdjacentHTML('beforeend',sk?'<div class="t skip">– '+esc(name)+' — ignoré : '+esc(info)+'</div>':
-      '<div class="t '+(msg?'bad':'ok')+'">'+(msg?'✕ ':'✓ ')+esc(name)+(msg?' — '+esc(msg):info?' — '+esc(info):'')+'</div>');
+      '<div class="t '+(msg?'bad':'ok')+'">'+(msg?'x ':'[ok] ')+esc(name)+(msg?' — '+esc(msg):info?' — '+esc(info):'')+'</div>');
     await sleep(30);
   }
   NOXE.close();

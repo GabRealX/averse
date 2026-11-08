@@ -29,7 +29,7 @@ function show(){
   $('svImport').disabled=false;$('svImport').textContent='Importer dans mon carnet';$('svOpen').hidden=true;
   $('svNote').hidden=false;
 }
-/* la note existe déjà (même titre ET même contenu) ? → on ne la duplique pas */
+/* la note existe déjà (même titre ET même contenu) ? -> on ne la duplique pas */
 function already(){
   try{const d=JSON.parse(localStorage.getItem('noxe-notes')||'{}');
     return Object.values(d.notes||{}).find(n=>n&&n.title===note.t&&n.body===note.b)||null;}catch(e){return null;}
@@ -39,7 +39,7 @@ $('svImport').addEventListener('click',()=>{
   const ex=already();
   if(ex){toast('Cette note est déjà dans ton carnet');}
   else{addToNotebook(note.t,note.b,note.g);toast('Note importée dans ton carnet');}
-  $('svImport').disabled=true;$('svImport').textContent=ex?'Déjà dans ton carnet':'Importée ✓';$('svOpen').hidden=false;
+  $('svImport').disabled=true;$('svImport').textContent=ex?'Déjà dans ton carnet':'Importée [ok]';$('svOpen').hidden=false;
 });
 $('svMd').addEventListener('click',()=>{
   if(!note)return;

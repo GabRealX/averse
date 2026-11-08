@@ -1,7 +1,7 @@
 /* tools/ocr.js — OCR : lire le texte d'une image (photo de document, capture d'écran…), 100 % sur l'appareil.
    Moteur : Tesseract.js, copié dans js/vendor/tesseract/ (rien n'est envoyé sur Internet).
    - chargé SEULEMENT quand on ouvre cet outil (≈ 4 à 8 Mo selon les langues : inutile de le faire payer à tout le monde) ;
-   - le service worker le garde dans un cache à part (« averse-ocr-1 ») dès la première utilisation → ensuite hors-ligne ;
+   - le service worker le garde dans un cache à part (« averse-ocr-1 ») dès la première utilisation -> ensuite hors-ligne ;
    - le moteur tourne dans un Worker : la page reste fluide pendant la lecture. */
 (function(){
 const {register,seg}=NOXE;
@@ -22,7 +22,7 @@ async function engine(lang,log){
     corePath:abs('core/'),                                   // dossier : le worker choisit la variante (simd ou non) adaptée
     langPath:abs('lang'),gzip:true,
     cacheMethod:'none',                                      // pas de 2e copie dans IndexedDB : le cache du SW suffit
-    workerBlobURL:false,                                     // vrai fichier → ses téléchargements passent par le SW (hors-ligne)
+    workerBlobURL:false,                                     // vrai fichier -> ses téléchargements passent par le SW (hors-ligne)
     logger:log
   });
   wLang=lang;
@@ -45,7 +45,7 @@ register({
   key:'ocr',cat:'fichiers',title:'Texte d\'une image (OCR)',image:true,
   words:'ocr texte image scanner reconnaître lire photo document capture extraire copier tesseract',
   desc:'Lit le texte d\'une photo, d\'un scan ou d\'une capture d\'écran (français, anglais). Tout se passe sur ton appareil.',
-  hint:'PNG · JPG · WEBP — glisse, colle (Ctrl+V) ou clic droit sur une image → Envoyer vers… → OCR',
+  hint:'PNG · JPG · WEBP — glisse, colle (Ctrl+V) ou clic droit sur une image -> Envoyer vers… -> OCR',
   run(p,img,file){
     let lang=localStorage.getItem('averse-ocr-lang')||'fra';if(!LANGS.some(l=>l[0]===lang))lang='fra';
     p.innerHTML=
@@ -61,14 +61,14 @@ register({
       '<div class="field" style="margin-top:16px"><label for="ocr_out">Texte reconnu</label>'+
         '<textarea id="ocr_out" readonly data-result rows="10" spellcheck="false" placeholder="Le texte lu apparaîtra ici."></textarea></div>'+
       '<div class="btn-row"><button class="btn primary" id="ocr_cp" data-main>Copier</button>'+
-        '<button class="btn ghost" id="ocr_nb">→ Carnet</button><button class="btn ghost" id="ocr_go">Relire</button>'+
+        '<button class="btn ghost" id="ocr_nb">-> Carnet</button><button class="btn ghost" id="ocr_go">Relire</button>'+
         '<button class="btn ghost" data-again>Autre image</button></div>';
     $('ocr_img').src=NOXE.urlOf(file);
     const st=$('ocr_st'),pg=$('ocr_pg'),out=$('ocr_out');
     const showOff=async()=>{
       const ok=await offline(lang),need=CORE+lang.split('+').reduce((a,l)=>a+SIZE[l],0);
-      const el=$('ocr_off');if(!el)return;                  // v5 : outil fermé entre-temps (téléphone lent) → rien à afficher
-      el.textContent=ok?'✓ Disponible hors-ligne (déjà téléchargé).':'Premier usage : ~'+mo(need)+' à télécharger une seule fois, ensuite hors-ligne.';
+      const el=$('ocr_off');if(!el)return;                  // v5 : outil fermé entre-temps (téléphone lent) -> rien à afficher
+      el.textContent=ok?'[ok] Disponible hors-ligne (déjà téléchargé).':'Premier usage : ~'+mo(need)+' à télécharger une seule fois, ensuite hors-ligne.';
     };
     const log=m=>{if(!m||!m.status)return;st.textContent=(STEP[m.status]||m.status)+(m.progress?' — '+Math.round(m.progress*100)+' %':'');pg.value=m.progress||0;};
     let token=0;

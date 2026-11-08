@@ -75,7 +75,7 @@ register({
           '<div class="group" style="margin-top:8px"><div class="row"><div class="field"><label>Vin (V)</label><input type="text" id="w_in" value="5" spellcheck="false"></div>'+
           '<div class="field"><label>Vout voulue (V)</label><input type="text" id="w_out" value="3.3" spellcheck="false"></div>'+
           '<div class="field"><label>R1 (Ω)</label><input type="text" id="w_r1" value="1k" spellcheck="false"></div></div></div><div id="w_res"></div>'+
-          '<div class="info">Vout = Vin × R2 / (R1 + R2). Exemple classique : 5 V → 3,3 V pour une entrée de ESP32. Le diviseur ne convient qu\'à une charge très faible (signal), pas à une alimentation.</div>';
+          '<div class="info">Vout = Vin × R2 / (R1 + R2). Exemple classique : 5 V -> 3,3 V pour une entrée de ESP32. Le diviseur ne convient qu\'à une charge très faible (signal), pas à une alimentation.</div>';
         function a(){
           const vin=parseSI($('v_in').value),r1=parseSI($('v_r1').value),r2=parseSI($('v_r2').value);
           ['v_in','v_r1','v_r2'].forEach(id=>$(id).classList.toggle('bad',isNaN(parseSI($(id).value))));
@@ -152,13 +152,13 @@ register({
           const stripes=d.map(i=>COL[i][1]).concat([COL[+$('cm').value][1]]);
           $('c_res').innerHTML=stripes.map(c=>'<i style="background:'+c+'"></i>').join('')+'<i class="gap"></i><i style="background:'+COL[+$('ct').value][1]+'"></i>';
           $('c_out').innerHTML=out([['Valeur',fmtSI(val,'Ω')+'  ±'+String(t).replace('.',',')+' %'],
-            ['Plage réelle',fmtSI(val*(1-t/100),'Ω')+' → '+fmtSI(val*(1+t/100),'Ω')],['Valeur brute',String(+val.toPrecision(6)).replace('.',',')+' Ω']]);
+            ['Plage réelle',fmtSI(val*(1-t/100),'Ω')+' -> '+fmtSI(val*(1+t/100),'Ω')],['Valeur brute',String(+val.toPrecision(6)).replace('.',',')+' Ω']]);
         }
         function fromValue(){
           const v=parseSI($('c_val').value);
           $('c_val').classList.toggle('bad',!!$('c_val').value.trim()&&!(v>0));
           if(!(v>0))return;
-          const n=bands-2,lo=Math.pow(10,n-1);                    // 4 bandes → 2 chiffres ; 5 bandes → 3 chiffres
+          const n=bands-2,lo=Math.pow(10,n-1);                    // 4 bandes -> 2 chiffres ; 5 bandes -> 3 chiffres
           let e=Math.floor(Math.log10(v))-(n-1),digits=Math.round(v/Math.pow(10,e));
           if(digits>=lo*10){digits=Math.round(digits/10);e++;}
           if(e<-2||e>9){toast('Valeur hors de la plage du code couleurs');return;}
@@ -189,5 +189,8 @@ register({
     ]);
   }
 });
+
+/* v11 : partagé avec circuit.js et esp32.js (chargés après ce fichier) */
+NOXE.si={parseSI,fmtSI,e24};
 
 })();

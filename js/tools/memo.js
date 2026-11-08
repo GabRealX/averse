@@ -50,7 +50,7 @@ const SECTIONS=[
  ['Deux résistances en parallèle','Req = R1×R2 / (R1+R2)'],['Diviseur de tension','Us = Ue × R2 / (R1+R2)'],['Résistance de LED','R = (Ualim − Uled) / I'],
  ['Condensateur : constante de temps','τ = R × C  (≈ 63 % de charge à τ, 99 % à 5τ)'],['Fréquence et période','f = 1 / T'],['Loi des nœuds','Σ I entrants = Σ I sortants'],['Loi des mailles','Σ U = 0 sur une maille'],
  ['Préfixes','p 10⁻¹² · n 10⁻⁹ · µ 10⁻⁶ · m 10⁻³ · k 10³ · M 10⁶ · G 10⁹']]],
-['bin','Binaire',[...pow2,['Hex → décimal','0xFF = 255'],['Octet','8 bits = 2 chiffres hexa'],['Ko / Kio','1 Ko = 1000 o · 1 Kio = 1024 o']]]
+['bin','Binaire',[...pow2,['Hex -> décimal','0xFF = 255'],['Octet','8 bits = 2 chiffres hexa'],['Ko / Kio','1 Ko = 1000 o · 1 Kio = 1024 o']]]
 ];
 
 /* v6 : exposé pour la recherche globale de l'accueil (search.js) */

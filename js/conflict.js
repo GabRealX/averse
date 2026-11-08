@@ -68,9 +68,9 @@ function check(n){
   const bar=$('cfBar');if(!bar)return;
   if(!isCopy(n)){bar.hidden=true;bar.innerHTML='';return;}
   const p=pair(n.id);bar.hidden=false;
-  bar.innerHTML=p&&p.orig?'<span>⚠ Copie de conflit : deux versions de « '+esc(p.orig.title||'Sans titre')+' » ont été modifiées en même temps.</span>'+
+  bar.innerHTML=p&&p.orig?'<span>[!] Copie de conflit : deux versions de « '+esc(p.orig.title||'Sans titre')+' » ont été modifiées en même temps.</span>'+
     '<button type="button" class="ico-btn" id="cfOpen">Comparer et régler</button>':
-    '<span>⚠ Copie de conflit : '+esc((/\(conflit — ([^)]*)\)$/.exec(n.title)||[,'gardée pour ne rien perdre'])[1])+'. La note d\'origine n\'existe plus.</span>'+
+    '<span>[!] Copie de conflit : '+esc((/\(conflit — ([^)]*)\)$/.exec(n.title)||[,'gardée pour ne rien perdre'])[1])+'. La note d\'origine n\'existe plus.</span>'+
     '<button type="button" class="ico-btn" id="cfKeep">Garder cette note</button>';
   const o=$('cfOpen');if(o)o.onclick=()=>open(n.id);
   const kp=$('cfKeep');if(kp)kp.onclick=()=>{notesApi.update(n.id,x=>{x.title=baseTitle(x.title);x.tags=(x.tags||[]).filter(t=>t!=='conflit');});toast('Conflit réglé');};
@@ -134,7 +134,7 @@ function showMerge(on,S){
 }
 function resolve(p,v){
   notesApi.update(p.orig.id,n=>{n.title=v.title||n.title;n.body=v.body;n.tags=(v.tags||[]).filter(t=>t!=='conflit').slice(0,40);});
-  notesApi.remove(p.copy.id);                                 // pierre tombale (data.deleted) → supprimée partout
+  notesApi.remove(p.copy.id);                                 // pierre tombale (data.deleted) -> supprimée partout
   close();notesApi.open(p.orig.id);toast('Conflit réglé — copie supprimée');
 }
 window.CONFLICT={diff,rows,mergeText,hasMarkers,pair,check,open,close,resolve};

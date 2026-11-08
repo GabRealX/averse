@@ -62,7 +62,7 @@ register({
       '<div class="info" id="j_st"></div>'+
       '<div class="field" style="margin-top:12px"><label>Résultat</label><textarea id="j_out" readonly style="min-height:170px" spellcheck="false"></textarea></div>'+
       '<div class="btn-row"><button class="btn primary" id="j_cp">Copier</button><button class="btn ghost" id="j_use">Remplacer l\'entrée</button>'+
-      (window.AI?'<button class="btn ghost" id="j_ai" title="Envoie ce JSON au fournisseur d\'IA choisi (après confirmation)">✦ Expliquer (IA)</button>':'')+'</div>';
+      (window.AI?'<button class="btn ghost" id="j_ai" title="Envoie ce JSON au fournisseur d\'IA choisi (après confirmation)">* Expliquer (IA)</button>':'')+'</div>';
     function render(){
       const t=$('j_in').value,st=$('j_st');
       $('j_in').classList.remove('bad');
@@ -72,11 +72,11 @@ register({
         const s=mode==='min'?JSON.stringify(v):JSON.stringify(v,null,mode==='tab'?'\t':+mode);
         $('j_out').value=s;
         const kind=Array.isArray(v)?'tableau de '+v.length+' élément'+(v.length>1?'s':''):v&&typeof v==='object'?'objet de '+Object.keys(v).length+' clé'+(Object.keys(v).length>1?'s':''):typeof v;
-        st.innerHTML='<span class="ok">✓ JSON valide</span> — '+kind+' · '+NOXE.bytes(te.encode(s).length);
+        st.innerHTML='<span class="ok">[ok] JSON valide</span> — '+kind+' · '+NOXE.bytes(te.encode(s).length);
       }catch(e){
         $('j_in').classList.add('bad');$('j_out').value='';
         const c=jsonCheck(t),pos=c?errPos(t,c.pos):null;
-        st.innerHTML='<span class="bad">✗ '+esc(c?c.msg:e.message)+(pos?' — ligne '+pos.line+', colonne '+pos.col:'')+'</span>';
+        st.innerHTML='<span class="bad">[x] '+esc(c?c.msg:e.message)+(pos?' — ligne '+pos.line+', colonne '+pos.col:'')+'</span>';
       }
     }
     $('j_in').oninput=render;$('j_sort').onchange=render;seg('j_m',v=>{mode=v;render();});
@@ -99,7 +99,7 @@ register({
       ['g','i','m','s','u'].map(f=>'<label class="check" title="'+f+'"><input type="checkbox" data-f="'+f+'"'+(f==='g'?' checked':'')+'>'+f+'</label>').join('')+'</div></div></div>'+
       '<div class="field"><label>Texte de test</label><textarea id="r_t" spellcheck="false" style="min-height:100px">contact: alice@example.com, bob@test.com</textarea></div>'+
       '<div class="field"><label>Remplacer par (optionnel — $1, $2, $&amp;)</label><input type="text" id="r_r" spellcheck="false" placeholder="ex : $2 (de $1)"></div></div>'+
-      (window.AI?'<div class="btn-row" style="margin-top:6px"><button class="btn ghost" id="r_aiX">✦ Expliquer la regex (IA)</button><button class="btn ghost" id="r_aiW">✦ Écrire une regex depuis une description (IA)</button></div>':'')+
+      (window.AI?'<div class="btn-row" style="margin-top:6px"><button class="btn ghost" id="r_aiX">* Expliquer la regex (IA)</button><button class="btn ghost" id="r_aiW">* Écrire une regex depuis une description (IA)</button></div>':'')+
       '<div id="r_out"></div>';
     /* v7 : IA (fenêtre de confirmation : rien ne part sans « Envoyer ») */
     if($('r_aiX')){
@@ -143,7 +143,7 @@ register({
       const mine=job={text,flags},rep=$('r_r').value;
       R.run({pat,flags,text,rep:rep===''?null:rep}).then(r=>{if(job===mine)show(r);}).catch(e=>{
         if(e.code==='abort'||!$('r_out'))return;
-        $('r_out').innerHTML=e.code==='timeout'?'<div class="info bad" id="r_slow">⏱ Calcul arrêté après '+NOXE.RX_TIMEOUT/1000+' s : cette expression part en « retour arrière catastrophique » '+
+        $('r_out').innerHTML=e.code==='timeout'?'<div class="info bad" id="r_slow"> Calcul arrêté après '+NOXE.RX_TIMEOUT/1000+' s : cette expression part en « retour arrière catastrophique » '+
           '(ex. <code>(a+)+$</code>). Évite les quantificateurs imbriqués comme <code>(x+)+</code> ou <code>(x|x)*</code>.</div>':'<div class="info bad">'+esc(e.message)+'</div>';
       });
     }
@@ -184,7 +184,7 @@ register({
         }
         function compare(){
           const want=$('h_cmp').value.trim().toLowerCase().replace(/\s+/g,''),got=$('h_out').dataset.copy;
-          $('h_res').innerHTML=!want||!got?'':want===got?'<span class="ok">✓ Identique : le fichier / texte n\'a pas été modifié.</span>':'<span class="bad">✗ Différent !</span>';
+          $('h_res').innerHTML=!want||!got?'':want===got?'<span class="ok">[ok] Identique : le fichier / texte n\'a pas été modifié.</span>':'<span class="bad">[x] Différent !</span>';
         }
         $('h_in').oninput=()=>{file=null;$('h_fn').textContent='';calc();};
         $('h_key').oninput=calc;$('h_cmp').oninput=compare;
@@ -290,7 +290,7 @@ register({
               if(!res.ok)throw 0;
               const line=(await res.text()).split(/\r?\n/).find(l=>l.startsWith(h.slice(5)+':'));
               if(!$('t_leakres'))return;
-              $('t_leakres').innerHTML=line?'<span class="bad">✗ Ce mot de passe apparaît dans <b>'+(+line.split(':')[1]).toLocaleString('fr-FR')+'</b> fuites. Ne l\'utilise plus.</span>':'<span class="ok">✓ Pas trouvé dans les fuites connues.</span>';
+              $('t_leakres').innerHTML=line?'<span class="bad">[x] Ce mot de passe apparaît dans <b>'+(+line.split(':')[1]).toLocaleString('fr-FR')+'</b> fuites. Ne l\'utilise plus.</span>':'<span class="ok">[ok] Pas trouvé dans les fuites connues.</span>';
             }catch(e){if($('t_leakres'))$('t_leakres').textContent='Impossible de contacter le service (connexion ?).';}
           };
         }
@@ -386,7 +386,7 @@ register({
         const L=c=>{const a=c.map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);});return .2126*a[0]+.7152*a[1]+.0722*a[2];};
         function render(){
           const t=h2rgb($('x_tt').value),b=h2rgb($('x_bt').value);if(!t||!b)return;
-          const l1=L(t),l2=L(b),r=(Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05),ok=v=>'<span class="'+(v?'ok':'bad')+'">'+(v?'✓ conforme':'✗ insuffisant')+'</span>';
+          const l1=L(t),l2=L(b),r=(Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05),ok=v=>'<span class="'+(v?'ok':'bad')+'">'+(v?'[ok] conforme':'[x] insuffisant')+'</span>';
           $('x_prev').style.background=rgb2hex(b);$('x_prev').style.color=rgb2hex(t);
           $('x_out').innerHTML='<div class="out"><div class="line"><span>Ratio</span><span>'+r.toFixed(2)+' : 1</span></div><div class="line"><span>AA · texte normal (≥ 4,5)</span><span>'+ok(r>=4.5)+'</span></div>'+
             '<div class="line"><span>AAA · texte normal (≥ 7)</span><span>'+ok(r>=7)+'</span></div><div class="line"><span>AA · grand texte (≥ 3)</span><span>'+ok(r>=3)+'</span></div></div>';

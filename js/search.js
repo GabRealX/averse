@@ -1,14 +1,14 @@
 /* search.js — v6 : la recherche GLOBALE de l'accueil (et Ctrl+K) dans les NOTES et le MÉMO
    (les outils restent notés par app.js). Pur JS, hors ligne.
-   - Insensible aux accents et à la casse : fold() garde la MÊME LONGUEUR que le texte d'origine (1 caractère → 1 caractère),
-     donc une position trouvée dans le texte « plié » est aussi la bonne dans le vrai texte → extrait surligné exact.
+   - Insensible aux accents et à la casse : fold() garde la MÊME LONGUEUR que le texte d'origine (1 caractère -> 1 caractère),
+     donc une position trouvée dans le texte « plié » est aussi la bonne dans le vrai texte -> extrait surligné exact.
    - Rapide avec 500+ notes : le texte plié de chaque note est PRÉCALCULÉ et gardé en mémoire ; il n'est recalculé
      que pour les notes modifiées (date « updated » changée) quand le carnet change (comparaison du texte stocké,
      événement « storage » des autres onglets). Une recherche = quelques includes() sur des chaînes prêtes.
    - Extrait : ~40 caractères avant la 1re occurrence, ~110 après, tout échappé, mots trouvés dans <mark>. */
 const SEARCH=(function(){
 const KEY='noxe-notes',CM=/[\u0300-\u036f]/g,ch=new Map();
-/* un caractère non ASCII → sa version minuscule sans accent, SEULEMENT si ça reste 1 caractère (sinon minuscule, sinon tel quel) */
+/* un caractère non ASCII -> sa version minuscule sans accent, SEULEMENT si ça reste 1 caractère (sinon minuscule, sinon tel quel) */
 function foldChar(c){
   let r=ch.get(c);if(r!==undefined)return r;
   const lc=c.toLowerCase();r=lc.length===1?lc:c;
@@ -19,7 +19,7 @@ const fold=s=>String(s==null?'':s).replace(/[A-Z]/g,c=>String.fromCharCode(c.cha
 const nfc=s=>String(s==null?'':s).normalize('NFC');
 
 /* ---------- index des notes ---------- */
-let rawStr=null,idx=[];const cache=new Map();   // id → {u, title, ft, body, fb, tags, ftags}
+let rawStr=null,idx=[];const cache=new Map();   // id -> {u, title, ft, body, fb, tags, ftags}
 const stats={builds:0,folded:0,ms:0};
 function entry(n){
   const c=cache.get(n.id);

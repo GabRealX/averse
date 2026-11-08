@@ -1,5 +1,5 @@
 /* attach.js — v9 : PIÈCES JOINTES d'une note (images, PDF).
-   - Ajout : bouton « + Joindre », glisser-déposer sur l'éditeur, coller (Ctrl+V) une image, ou Photo → note (photo.js).
+   - Ajout : bouton « + Joindre », glisser-déposer sur l'éditeur, coller (Ctrl+V) une image, ou Photo -> note (photo.js).
    - Stockage local : le fichier dans IndexedDB (base « averse-att »), la liste (nom, type, taille, note) dans localStorage
      « averse-att » avec ses pierres tombales — comme les notes, en clair SUR l'appareil.
    - Synchro (cloud.js) : la liste voyage DANS le coffre chiffré des notes ; chaque fichier part dans un 2e Gist secret
@@ -50,7 +50,7 @@ const haveIds=()=>tx('readonly',s=>s.getAllKeys()).then(k=>new Set(k||[])).catch
 /* ---------- ajout ---------- */
 const pref=()=>localStorage.getItem(PKEY)!=='off';
 function setPref(on){try{localStorage.setItem(PKEY,on?'on':'off');}catch(e){}}
-/* photo → WebP (si le navigateur sait l'encoder et si c'est plus petit) ; max 2560 px de côté */
+/* photo -> WebP (si le navigateur sait l'encoder et si c'est plus petit) ; max 2560 px de côté */
 async function compress(f){
   if(!/^image\/(jpeg|png)$/.test(f.type)||f.size<200*1024||typeof createImageBitmap!=='function')return f;
   try{const bm=await createImageBitmap(f),k=Math.min(1,2560/Math.max(bm.width,bm.height));
@@ -96,7 +96,7 @@ function revoke(id){if(URLS[id]){URL.revokeObjectURL(URLS[id]);delete URLS[id];}
 function resolve(root){
   if(!root)return;
   root.querySelectorAll('img[data-att]').forEach(async im=>{const id=im.dataset.att,m=get(id);
-    if(m&&m.type===DRAWT&&window.DRAW){const d=await DRAW.load(id);                 // v10 : dessin → SVG généré ici (que des <path>)
+    if(m&&m.type===DRAWT&&window.DRAW){const d=await DRAW.load(id);                 // v10 : dessin -> SVG généré ici (que des <path>)
       if(d){if(im.dataset.u)URL.revokeObjectURL(im.dataset.u);const u=DRAW.svgUrl(d);im.dataset.u=u;im.src=u;im.classList.add('att-draw');im.title='Dessin — toucher pour le modifier';
         im.alt=im.alt||'dessin';im.tabIndex=0;im.setAttribute('role','button');return;}}
     const u=m&&/^image\//.test(m.type)?await url(id):null;
@@ -134,8 +134,8 @@ function merge(d){
 }
 
 /* ---------- synchro : les fichiers (2e Gist), appelée par cloud.js APRÈS la synchro des notes ----------
-   ctx = {gh(method, path, body, opt), raw(url) → texte, key (clé de données, AES-GCM non exportable)}
-   « empreinte » de l'état : si rien n'a bougé depuis la dernière fois → AUCUNE requête. */
+   ctx = {gh(method, path, body, opt), raw(url) -> texte, key (clé de données, AES-GCM non exportable)}
+   « empreinte » de l'état : si rien n'a bougé depuis la dernière fois -> AUCUNE requête. */
 const fnv=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}return(h>>>0).toString(36)+'.'+s.length;};
 const FNAME=id=>'a-'+id+'.bin';
 const README='Pièces jointes du carnet AVERSE, chiffrées (AES-GCM) avec la clé de ta synchro. Ne pas modifier à la main.';

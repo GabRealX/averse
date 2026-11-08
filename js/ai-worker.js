@@ -8,8 +8,8 @@
      huggingface.co, à une révision FIGÉE (commit), mis en cache par Transformers.js (cache « transformers-cache »).
      Français ET anglais dans le même espace : une question en anglais retrouve une note en français.
      (v7 : all-MiniLM-L6-v2, 23 Mo, anglais seulement — comparaison chiffrée dans le README.)
-   Messages : {type:'load'} → {type:'progress',p,loaded,total} … {type:'ready'}
-              {type:'embed',id,texts} → {type:'vecs',id,vecs:[Float32Array]}   ·   erreurs : {type:'error',id?,message} */
+   Messages : {type:'load'} -> {type:'progress',p,loaded,total} … {type:'ready'}
+              {type:'embed',id,texts} -> {type:'vecs',id,vecs:[Float32Array]}   ·   erreurs : {type:'error',id?,message} */
 import {pipeline,env} from './vendor/transformers/transformers.min.js';
 
 const WASM_URL='https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6/dist/ort-wasm-simd-threaded.jsep.wasm';

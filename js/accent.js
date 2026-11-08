@@ -20,7 +20,7 @@ const hex=a=>'#'+a.map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).p
 const lin=v=>(v/=255)<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);
 const lum=a=>.2126*lin(a[0])+.7152*lin(a[1])+.0722*lin(a[2]);
 const contrast=(a,b)=>{const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
-/* RVB ↔ TSL (teinte 0-360, saturation et luminosité 0-1) */
+/* RVB <-> TSL (teinte 0-360, saturation et luminosité 0-1) */
 function hsl([r,g,b]){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,d=mx-mn;let h=0,s=0;
   if(d){s=d/(1-Math.abs(2*l-1));h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;if(h<0)h+=360;}return[h,s,l];}
 function fromHsl(h,s,l){const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2;
@@ -37,7 +37,7 @@ function readable(h){
   return hex(c);
 }
 /* v7 : la couleur réellement affichée = choix de l'utilisateur adapté au thème
-   (violet par défaut → teinte du thème ; Néon → saturée et lumineuse) */
+   (violet par défaut -> teinte du thème ; Néon -> saturée et lumineuse) */
 function effective(h){
   const T=TH();if(!ok(h))h=DEF;
   if(h===DEF&&T.base)h=T.base;

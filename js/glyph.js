@@ -5,14 +5,14 @@
    États :
      think    respiration lente et organique (on attend la réponse)
      search   balayage radar + points qui s'allument au hasard (recherche par le sens, RAG)
-     download remplissage du disque de bas en haut = progression RÉELLE (0 → 1)
+     download remplissage du disque de bas en haut = progression RÉELLE (0 -> 1)
      write    une onde qui suit le flux de texte : plus les morceaux arrivent vite, plus elle s'agite
      error    flash bref puis disque éteint barré (statique)
      done     disque plein puis fondu (statique à la fin)
      idle     disque immobile (option dim : très atténué, « au repos » dans la barre de l'accueil)
    Le « type » de demande (résumé, flashcards, regex…) dessine un petit motif sombre au centre.
    prefers-reduced-motion : pas de flash, et les états animés ne changent que 3 fois par seconde, doucement.
-   v9 : plus grand partout, et la grille gagne des points avec la taille (13 → 21 cases de côté).
+   v9 : plus grand partout, et la grille gagne des points avec la taille (13 -> 21 cases de côté).
    v9 (accueil) : le grand Glyph de l'accueil est « vivant » et change de motif selon l'intention :
      alive    au repos : respiration, clignement, regard qui se promène, petites ondes au hasard
      absorb   un fichier survole la page : des anneaux aspirés vers le centre
@@ -80,7 +80,7 @@ function create(o){
       S.rip=S.rip.filter(r=>t-r.t0<2.2);
     }
     const gx=c+c*.38*Math.sin(t*.37+seed)+c*.12*Math.sin(t*1.3),gy=c+c*.28*Math.sin(t*.23+seed*2);   // le « regard »
-    const bl=t-S.blinkT<.32?Math.sin((t-S.blinkT)/.32*Math.PI):0;                                    // paupières (0 → 1 → 0)
+    const bl=t-S.blinkT<.32?Math.sin((t-S.blinkT)/.32*Math.PI):0;                                    // paupières (0 -> 1 -> 0)
     for(const k of cells){
       let b;const nx=(k.i-c)/(c||1),ny=(k.j-c)/(c||1);
       switch(st){
@@ -132,7 +132,7 @@ function create(o){
   /* animé ? (error et done s'arrêtent seuls après leur petite transition) */
   function live(){
     if(!el.isConnected)return false;
-    if(S.pause&&!el.getClientRects().length)return false;        // v9 : pas affiché → pas d'animation
+    if(S.pause&&!el.getClientRects().length)return false;        // v9 : pas affiché -> pas d'animation
     if(MOT.has(S.state))return true;
     if(S.state==='idle')return false;
     if(S.state==='error')return S.t-S.t0<.4&&!reduce();
