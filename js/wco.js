@@ -1,5 +1,5 @@
 /* wco.js — v9 : appli installée en mode « window-controls-overlay » (Windows / Linux / macOS, Chrome et Edge).
-   Dans ce mode, la page monte jusqu'en haut de la fenêtre et les boutons ─ ☐ ✕ se posent PAR-DESSUS.
+   Dans ce mode, la page monte jusqu'en haut de la fenêtre et les boutons _ [] x se posent PAR-DESSUS.
    Le CSS (base.css) lit env(titlebar-area-*) ; ce petit script fait la même chose avec l'API JS
    (navigator.windowControlsOverlay), au cas où env() n'est pas pris en compte, et suit les changements de taille.
    Résultat : trois variables CSS --tb-l (marge à gauche), --tb-r (marge à droite), --tb-h (hauteur de la barre de titre)

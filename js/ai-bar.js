@@ -8,13 +8,13 @@
    - Pas de clé : l'option mène aux réglages IA. La recherche par le sens (100 % locale) reste disponible si activée.
    v10 : l'attente se voit.
    - Le GRAND Glyph de l'accueil reste grand pendant la recherche et la réponse, et suit chaque étape
-     (lire → search, envoyer / réfléchir → think, rédiger → write, fin → done).
+     (lire -> search, envoyer / réfléchir -> think, rédiger -> write, fin -> done).
    - Des étapes RÉELLES s'enchaînent dans le panneau : « Je lis ta question », « Je cherche dans tes 42 notes »,
      « 3 notes trouvées : X, Y, Z » (puces cliquables), « J'envoie à Gemini », « Gemini réfléchit », « Je rédige ».
      Chaque étape ne passe à la suivante que quand le travail est VRAIMENT fait (pas de fausse barre de progression) ;
      le temps écoulé de l'étape en cours s'affiche (vrai chronomètre).
    - Squelette de réponse tout de suite, puis texte qui s'écrit en douceur (au rythme de ce qui arrive), petite transition à la fin.
-   - Pendant que tu tapes une question : son vecteur est calculé à l'avance (100 % local, aucun réseau) → la recherche démarre aussitôt.
+   - Pendant que tu tapes une question : son vecteur est calculé à l'avance (100 % local, aucun réseau) -> la recherche démarre aussitôt.
    - Hors ligne : message clair (ce qui marche sans réseau, ce qui ne marche pas) et, SEULEMENT si tu cliques
      « Envoyer quand le réseau revient », la demande attend le retour du réseau (en mémoire : fermer l'onglet l'oublie). */
 (function(){
@@ -46,7 +46,7 @@ function glyphInView(again){const gl=HV.querySelector('.home-glyph');if(!gl||!HV
   if(r.top>=top-1&&r.bottom<=innerHeight+1)return;
   const smooth=again!==true&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
   scrollBy({top:r.top-top-8,behavior:smooth?'smooth':'auto'});
-  if(smooth)setTimeout(()=>glyphInView(true),450);}       // WebKit : un défilement doux peut s'arrêter en route (la page change pendant) → on corrige
+  if(smooth)setTimeout(()=>glyphInView(true),450);}       // WebKit : un défilement doux peut s'arrêter en route (la page change pendant) -> on corrige
 let cur=null;                                     // la demande en cours : {mode, q, phase, ctl, result, extracts, t0}
 function rest(){if(cur&&cur.phase==='busy')return;g.set('idle',{dim:!(AI.hasKey()||AI.local()),kind:'ask'});}
 rest();
@@ -62,7 +62,7 @@ NOXE.searchLead=(v,forced)=>{
   const out=[],P0=AI.provider(),off=!AI.online();
   if(AI.hasKey())out.push(
     {type:'ai',act:'free',title:'Demander à l\'IA : « '+cut(qq)+' »',hint:(off?'Hors ligne · ':'Question libre · ')+P0.short,run:()=>ask('free',qq)},
-    {type:'ai',act:'notes',title:'Demander à mes notes : « '+cut(qq)+' »',hint:(off?'Hors ligne · ':'Extraits → ')+P0.short,run:()=>ask('notes',qq)});
+    {type:'ai',act:'notes',title:'Demander à mes notes : « '+cut(qq)+' »',hint:(off?'Hors ligne · ':'Extraits -> ')+P0.short,run:()=>ask('notes',qq)});
   else out.push({type:'ai',act:'setup',title:'Demander à l\'IA : ajoute d\'abord ta clé d\'API…',hint:'Réglages IA',run:()=>{close();AI.settings();}});
   if(AI.local())out.push({type:'ai',act:'sem',title:'Chercher par le sens dans mes notes : « '+cut(qq)+' »',hint:off?'Local · marche hors ligne':'Local',run:()=>ask('sem',qq)});
   return out;
@@ -74,7 +74,7 @@ const B=(act,label,cls)=>'<button type="button" class="btn '+(cls||'ghost')+'" d
 function frame(title,sub){
   P.classList.remove('aip-arrive');
   P.innerHTML='<div class="aip-h"><span class="aip-glw"></span><b>'+esc(title)+'</b><span class="aip-sub">'+esc(sub)+'</span>'+
-    '<button type="button" class="aip-x" data-p="x" aria-label="Fermer (Échap)" title="Fermer (Échap)">✕</button></div>'+
+    '<button type="button" class="aip-x" data-p="x" aria-label="Fermer (Échap)" title="Fermer (Échap)">x</button></div>'+
     '<ol class="aip-steps" aria-live="polite"></ol><div class="aip-b"></div><div class="aip-a"></div>';
   P.querySelector('.aip-glw').appendChild(gp.el);gp.frame(0);
   P.hidden=false;
@@ -107,11 +107,11 @@ function close(){
   cur=null;P.hidden=true;P.innerHTML='';P.classList.remove('aip-arrive');aiMode('');rest();
 }
 function warnHtml(kind,len){const p=AI.provider();
-  return'<div class="ai-warn">⚠ '+(kind==='notes'?'Ta question <b>et les extraits ci-dessus</b>':'Ta question')+' ('+len+' caractères) <b>part chez '+esc(p.name)+'</b> ('+esc(AI.host())+', modèle '+esc(AI.model())+
+  return'<div class="ai-warn">[!] '+(kind==='notes'?'Ta question <b>et les extraits ci-dessus</b>':'Ta question')+' ('+len+' caractères) <b>part chez '+esc(p.name)+'</b> ('+esc(AI.host())+', modèle '+esc(AI.model())+
     ') avec ta clé. AVERSE n\'envoie rien d\'autre, nulle part. Évite les données sensibles.'+
     '<details><summary>Voir exactement ce qui sera envoyé</summary><pre class="ai-pre"></pre></details></div>';}
 
-/* recherche locale avec ses étapes : je lis ta question → je cherche dans tes N notes. Renvoie le résultat de fn(). */
+/* recherche locale avec ses étapes : je lis ta question -> je cherche dans tes N notes. Renvoie le résultat de fn(). */
 async function localSteps(c,qq,fn){
   const n=nNotes();
   if(AI.local()){

@@ -1,7 +1,7 @@
 /* eggs.js — v7 : petites surprises (jamais gênantes, rien ne tourne en continu)
-   1. code Konami (↑↑↓↓←→←→BA, hors champ de saisie sauf la recherche) → averse de confettis (canvas temporaire, s'arrête et disparaît seul)
-   2. taper « pluie » ou « averse » dans une recherche → grosse averse temporaire (rain.js : rainBurst)
-   3. cliquer 5 fois en 2 s sur le titre AVERSE → les lettres « dégoulinent » une fois
+   1. code Konami (^^vv<--><-->BA, hors champ de saisie sauf la recherche) -> averse de confettis (canvas temporaire, s'arrête et disparaît seul)
+   2. taper « pluie » ou « averse » dans une recherche -> grosse averse temporaire (rain.js : rainBurst)
+   3. cliquer 5 fois en 2 s sur le titre AVERSE -> les lettres « dégoulinent » une fois
    4. console : un petit parapluie ASCII (une fois)
    prefers-reduced-motion : moins de confettis, sans rotation, plus court ; titre = simple message. */
 const EGGS=(function(){
@@ -51,7 +51,7 @@ const WORD=/^(pluie|averse)$/i;const had=new WeakMap();
 document.addEventListener('input',e=>{
   const t=e.target;if(!t||!t.matches||!t.matches('#q,#search,.pal input'))return;
   const hit=WORD.test(t.value.trim());
-  if(hit&&!had.get(t)&&window.rainBurst){rainBurst(reduce()?2500:7000);if(window.toast)toast('☂ Sors le parapluie…');}
+  if(hit&&!had.get(t)&&window.rainBurst){rainBurst(reduce()?2500:7000);if(window.toast)toast(' Sors le parapluie…');}
   had.set(t,hit);
 });
 
@@ -68,7 +68,7 @@ document.addEventListener('click',e=>{
   const now=Date.now();clicks=clicks.filter(t=>now-t<2000);clicks.push(now);
   if(clicks.length<5)return;clicks=[];
   const t=titleOf(h);
-  if(reduce()||!/^(H1|PRE)$/.test(t.tagName)){if(window.toast)toast('Il pleut des lettres… (en silence) ☂');drip++;return;}
+  if(reduce()||!/^(H1|PRE)$/.test(t.tagName)){if(window.toast)toast('Il pleut des lettres… (en silence) ');drip++;return;}
   if(t.dataset.drip)return;
   const txt=t.textContent;t.dataset.drip='1';
   t.textContent='';let row=0,col=0;
@@ -85,7 +85,7 @@ document.addEventListener('click',e=>{
 
 /* --- console --- */
 try{if(!sessionStorage.getItem('averse-egg-console')){sessionStorage.setItem('averse-egg-console','1');
-  console.log('%c   .-^-.\n  /_/_\\_\\\n    |\n    J    AVERSE — tout reste dans ton navigateur. Essaie ↑↑↓↓←→←→BA.','color:#c7bce4;font-family:monospace');}}catch(e){}
+  console.log('%c   .-^-.\n  /_/_\\_\\\n    |\n    J    AVERSE — tout reste dans ton navigateur. Essaie ^^vv<--><-->BA.','color:#c7bce4;font-family:monospace');}}catch(e){}
 
 return{confetti,stop:stopConfetti,active:()=>!!conf,raf:()=>raf,drips:()=>drip};
 })();

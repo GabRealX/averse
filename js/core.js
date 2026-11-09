@@ -32,12 +32,27 @@ function copy(text,label){
 }
 
 /* v5 — tests.html tourne sur le même site que tes vraies notes : avant de commencer il range une copie de tout le
-   localStorage dans « averse-tests-backup ». Si la page de tests est fermée en plein milieu (téléphone, onglet fermé…),
-   la page suivante remet cette copie en place : tes notes ne restent jamais remplacées par les notes de test. */
+   localStorage dans « averse-tests-backup ». Si la page de tests est quittée en plein milieu (téléphone, onglet fermé,
+   clic sur « accueil »…), la page suivante remet cette copie en place.
+   v11 : correctif. Avant, si on quittait les tests DANS LE MÊME ONGLET, le drapeau de session restait levé et la copie
+   n'était jamais remise : les notes de test (N0, N1…) restaient dans le carnet à la place des vraies. Maintenant :
+   - toute page ouverte seule (ni tests.html, ni un cadre de tests.html) éteint le drapeau et remet la copie ;
+   - la remise est une FUSION pour le carnet (on ne perd pas ce qui a été écrit entre-temps), et les notes de test
+     (id g0…g499, titre N0…) ne sont jamais gardées. */
 (function(){try{
-  if(sessionStorage.getItem('averse-tests')||!localStorage.getItem('averse-tests-backup'))return;
-  const o=JSON.parse(localStorage.getItem('averse-tests-backup'));localStorage.clear();
+  const framed=window.top!==window,inTests=/tests\.html$/.test(location.pathname);
+  if(inTests||(framed&&sessionStorage.getItem('averse-tests')))return;     // les tests eux-mêmes : on ne touche à rien
+  sessionStorage.removeItem('averse-tests');
+  const raw=localStorage.getItem('averse-tests-backup');if(!raw)return;
+  const o=JSON.parse(raw),fixture=n=>n&&/^g\d+$/.test(n.id)&&/^N\d+$/.test(n.title);
+  let cur={};try{cur=JSON.parse(localStorage.getItem('noxe-notes'))||{};}catch(e){}
+  let old={};try{old=JSON.parse(o['noxe-notes'])||{};}catch(e){}
+  const notes=Object.assign({},old.notes),del=Object.assign({},old.deleted);
+  Object.entries(cur.notes||{}).forEach(([id,n])=>{if(!n||fixture(n)||/^n_(ctx|a|b|c)$/.test(id))return;if(!notes[id]||(+n.updated||0)>(+notes[id].updated||0))notes[id]=n;});
+  Object.entries(cur.deleted||{}).forEach(([id,t])=>{if(!notes[id]&&t>(del[id]||0))del[id]=t;});
+  localStorage.clear();
   for(const k in o)if(k!=='averse-tests-backup')localStorage.setItem(k,o[k]);
+  if(Object.keys(notes).length)localStorage.setItem('noxe-notes',JSON.stringify(Object.assign({},old,{notes,deleted:del,openId:old.openId&&notes[old.openId]?old.openId:Object.keys(notes)[0]||null})));
 }catch(e){}})();
 /* IndexedDB : base séparée pendant les tests (le fichier lié / la clé de synchro de l'appareil ne sont jamais touchés) */
 const IDB_NAME=(()=>{try{return sessionStorage.getItem('averse-tests')?'averse-tests':'averse';}catch(e){return 'averse';}})();

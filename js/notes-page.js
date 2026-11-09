@@ -1,18 +1,18 @@
-/* notes-page.js — petits branchements de la page carnet (v5 : plus aucun script « en ligne » dans notes.html → CSP stricte)
-   + la barre de boutons défilante sur mobile, rendue visible : fondus aux bords, flèches ‹ ›, petite barre de position. */
+/* notes-page.js — petits branchements de la page carnet (v5 : plus aucun script « en ligne » dans notes.html -> CSP stricte)
+   + la barre de boutons défilante sur mobile, rendue visible : fondus aux bords, flèches < >, petite barre de position. */
 (function(){
   const sb=$('styleBtn');if(sb)sb.addEventListener('click',()=>toggleStyle());
   const bn=$('blankNew');if(bn)bn.addEventListener('click',()=>$('newBtn').click());
   if('serviceWorker' in navigator&&location.protocol!=='file:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
-  /* ===== v9 : menu « ⋯ » (actions secondaires, ordinateur) ===== */
+  /* ===== v9 : menu « ... » (actions secondaires, ordinateur) ===== */
   const mb=$('moreBtn'),mm=$('moreMenu');
   if(mb&&mm){
     const items=()=>[...mm.querySelectorAll('button')];
     const open=(on,focus)=>{mm.classList.toggle('open',on);mb.setAttribute('aria-expanded',on?'true':'false');
       if(on&&focus)items()[0].focus();};
     mb.addEventListener('click',e=>{e.stopPropagation();open(!mm.classList.contains('open'),e.detail===0);});
-    mm.addEventListener('click',e=>{if(e.target.closest('button'))open(false);});        // une action choisie → le menu se ferme
+    mm.addEventListener('click',e=>{if(e.target.closest('button'))open(false);});        // une action choisie -> le menu se ferme
     document.addEventListener('click',e=>{if(mm.classList.contains('open')&&!e.target.closest('#barMore'))open(false);});
     mm.addEventListener('keydown',e=>{const it=items(),i=it.indexOf(document.activeElement);
       if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();it[(i+(e.key==='ArrowDown'?1:-1)+it.length)%it.length].focus();}
@@ -26,7 +26,7 @@
   const row=document.querySelector('.bar-right'),nav=$('barNav'),th=$('barThumb'),L=$('barL'),R=$('barR');
   if(!row||!nav)return;
   function update(){
-    const over=row.scrollWidth-row.clientWidth>2;           // ça déborde ? (sur ordinateur : non → rien n'apparaît)
+    const over=row.scrollWidth-row.clientWidth>2;           // ça déborde ? (sur ordinateur : non -> rien n'apparaît)
     nav.hidden=L.hidden=R.hidden=!over;row.classList.toggle('scrolls',over);
     if(!over){row.classList.remove('fade-l','fade-r');return;}
     const max=row.scrollWidth-row.clientWidth,x=row.scrollLeft,r=row.getBoundingClientRect(),br=row.parentElement.getBoundingClientRect();

@@ -1,8 +1,8 @@
 /* home.js — v9 : l'accueil sans grille d'outils. Au centre, un GRAND Glyph (l'assistant) toujours un peu vivant.
-   - clic / tap sur le Glyph, « / », Ctrl+K, ou commencer à taper → la barre de recherche apparaît (le Glyph se réduit au-dessus) ;
-   - barre ouverte et vide → la liste complète des outils (favoris, récents, familles + « Autres outils ») ;
-   - Échap, ou barre vide quand on la quitte → retour au Glyph seul ;
-   - un fichier qui survole la page → le Glyph « aspire » ; au dépôt, app.js choisit l'outil (PDF, image, JSON…) ;
+   - clic / tap sur le Glyph, « / », Ctrl+K, ou commencer à taper -> la barre de recherche apparaît (le Glyph se réduit au-dessus) ;
+   - barre ouverte et vide -> la liste complète des outils (favoris, récents, familles + « Autres outils ») ;
+   - Échap, ou barre vide quand on la quitte -> retour au Glyph seul ;
+   - un fichier qui survole la page -> le Glyph « aspire » ; au dépôt, app.js choisit l'outil (PDF, image, JSON…) ;
    - pendant la frappe, le motif du Glyph suit l'intention détectée (PDF, image, code, note, synchro, IA…).
    v10 : pendant une demande à l'IA (data-ai), le Glyph REGRANDIT au-dessus du panneau et suit les étapes (ai-bar.js).
    Une seule boucle d'animation (glyph.js), arrêtée quand l'onglet est caché ou quand l'accueil n'est pas affiché. */
@@ -20,7 +20,7 @@ const BY_KEY={pdfoutils:'pdf',pdf:'pdf',optimiser:'image',convertir:'image',edit
   carnet:'note',memo:'note',sauvegarde:'sync'};
 function intent(v){
   const t=norm(v).trim();if(!t)return'alive';
-  if(/^\?|\?$/.test(t))return'think';                        // une question → l'IA réfléchit
+  if(/^\?|\?$/.test(t))return'think';                        // une question -> l'IA réfléchit
   if(/\b(synchro|sync|gist|appareil)/.test(t))return'sync';
   if(/\bconflit/.test(t))return'conflict';
   if(/\b(photo|scan|ocr)/.test(t))return'ocr';
@@ -48,7 +48,7 @@ function flash(m,ms){hold=Date.now()+(ms||1400);clearTimeout(holdT);apply(m);hol
 /* ---------- ouvrir / refermer la barre ---------- */
 function setOpen(v,focus){
   if(v!==isOpen){isOpen=v;hv.dataset.home=v?'open':'rest';btn.setAttribute('aria-expanded',String(v));
-    if(v&&NOXE.refreshHome)NOXE.refreshHome();}               // barre vide → la liste des outils (app.js)
+    if(v&&NOXE.refreshHome)NOXE.refreshHome();}               // barre vide -> la liste des outils (app.js)
   if(v&&focus&&document.activeElement!==q)q.focus({preventScroll:true});
   mood();
 }
@@ -67,8 +67,8 @@ NOXE.homeMood=()=>{hold=0;mood();};
 btn.addEventListener('click',()=>setOpen(true,true));
 document.getElementById('homeAll').addEventListener('click',()=>{q.value='';setOpen(true,true);});
 q.addEventListener('focus',()=>setOpen(true));
-q.addEventListener('input',()=>{if(q.value.trim()&&!isOpen)setOpen(true);else mood();});   // du texte dans la barre → elle est visible
-/* Échap (app.js vide d'abord le champ) → le Glyph seul */
+q.addEventListener('input',()=>{if(q.value.trim()&&!isOpen)setOpen(true);else mood();});   // du texte dans la barre -> elle est visible
+/* Échap (app.js vide d'abord le champ) -> le Glyph seul */
 q.addEventListener('keydown',e=>{if(e.key==='Escape')setTimeout(()=>rest(true),0);});
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape'||e.defaultPrevented||hv.hidden||!isOpen||(NOXE.current&&NOXE.current()))return;
@@ -76,7 +76,7 @@ document.addEventListener('keydown',e=>{
   if(document.activeElement===q)return;                      // le champ a son propre Échap (ci-dessus)
   e.preventDefault();q.value='';q.dispatchEvent(new Event('input'));rest(true);
 });
-/* on quitte la barre vide (clic ailleurs) → retour au repos */
+/* on quitte la barre vide (clic ailleurs) -> retour au repos */
 hv.addEventListener('focusout',()=>setTimeout(()=>{
   const a=document.activeElement;
   if(isOpen&&!q.value.trim()&&(!a||a===document.body)&&document.getElementById('suggest').hidden)rest(false);},120));
@@ -102,7 +102,7 @@ document.addEventListener('paste',e=>{
   if(f)flash(BY_KEY[f.key]||'code',1600);
 },true);
 
-/* ---------- l'accueil réapparaît (retour d'un outil) → l'animation repart ---------- */
+/* ---------- l'accueil réapparaît (retour d'un outil) -> l'animation repart ---------- */
 if('IntersectionObserver' in window)new IntersectionObserver(es=>{if(es.some(x=>x.isIntersecting))g.set(g.state());}).observe(btn);
 addEventListener('hashchange',()=>setTimeout(()=>{if(!hv.hidden)g.set(g.state());},0));
 /* app.js a pu donner le focus à la barre avant le chargement de ce fichier : au repos, on le lui retire */

@@ -4,7 +4,7 @@
      module l'épaisseur quand elle est disponible (souris / doigt : épaisseur constante).
    - Outils : stylo, gomme (efface les traits touchés), couleurs (la teinte d'AVERSE + quelques couleurs), épaisseur,
      annuler / rétablir (Ctrl+Z / Ctrl+Y), tout effacer, export PNG.
-   - Stockage : JSON vectoriel léger (pas une image) dans une PIÈCE JOINTE (attach.js) → chiffré et synchronisé comme
+   - Stockage : JSON vectoriel léger (pas une image) dans une PIÈCE JOINTE (attach.js) -> chiffré et synchronisé comme
      les autres pièces jointes. Format : {v:1, w, h, s:[{c, w, p:[x,y,pression(0–100), …]}]} (entiers).
      c = 'acc' (la teinte du thème, résolue à l'affichage) ou une couleur #rrggbb parmi celles proposées.
    - Dans le texte : ![dessin](att:ID). L'aperçu le dessine en SVG produit ICI (que des <path>, jamais le contenu brut) ;
@@ -75,11 +75,11 @@ function open(o){
   const T=(k,label,txt,extra)=>'<button type="button" class="dw-b" data-dw="'+k+'" aria-label="'+label+'" title="'+label+'"'+(extra||'')+'>'+txt+'</button>';
   ov.innerHTML='<div class="dw-dlg" role="dialog" aria-modal="true" aria-label="Dessin">'+
     '<div class="dw-bar" role="toolbar" aria-label="Outils de dessin">'+
-      T('pen','Stylo','✎',' aria-pressed="true"')+T('erase','Gomme (efface les traits touchés)','⌫',' aria-pressed="false"')+
+      T('pen','Stylo','',' aria-pressed="true"')+T('erase','Gomme (efface les traits touchés)','⌫',' aria-pressed="false"')+
       '<span class="dw-sep"></span>'+COLORS.map(([c,l],i)=>'<button type="button" class="dw-b dw-c" data-col="'+c+'" aria-label="Couleur : '+l+'" title="'+l+'" aria-pressed="'+(i?'false':'true')+'"><i style="background:'+(c==='acc'?'var(--fg)':c)+'"></i></button>').join('')+
       '<span class="dw-sep"></span>'+SIZES.map((s,i)=>'<button type="button" class="dw-b dw-s" data-size="'+s+'" aria-label="Épaisseur '+(i+1)+'" title="Épaisseur '+(i+1)+'" aria-pressed="'+(s===size)+'"><i style="width:'+(s+3)+'px;height:'+(s+3)+'px"></i></button>').join('')+
       '<span class="dw-sep"></span>'+T('undo','Annuler (Ctrl+Z)','↶')+T('redo','Rétablir (Ctrl+Y)','↷')+T('clear','Tout effacer','⨯')+T('png','Exporter en PNG','PNG')+
-      '<span class="dw-sp"></span>'+T('x','Fermer sans enregistrer','✕')+'<button type="button" class="dw-b dw-ok" data-dw="ok" aria-label="Enregistrer le dessin" title="Enregistrer">✓ Enregistrer</button>'+
+      '<span class="dw-sp"></span>'+T('x','Fermer sans enregistrer','x')+'<button type="button" class="dw-b dw-ok" data-dw="ok" aria-label="Enregistrer le dessin" title="Enregistrer">[ok] Enregistrer</button>'+
     '</div><div class="dw-stage"><canvas class="dw-cv" aria-label="Zone de dessin (doigt, stylet ou souris)"></canvas></div></div>';
   document.body.appendChild(ov);
   document.documentElement.classList.add('dw-lock');

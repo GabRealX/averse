@@ -46,7 +46,7 @@ register({
         let prev=null;
         host.innerHTML='<div class="field"><label>Une valeur par ligne <b id="l_n">0 ligne</b></label><textarea id="l_in" style="min-height:190px" spellcheck="false"></textarea></div>'+
           '<div class="btn-row" style="gap:8px">'+
-          [['az','Trier A → Z'],['za','Trier Z → A'],['len','Par longueur'],['rev','Inverser'],['shuf','Mélanger'],['uniq','Supprimer les doublons'],['empty','Supprimer les vides'],['trim','Nettoyer les espaces'],['num','Numéroter']]
+          [['az','Trier A -> Z'],['za','Trier Z -> A'],['len','Par longueur'],['rev','Inverser'],['shuf','Mélanger'],['uniq','Supprimer les doublons'],['empty','Supprimer les vides'],['trim','Nettoyer les espaces'],['num','Numéroter']]
             .map(b=>'<button class="btn ghost" data-op="'+b[0]+'">'+b[1]+'</button>').join('')+
           '<button class="btn ghost" id="l_undo" disabled>Annuler</button><button class="btn primary" id="l_cp">Copier</button></div>';
         const lines=()=>$('l_in').value.split('\n');
@@ -76,7 +76,7 @@ register({
         /* v4 : la recherche tourne dans un Worker avec délai maximum (NOXE.rxRunner, comme le testeur de regex) :
            une expression catastrophique ne fige plus la page. */
         const R=NOXE.rxRunner();let deb=null;NOXE.onClose(()=>{R.stop();clearTimeout(deb);});
-        const SLOW='⏱ Recherche arrêtée après '+NOXE.RX_TIMEOUT/1000+' s : expression trop coûteuse (« retour arrière catastrophique », ex. (a+)+$).';
+        const SLOW=' Recherche arrêtée après '+NOXE.RX_TIMEOUT/1000+' s : expression trop coûteuse (« retour arrière catastrophique », ex. (a+)+$).';
         function job(){                                     // null = rien à chercher, undefined = expression invalide
           const a=$('r_a').value;if(!a)return null;
           const pat=$('r_re').checked?a:a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),flags='g'+($('r_case').checked?'':'i');
@@ -139,7 +139,7 @@ register({
       }
       for(let k=ea;k<A.length;k++)rows.push(['=',A[k]]);
       const add=rows.filter(r=>r[0]==='+').length,del=rows.filter(r=>r[0]==='-').length;
-      if(!add&&!del){o.innerHTML='<div class="info ok" style="margin-top:14px">✓ Les deux textes sont identiques.</div>';return;}
+      if(!add&&!del){o.innerHTML='<div class="info ok" style="margin-top:14px">[ok] Les deux textes sont identiques.</div>';return;}
       let html='',buf=[];
       const flush=()=>{
         if(buf.length>8){html+=buf.slice(0,3).map(l=>'<div>  '+esc(l)+'</div>').join('')+'<div style="color:var(--fg-faint)">… '+(buf.length-6)+' lignes identiques …</div>'+buf.slice(-3).map(l=>'<div>  '+esc(l)+'</div>').join('');}
@@ -250,7 +250,7 @@ register({
       }],
       ['unix','Timestamp Unix',host=>{
         host.innerHTML='<div class="row"><div class="field"><label>Timestamp (secondes ou millisecondes)</label><input type="text" id="x_ts" spellcheck="false"></div><div class="field" style="flex:none;justify-content:flex-end"><button class="btn ghost" id="x_now">Maintenant</button></div></div><div id="x_out"></div>'+
-          '<div class="field" style="margin-top:22px"><label>Date et heure locales → timestamp</label><input type="datetime-local" id="x_dt"></div><div id="x_out2"></div>';
+          '<div class="field" style="margin-top:22px"><label>Date et heure locales -> timestamp</label><input type="datetime-local" id="x_dt"></div><div id="x_out2"></div>';
         function fromTs(){
           const raw=$('x_ts').value.trim(),o=$('x_out');
           if(!raw){o.innerHTML='';return;}

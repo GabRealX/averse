@@ -27,7 +27,7 @@ register({
   run(p){
     let takeFile=null;
     NOXE.tabs(p,[
-      ['enc','Texte → Base64',host=>{
+      ['enc','Texte -> Base64',host=>{
         let url=false;
         host.innerHTML=
           '<label class="check"><input type="checkbox" id="b_u"> Variante URL-safe</label>'+
@@ -42,7 +42,7 @@ register({
         $('b_in').oninput=render;$('b_u').onchange=e=>{url=e.target.checked;render();};
         render();
       }],
-      ['dec','Base64 → texte / fichier',host=>{
+      ['dec','Base64 -> texte / fichier',host=>{
         host.innerHTML=
           '<div class="field"><label>Base64 ou data URI</label><textarea id="b_dec" style="min-height:90px" spellcheck="false" placeholder="SGVsbG8… ou data:image/png;base64,…"></textarea></div><div id="b_dout"></div>';
         function render(){NOXE.unurl(render.img);render.img=null;     // v4 : l'aperçu précédent est libéré
@@ -71,7 +71,7 @@ register({
         }
         $('b_dec').oninput=render;render();
       }],
-      ['file','Fichier → Base64',host=>{
+      ['file','Fichier -> Base64',host=>{
         host.innerHTML=
           '<div class="btn-row" style="margin-top:0"><button class="btn primary" id="b_fb">Choisir un fichier…</button><input type="file" id="b_file" hidden></div><div id="b_fout"></div>';
         function take(f){
@@ -79,7 +79,7 @@ register({
           if(f.size>20e6){$('b_fout').innerHTML='<div class="info bad">Fichier trop gros (20 Mo maximum).</div>';return;}
           const r=new FileReader();
           r.onload=()=>{if(!$('b_fout'))return;const uri=r.result,b=uri.slice(uri.indexOf(',')+1);
-            $('b_fout').innerHTML='<div class="info"><b>'+esc(f.name)+'</b> · '+NOXE.bytes(f.size)+' → '+NOXE.bytes(b.length)+' en Base64</div>'+
+            $('b_fout').innerHTML='<div class="info"><b>'+esc(f.name)+'</b> · '+NOXE.bytes(f.size)+' -> '+NOXE.bytes(b.length)+' en Base64</div>'+
               '<div class="btn-row" style="margin-top:8px"><button class="btn primary" data-copy="'+esc(uri)+'">Copier le data URI</button><button class="btn ghost" data-copy="'+esc(b)+'">Copier le Base64</button></div>'+
               '<textarea readonly id="b_fres" style="min-height:90px;margin-top:10px" spellcheck="false">'+esc(b.length>200000?b.slice(0,200000)+'…':b)+'</textarea>';};
           r.readAsDataURL(f);
@@ -136,7 +136,7 @@ register({
         const [h,pl]=t.split('.').slice(0,2).map(x=>JSON.parse(new TextDecoder().decode(b64dec(x))));
         const dates=['exp','iat','nbf'].filter(k=>typeof pl[k]==='number').map(k=>[({exp:'Expire le',iat:'Émis le',nbf:'Valide à partir du'})[k],new Date(pl[k]*1000).toLocaleString('fr-FR')]);
         let state='';
-        if(typeof pl.exp==='number')state=pl.exp*1000<Date.now()?'<div class="info bad">✗ Jeton expiré.</div>':'<div class="info ok">✓ Jeton non expiré.</div>';
+        if(typeof pl.exp==='number')state=pl.exp*1000<Date.now()?'<div class="info bad">[x] Jeton expiré.</div>':'<div class="info ok">[ok] Jeton non expiré.</div>';
         o.innerHTML=state+(dates.length?out(dates):'')+'<div class="lbl" style="margin-top:14px">En-tête</div><div class="codebox" data-copy="'+esc(JSON.stringify(h,null,2))+'">'+esc(JSON.stringify(h,null,2))+'</div>'+
           '<div class="lbl" style="margin-top:14px">Contenu (payload)</div><div class="codebox" data-result data-copy="'+esc(JSON.stringify(pl,null,2))+'">'+esc(JSON.stringify(pl,null,2))+'</div>';
       }catch(e){$('w_in').classList.add('bad');o.innerHTML='<div class="info bad">Ce n\'est pas un JWT valide (trois parties séparées par des points).</div>';}
@@ -176,9 +176,9 @@ register({
       const v=$('id_chk').value.trim(),r=$('id_res');
       if(!v){r.textContent='';return;}
       const m=/^([0-9a-f]{8})-?([0-9a-f]{4})-?([0-9a-f]{4})-?([0-9a-f]{4})-?([0-9a-f]{12})$/i.exec(v);
-      if(!m){r.innerHTML='<span class="bad">✗ Ce n\'est pas un UUID (32 chiffres hexadécimaux, tirets optionnels).</span>';return;}
+      if(!m){r.innerHTML='<span class="bad">[x] Ce n\'est pas un UUID (32 chiffres hexadécimaux, tirets optionnels).</span>';return;}
       const ver=m[3][0],vr=parseInt(m[4][0],16);
-      r.innerHTML='<span class="ok">✓ UUID valide</span> — version <b>'+ver+'</b>'+(vr>=8&&vr<=11?', variante RFC 4122':', variante non standard');
+      r.innerHTML='<span class="ok">[ok] UUID valide</span> — version <b>'+ver+'</b>'+(vr>=8&&vr<=11?', variante RFC 4122':', variante non standard');
     }
     ['id_n','id_up','id_nd'].forEach(id=>$(id).addEventListener('change',gen));$('id_n').oninput=gen;
     $('id_go').onclick=gen;$('id_cp').onclick=()=>copy(list.join('\n'),list.length+' UUID copiés');
@@ -228,7 +228,7 @@ register({
       x.fillStyle='#fff';x.fillRect(0,0,size,size);x.fillStyle='#000';
       for(let r=0;r<n;r++)for(let k=0;k<n;k++)if(qr.isDark(r,k))x.fillRect((k+m)*cell,(r+m)*cell,cell,cell);
       svg=qr.createSvgTag(cell,m*cell);
-      NOXE.setResult({get:()=>new Promise(ok=>c.toBlob(b=>ok(b?{files:[new File([b],'qrcode.png',{type:'image/png'})]}:null),'image/png'))});   // le QR est une image : → optimiser, PDF…
+      NOXE.setResult({get:()=>new Promise(ok=>c.toBlob(b=>ok(b?{files:[new File([b],'qrcode.png',{type:'image/png'})]}:null),'image/png'))});   // le QR est une image : -> optimiser, PDF…
       info.innerHTML='<b>'+n+' × '+n+'</b> modules · '+size+' px · '+te.encode(t).length+' octets';
     }
     seg('q_m',v=>{mode=v;$('q_txt').style.display=v==='txt'?'':'none';$('q_wifi').style.display=v==='wifi'?'':'none';render();});

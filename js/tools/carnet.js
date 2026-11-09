@@ -18,7 +18,7 @@ register({
       const tags=$('nq_tags').value.split(',').map(s=>s.trim()).filter(Boolean);
       const id=addToNotebook(title,b,tags);
       ['nq_t','nq_b'].forEach(i=>NOXE.fill(i,''));          // vide aussi le brouillon mémorisé
-      $('nq_info').innerHTML='✓ Ajoutée : <a href="notes.html#'+encodeURIComponent(id)+'">'+esc(title)+'</a>';
+      $('nq_info').innerHTML='[ok] Ajoutée : <a href="notes.html#'+encodeURIComponent(id)+'">'+esc(title)+'</a>';
       if(NOXE.notesChanged)NOXE.notesChanged();
       $('nq_b').focus();
     };

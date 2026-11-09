@@ -4,7 +4,7 @@
      · tout est dans le FRAGMENT (après #) : un navigateur ne l'envoie JAMAIS au serveur (ni GitHub Pages ni personne
        ne voit la note) ; la clé n'existe que dans le lien. Option « clé à part » : le lien n'a pas la clé
        (share.html#n1..<données>) et tu l'envoies par un autre canal : le lien seul ne suffit plus.
-     · limites : > 8 000 caractères, certaines messageries coupent le lien (avertissement) ; > 60 000 : refusé → fichier .md.
+     · limites : > 8 000 caractères, certaines messageries coupent le lien (avertissement) ; > 60 000 : refusé -> fichier .md.
    AUTRES : fichier .md (déjà là), PDF (déjà là), partage du téléphone (Web Share API) quand il existe.
    Côté réception (share.html + share-view.js) : tout est revérifié (format, tailles, JSON) puis rendu par md.js qui échappe tout.
    Les fonctions encode/decode sont aussi testées seules (tests.html). */
@@ -28,7 +28,7 @@ function clean(o){
   const g=Array.isArray(o.g)?o.g.filter(x=>typeof x==='string').map(x=>x.slice(0,60)).slice(0,20):[];
   return{v:1,t:t||'Note partagée',b,g};
 }
-/* note → {frag, key} ; frag = « n1.<clé>.<données> » (ou sans la clé si apart) */
+/* note -> {frag, key} ; frag = « n1.<clé>.<données> » (ou sans la clé si apart) */
 async function encode(note,apart){
   const p=clean({v:1,t:note.title,b:note.body,g:note.tags});
   let raw=te.encode(JSON.stringify(p)),flag=0;
@@ -41,7 +41,7 @@ async function encode(note,apart){
   const key=b64u(kb),data=b64u(all);
   return{frag:'n1.'+(apart?'':key)+'.'+data,key};
 }
-/* fragment (avec ou sans #) [+ clé donnée à part] → note propre. Erreurs : 'format' | 'clé' | 'trop gros' */
+/* fragment (avec ou sans #) [+ clé donnée à part] -> note propre. Erreurs : 'format' | 'clé' | 'trop gros' */
 function parse(frag){
   frag=String(frag||'').replace(/^#/,'').trim();
   if(frag.length>MAXIN)throw new Error('trop gros');
@@ -80,7 +80,7 @@ async function dialog(note){
     '<div class="ctx-dt" id="shT">Partager « '+esc(note.title||'Sans titre')+' »</div>'+
     '<p class="ctx-msg">Lien chiffré : la note est <b>dans le lien</b> (après le #), chiffrée avec une clé tirée au hasard. Aucun serveur ne la voit ; qui a le lien peut la lire (en lecture seule) et l\'importer dans son carnet.</p>'+
     ((window.ATT&&note.id&&ATT.list(note.id).length)||/\(att:[\w-]+\)/.test(note.body||'')?
-      '<p class="ctx-msg sh-att" id="shAtt">📎 Les pièces jointes ('+(window.ATT&&note.id?ATT.list(note.id).length:'?')+') ne sont <b>pas incluses</b> dans le lien : la personne verra « pièce jointe non partagée ». Envoie-les à part (Télécharger).</p>':
+      '<p class="ctx-msg sh-att" id="shAtt">[pj] Les pièces jointes ('+(window.ATT&&note.id?ATT.list(note.id).length:'?')+') ne sont <b>pas incluses</b> dans le lien : la personne verra « pièce jointe non partagée ». Envoie-les à part (Télécharger).</p>':
       '<p class="ctx-msg sh-att" id="shAtt">Les pièces jointes ne sont jamais incluses dans le lien.</p>')+
     '<label class="sh-opt"><input type="checkbox" id="shApart"> envoyer la clé à part (le lien seul ne suffit plus)</label>'+
     '<textarea id="shLink" class="sh-link" readonly rows="3" aria-label="Lien de partage"></textarea>'+

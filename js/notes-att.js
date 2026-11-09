@@ -13,7 +13,8 @@ async function render(){
   const have=await ATT.haveIds();
   if(id!==notesApi.current())return;                          // une autre note ouverte entre-temps
   box.innerHTML='<div class="att-h"><b>Pièces jointes</b><span class="att-n">'+(l.length?l.length+' · ':'')+'total '+ATT.mo(u.bytes)+' / 50 Mo</span>'+
-    (window.DRAW?'<button type="button" class="ico-btn" id="drawAdd" title="Dessiner à main levée (doigt, stylet, souris) — le dessin est joint à la note">✎ Dessin</button>':'')+
+    (window.DRAW?'<button type="button" class="ico-btn" id="drawAdd" title="Dessiner à main levée (doigt, stylet, souris) — le dessin est joint à la note"> Dessin</button>':'')+
+    (window.CIRCUIT?'<select class="ico-btn" id="circAdd" aria-label="Insérer un schéma de circuit dans la note" title="Insère un schéma de circuit (résistances, LED, condensateur…) à l\'endroit du curseur : il s\'affiche en vrai schéma dans l\'aperçu"><option value="">+ Circuit</option>'+CIRCUIT.EXAMPLES.map((e,i)=>'<option value="'+i+'">'+esc(e[0])+'</option>').join('')+'</select>':'')+
     '<button type="button" class="ico-btn" id="attAdd" title="Joindre une image ou un PDF (5 Mo max) — ou glisse-dépose / colle sur la note">+ Joindre</button>'+
     '<label class="att-c" title="Les photos (JPG/PNG de plus de 200 Ko) sont recompressées en WebP si c\'est plus léger"><input type="checkbox" id="attWebp"'+(ATT.pref()?' checked':'')+'> compresser les photos (WebP)</label></div>'+
     (l.length?'<ul class="att-l">'+l.map(x=>'<li class="att-it" data-att-id="'+esc(x.id)+'">'+
@@ -43,6 +44,7 @@ async function addFiles(files,o){
 box.addEventListener('click',async e=>{
   if(e.target.closest('#attAdd')){inp.click();return;}
   if(e.target.closest('#drawAdd')){DRAW.newIn();return;}
+  if(e.target.closest('#circAdd'))return;
   const b=e.target.closest('[data-att-act]');if(!b)return;
   const id=b.closest('[data-att-id]').dataset.attId,m=ATT.get(id);if(!m)return;
   switch(b.dataset.attAct){
@@ -56,7 +58,10 @@ box.addEventListener('click',async e=>{
     case 'rm':{const ok=typeof confirmBox==='function'?await confirmBox('Supprimer la pièce jointe « '+m.name+' » ? Elle disparaît aussi de tes autres appareils.','Supprimer'):true;
       if(!ok)return;await ATT.remove(id);toast('Pièce jointe supprimée');}}
 });
-box.addEventListener('change',e=>{if(e.target.id==='attWebp')ATT.setPref(e.target.checked);});
+box.addEventListener('change',e=>{
+  if(e.target.id==='attWebp')ATT.setPref(e.target.checked);
+  if(e.target.id==='circAdd'&&e.target.value!==''){const x=CIRCUIT.EXAMPLES[+e.target.value];e.target.value='';       // v11 : un schéma de circuit dans la note
+    if(x)notesApi.insert(CIRCUIT.snippet(x[1],x[2]));}});
 inp.addEventListener('change',()=>{const f=[...inp.files];inp.value='';if(f.length)addFiles(f);});
 /* glisser-déposer sur l'éditeur */
 const ed=document.querySelector('#main .editor');
@@ -68,7 +73,7 @@ if(ed){
 /* coller une image dans le texte */
 const body=$('bodyIn');
 if(body)body.addEventListener('paste',e=>{const f=e.clipboardData&&[...e.clipboardData.files].filter(x=>ATT.TYPES[x.type]);if(!f||!f.length)return;e.preventDefault();addFiles(f);});
-ATT.on(why=>{render();                                       // reçue d'un autre appareil / supprimée → l'aperçu se met à jour
+ATT.on(why=>{render();                                       // reçue d'un autre appareil / supprimée -> l'aperçu se met à jour
   if(why==='merge'||why==='remove'||why==='import'){const n=notesApi.get(notesApi.current());if(n&&/\(att:/.test(n.body||''))notesApi.preview();}});
 /* v10 : toucher un dessin dans l'aperçu le rouvre */
 const prev=$('preview');

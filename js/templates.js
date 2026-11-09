@@ -1,7 +1,7 @@
 /* templates.js — v6 : les MODÈLES de note (ceux d'AVERSE + les tiens).
    - Tes modèles : localStorage « averse-tpl » = {items:{id:{id,name,title,tags,body,created,updated}}, deleted:{id:date}}
      (même logique que les notes : la version la plus récente gagne, « pierre tombale » pour une suppression).
-   - Ils voyagent avec les notes : Sauvegarde (backup.js), fichier lié et synchro Gist (notes.js → notesApi).
+   - Ils voyagent avec les notes : Sauvegarde (backup.js), fichier lié et synchro Gist (notes.js -> notesApi).
    - Variables remplacées à la création de la note : {{date}} {{heure}} {{jour}} {{année}} {{titre}}
      ({{titre}} = le titre final de la note, utile dans le corps). Une variable inconnue reste telle quelle.
    Tout ce qui est lu (stockage, sauvegarde, synchro) est revérifié par clean() : textes bornés, ids sûrs. */
@@ -18,7 +18,7 @@ const BUILTIN=[
 ];
 const now=()=>Date.now();
 const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
-/* un modèle venu de l'extérieur → modèle propre, ou null */
+/* un modèle venu de l'extérieur -> modèle propre, ou null */
 function clean(t){
   if(!t||typeof t!=='object'||typeof t.id!=='string'||!RE_ID.test(t.id)||BAD.test(t.id))return null;
   const n=now(),num=v=>(v=+v,isFinite(v)&&v>0?Math.min(v,n+864e5):0),updated=num(t.updated)||n;

@@ -4,7 +4,7 @@
 const {register,seg,bytes,download,zip,stem}=NOXE;
 const LIB='js/vendor/pdf-lib.min.js';
 
-/* « 1-3, 5, 8- » → [0,1,2,4,7,8,…] (index à partir de 0) ; vide = toutes les pages ; renvoie null si invalide */
+/* « 1-3, 5, 8- » -> [0,1,2,4,7,8,…] (index à partir de 0) ; vide = toutes les pages ; renvoie null si invalide */
 NOXE.pageRanges=(str,max)=>{
   const s=str.replace(/\s+/g,'');
   if(!s)return Array.from({length:max},(_,i)=>i);
@@ -49,8 +49,8 @@ register({
           const total=list.reduce((a,d)=>a+d.pages,0);
           $('pd_list').innerHTML=list.map((d,i)=>
             '<div class="line" data-fi="'+i+'"><span style="text-transform:none;letter-spacing:0;font-size:.78rem;color:var(--fg)">'+(i+1)+'. '+esc(d.file.name)+' <span class="dim">· '+d.pages+' p.</span></span>'+
-            '<span style="display:flex;gap:6px"><button class="btn ghost" style="padding:4px 9px" data-up="'+i+'">↑</button><button class="btn ghost" style="padding:4px 9px" data-dn="'+i+'">↓</button>'+
-            '<button class="btn ghost" style="padding:4px 9px" data-rm="'+i+'">✕</button></span></div>').join('');
+            '<span style="display:flex;gap:6px"><button class="btn ghost" style="padding:4px 9px" data-up="'+i+'">^</button><button class="btn ghost" style="padding:4px 9px" data-dn="'+i+'">v</button>'+
+            '<button class="btn ghost" style="padding:4px 9px" data-rm="'+i+'">x</button></span></div>').join('');
           $('pd_go').textContent='Fusionner ('+total+' page'+(total>1?'s':'')+')';
           $('pd_go').disabled=list.length<1;
         }

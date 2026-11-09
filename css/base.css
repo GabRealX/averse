@@ -54,7 +54,7 @@ html{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ===== v9 : appli installée en « window-controls-overlay » =====
-   Les boutons de fenêtre (─ ☐ ✕) se posent sur le haut de la page : les barres du haut gardent une marge
+   Les boutons de fenêtre (_ [] x) se posent sur le haut de la page : les barres du haut gardent une marge
    à leur place (--tb-r à droite sous Windows, --tb-l à gauche sous macOS), et on peut déplacer la fenêtre
    en tirant la barre (drag), sauf sur ce qui se clique (no-drag). js/wco.js met les mêmes valeurs via l'API JS. */
 :root{--tb-l:0px;--tb-r:0px;--tb-h:0px}

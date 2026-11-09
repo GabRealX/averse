@@ -1,11 +1,11 @@
 /* ctxmenu.js — le menu du clic droit d'AVERSE (toutes les pages).
    Ce qu'il propose dépend de ce qu'on vise :
-     une NOTE (liste du carnet, panneau Ctrl+J, nœud du graphe, résultat de recherche) → ouvrir, renommer, dupliquer, épingler, tag, .md, PDF, supprimer
-     un FICHIER chargé dans un outil (miniature, ligne de liste) → autre outil, renommer, télécharger, copier, retirer, infos
-     une SÉLECTION de texte, un RÉSULTAT, une IMAGE → copier, envoyer vers un outil (le chaînage), ajouter au carnet, ouvrir l'outil associé
-     une carte d'outil → ouvrir, favori, copier le lien
+     une NOTE (liste du carnet, panneau Ctrl+J, nœud du graphe, résultat de recherche) -> ouvrir, renommer, dupliquer, épingler, tag, .md, PDF, supprimer
+     un FICHIER chargé dans un outil (miniature, ligne de liste) -> autre outil, renommer, télécharger, copier, retirer, infos
+     une SÉLECTION de texte, un RÉSULTAT, une IMAGE -> copier, envoyer vers un outil (le chaînage), ajouter au carnet, ouvrir l'outil associé
+     une carte d'outil -> ouvrir, favori, copier le lien
    Le menu natif du navigateur reste disponible : Maj + clic droit, et dans les champs de saisie (sauf s'il y a une sélection).
-   Clavier : touche Menu ou Maj+F10 pour l'ouvrir, ↑ ↓ Début Fin pour choisir, Entrée, → ouvre un sous-menu, ← revient, Échap ferme. */
+   Clavier : touche Menu ou Maj+F10 pour l'ouvrir, ^ v Début Fin pour choisir, Entrée, -> ouvre un sous-menu, <- revient, Échap ferme. */
 const CTX=(function(){
 const providers=[];
 let menu=null,before=null,stack=[];
@@ -28,10 +28,10 @@ function open(x,y,items,title){
 }
 function fill(items,title){
   menu._items=items;
-  menu.innerHTML=(title?'<div class="ctx-title">'+esc(title)+'</div>':'')+(stack.length?'<button type="button" role="menuitem" class="ctx-back" data-back>← Retour</button>':'')+
+  menu.innerHTML=(title?'<div class="ctx-title">'+esc(title)+'</div>':'')+(stack.length?'<button type="button" role="menuitem" class="ctx-back" data-back><- Retour</button>':'')+
     items.map((it,i)=>it==='-'?'<div class="ctx-sep" role="separator"></div>':
       '<button type="button" role="menuitem" data-ci="'+i+'"'+(it.disabled?' disabled':'')+(it.sub?' aria-haspopup="menu"':'')+' class="'+(it.danger?'danger':'')+'">'+
-        '<span>'+esc(it.label)+'</span>'+(it.sub?'<span class="ctx-k">▸</span>':it.hint?'<span class="ctx-k">'+esc(it.hint)+'</span>':'')+'</button>').join('');
+        '<span>'+esc(it.label)+'</span>'+(it.sub?'<span class="ctx-k">></span>':it.hint?'<span class="ctx-k">'+esc(it.hint)+'</span>':'')+'</button>').join('');
   const f=menu.querySelector('button:not([disabled])');if(f)f.focus();
 }
 async function act(btn){
@@ -161,7 +161,7 @@ function imageItems(getFile){
     {label:'Copier l\'image',run:async()=>copyImage(await getFile())},
     {label:'Envoyer vers…',sub:async()=>sendItems({files:[await getFile()]})},
     hasNoxe()&&NOXE.tools.some(t=>t.key==='ocr')?{label:'Envoyer vers OCR (lire le texte)',run:async()=>NOXE.open('ocr',{files:[await getFile()]})}:null,
-    window.PHOTO?{label:'Photo → note (lire le texte)',run:async()=>PHOTO.open(await getFile())}:null,   // v9
+    window.PHOTO?{label:'Photo -> note (lire le texte)',run:async()=>PHOTO.open(await getFile())}:null,   // v9
     {label:'Télécharger',run:async()=>{const f=await getFile();dl(f,f.name);}}
   ].filter(Boolean);
 }
@@ -301,7 +301,7 @@ document.addEventListener('contextmenu',e=>{
       if(!x&&!y){const b=t.getBoundingClientRect();x=b.left+8;y=b.top+Math.min(b.height,24);}   // ouvert au clavier (touche Menu)
       /* v6 : dernière entrée de chaque menu AVERSE */
       let items=r.items;
-      if(typeof AI!=='undefined'&&(items.text||items.noteId))items=items.concat(AI.ctxItems(items));   // v7 : sous-menu IA ✦
+      if(typeof AI!=='undefined'&&(items.text||items.noteId))items=items.concat(AI.ctxItems(items));   // v7 : sous-menu IA *
       if(typeof FEEDBACK!=='undefined')items=items.concat(['-',{label:'Signaler / Suggérer…',run:()=>FEEDBACK.open()}]);
       open(x,y,items,r.title);return;
     }

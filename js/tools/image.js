@@ -9,7 +9,7 @@ const load=f=>createImageBitmap(f).catch(()=>imgP(f));          // createImageBi
 /* ===================== Optimiser des images ===================== */
 /* o = réglages de départ {fmt, q, max} : « Optimiser » et « Convertir » partagent le même code */
 function optimise(p,files,o){
-    let fmt=o.fmt,q=o.q,max=o.max,token=0,timer,results=[],names=[];   // names[i] = nom d'export choisi (clic droit → Renommer)
+    let fmt=o.fmt,q=o.q,max=o.max,token=0,timer,results=[],names=[];   // names[i] = nom d'export choisi (clic droit -> Renommer)
     p.innerHTML=
       '<div class="group"><div class="row">'+
         '<div class="field"><label>Format</label><div class="segmented" id="ofmt"><button data-v="auto" class="active">Identique</button>'+
@@ -32,11 +32,11 @@ function optimise(p,files,o){
         if(r&&r.blob&&!r.url)r.url=NOXE.urlOf(r.blob);           // une seule URL par fichier (libérée plus bas)
         const th=r&&r.url?'<img src="'+r.url+'" alt="" data-cmp="'+i+'" style="width:44px;height:44px;object-fit:cover;border:1px solid var(--line-2);cursor:zoom-in">':'';
         return'<tr data-fi="'+i+'"><td>'+th+'</td><td>'+esc(r&&r.name?r.name:f.name)+'</td><td class="dim">'+bytes(f.size)+'</td>'+after+
-          '<td>'+(r&&r.blob?'<button class="btn ghost" style="padding:5px 9px" data-i="'+i+'">↓</button>':'')+'</td></tr>';
+          '<td>'+(r&&r.blob?'<button class="btn ghost" style="padding:5px 9px" data-i="'+i+'">v</button>':'')+'</td></tr>';
       }).join('');
       const ok=results.filter(r=>r&&r.blob);
       const b=ok.reduce((a,r)=>a+r.before,0),a=ok.reduce((s,r)=>s+r.after,0);
-      $('osum').innerHTML=ok.length?'Total : <b>'+bytes(b)+'</b> → <b>'+bytes(a)+'</b>'+(b?' ('+pct(a,b)+')':''):'';
+      $('osum').innerHTML=ok.length?'Total : <b>'+bytes(b)+'</b> -> <b>'+bytes(a)+'</b>'+(b?' ('+pct(a,b)+')':''):'';
       $('ozip').textContent=ok.length>1?'Tout télécharger (.zip)':'Télécharger';
       $('ozip').disabled=!ok.length;
     }
@@ -134,8 +134,8 @@ register({
       $('plist').innerHTML=list.map((f,i)=>
         '<div class="line" data-fi="'+i+'"><span style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:.78rem;color:var(--fg)">'+
           '<img src="'+NOXE.urlOf(f)+'" alt="" style="width:34px;height:34px;object-fit:cover;border:1px solid var(--line-2)">'+(i+1)+'. '+esc(f.name)+'</span>'+
-        '<span style="display:flex;gap:6px"><button class="btn ghost" style="padding:4px 9px" data-up="'+i+'">↑</button><button class="btn ghost" style="padding:4px 9px" data-dn="'+i+'">↓</button>'+
-        '<button class="btn ghost" style="padding:4px 9px" data-rm="'+i+'">✕</button></span></div>').join('');
+        '<span style="display:flex;gap:6px"><button class="btn ghost" style="padding:4px 9px" data-up="'+i+'">^</button><button class="btn ghost" style="padding:4px 9px" data-dn="'+i+'">v</button>'+
+        '<button class="btn ghost" style="padding:4px 9px" data-rm="'+i+'">x</button></span></div>').join('');
       $('pgo').disabled=!list.length;
       preview();
     }

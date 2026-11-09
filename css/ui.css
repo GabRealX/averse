@@ -5,7 +5,7 @@
 .install-btn:hover{background:var(--fg);color:var(--bg)}
 .install-btn[hidden]{display:none}
 
-/* « → Envoyer vers… » dans l'en-tête d'un outil */
+/* « -> Envoyer vers… » dans l'en-tête d'un outil */
 .modal-actions{position:relative}
 .modal-send{height:34px;padding:0 12px;border:1px solid var(--line-2);background:transparent;color:var(--fg-soft);cursor:pointer;font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;font-family:inherit;transition:all .2s}
 .modal-send:hover,.modal-send[aria-expanded="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
@@ -139,7 +139,7 @@ html[data-style="ascii"] .res-item mark,html[data-style="ascii"] .res-snip mark{
 .res-cmd em{color:var(--fg)}
 html[data-style="ascii"] .fb-type{border-style:dashed;border-radius:0}
 html[data-style="ascii"] .fb-type:has(input:checked) b::before{content:'> '}
-/* v6 : un display:flex / inline-flex l'emporte sur l'attribut hidden → on le rétablit pour les éléments v6 qu'on cache */
+/* v6 : un display:flex / inline-flex l'emporte sur l'attribut hidden -> on le rétablit pour les éléments v6 qu'on cache */
 .sh-key[hidden],.tpl-b[hidden],.sh-info[hidden],.fb-techlist[hidden]{display:none}
 html[data-theme="papier"] .sh-info.warn{color:#7a4d0c}
 /* v7 : easter egg du titre (les lettres « dégoulinent » une fois) */

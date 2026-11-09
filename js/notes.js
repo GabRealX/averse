@@ -60,7 +60,7 @@ function seed(){
 /* ===== ACCÈS NOTES ===== */
 const allNotes=()=>Object.values(data.notes);
 /* Recherche d'une note par titre. Pendant un rendu de toute la liste / du graphe, withTitles() construit
-   un index une seule fois (v4 : sinon chaque lien parcourait toutes les notes → lent à 500 notes). */
+   un index une seule fois (v4 : sinon chaque lien parcourait toutes les notes -> lent à 500 notes). */
 let TI=null;
 const byTitle=t=>{const k=norm(t);if(TI)return TI.get(k)||null;return allNotes().find(n=>norm(n.title)===k)||null;};
 function withTitles(fn){
@@ -77,7 +77,7 @@ function allTags(){const s={};allNotes().forEach(n=>(n.tags||[]).forEach(t=>{s[t
 /* ===== RENDU MARKDOWN LÉGER ===== */
 // v6 : le moteur est dans md.js (partagé avec share.html, la page de lecture d'une note partagée)
 const safeUrl=MD.safeUrl;
-const MDO={exists:t=>!!byTitle(t),att:true};               // v9 : att → ![nom](att:ID) = image jointe
+const MDO={exists:t=>!!byTitle(t),att:true};               // v9 : att -> ![nom](att:ID) = image jointe
 const inline=t=>MD.inline(t,MDO);
 const render=body=>MD.render(body,MDO);
 const renderMd=body=>MD.renderMd(body,MDO);
@@ -95,7 +95,7 @@ function renderList0(){
   host.innerHTML=ns.map(n=>{
     const links=outLinks(n).length;
     return'<div class="note-item'+(n.id===data.openId?' active':'')+'" data-id="'+esc(n.id)+'">'+
-      '<h4>'+(n.pinned?'<span class="pin" title="Épinglée">◆</span> ':'')+esc(n.title||'Sans titre')+'</h4>'+
+      '<h4>'+(n.pinned?'<span class="pin" title="Épinglée">*</span> ':'')+esc(n.title||'Sans titre')+'</h4>'+
       '<div class="meta"><span>'+fmtDate(n.updated)+'</span>'+
       (links?'<span class="dot"></span><span>'+links+' lien'+(links>1?'s':'')+'</span>':'')+
       ((n.tags||[]).length?'<span class="dot"></span><span>'+esc(n.tags.join(' · '))+'</span>':'')+
@@ -122,7 +122,7 @@ function renderEditor(){
   $('preview').innerHTML='<div class="rendered">'+render(n.body)+'</div>';typeset($('preview'));
   renderBacklinks(n);
   if(window.notesAtt)notesAtt.render();                     // v9 : pièces jointes de la note
-  if(window.CONFLICT)CONFLICT.check(n);                     // v9 : copie de conflit → bandeau « Comparer »
+  if(window.CONFLICT)CONFLICT.check(n);                     // v9 : copie de conflit -> bandeau « Comparer »
 }
 function renderBacklinks(n){
   const bl=backlinks(n),host=$('backlinks');
@@ -142,7 +142,7 @@ function livePreview(){
   const n=data.notes[data.openId];if(!n)return;
   $('preview').innerHTML='<div class="rendered">'+render($('bodyIn').value)+'</div>';typeset($('preview'));
 }
-/* modèles : v6 → templates.js (ceux d'AVERSE + les tiens, avec variables {{date}}, {{titre}}…).
+/* modèles : v6 -> templates.js (ceux d'AVERSE + les tiens, avec variables {{date}}, {{titre}}…).
    tpl = id d'un modèle AVERSE (« tp », « cours »…) ou « u:<id> » pour un des tiens */
 function tplOf(v){if(!v||typeof TPL==='undefined')return null;return v.startsWith('u:')?TPL.get(v.slice(2)):TPL.builtin(v);}
 function newNote(title,tpl){
@@ -186,7 +186,7 @@ function importJSON(file){
 }
 
 /* PDF propre d'une note : une vue d'impression dédiée (#printArea, voir @media print dans notes.css)
-   puis la boîte « Imprimer » du navigateur → « Enregistrer au format PDF ». */
+   puis la boîte « Imprimer » du navigateur -> « Enregistrer au format PDF ». */
 async function printNote(){
   const n=data.notes[data.openId];if(!n){toast('Aucune note ouverte');return;}
   let a=$('printArea');if(!a){a=document.createElement('div');a.id='printArea';document.body.appendChild(a);}
@@ -232,15 +232,15 @@ const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open(IDB_NAME,1);r.onupg
 const idbGet=async k=>{const d=await idb();return new Promise(r=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null);});};
 const idbSet=async(k,v)=>{const d=await idb();return new Promise(r=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>r();t.onerror=()=>r();});};
 const hhmm=t=>new Date(t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-/* indicateur : off · busy · ok (synchro OK) · ext (modifié ailleurs → fusionné) · err (erreur) · re (à reconnecter) */
+/* indicateur : off · busy · ok (synchro OK) · ext (modifié ailleurs -> fusionné) · err (erreur) · re (à reconnecter) */
 function fsUi(state,detail){
   FS.state=state;
   const b=$('fileBtn'),st=$('syncState');
-  if(b){b.textContent=FS.h?'Fichier ✓':state==='re'?'Fichier — reconnecter':'Fichier';b.classList.toggle('on',!!FS.h&&state!=='err');}
+  if(b){b.textContent=FS.h?'Fichier [ok]':state==='re'?'Fichier — reconnecter':'Fichier';b.classList.toggle('on',!!FS.h&&state!=='err');}
   if(!st)return;
   const T={busy:'synchro…',ok:'synchro OK',ext:'modifié ailleurs — fusionné',err:'erreur',re:'accès au fichier à redonner'};
   st.hidden=state==='off';st.dataset.state=state;
-  st.textContent=state==='off'?'':'● '+T[state]+(detail?' : '+detail:'')+(state==='ok'||state==='ext'?' · '+hhmm(FS.at):'');
+  st.textContent=state==='off'?'':'* '+T[state]+(detail?' : '+detail:'')+(state==='ok'||state==='ext'?' · '+hhmm(FS.at):'');
   st.title=st.textContent+(FS.name?'\n':'')+(FS.name?'Fichier lié : '+FS.name+(FS.conflicts?' — '+FS.conflicts+' copie(s) de conflit créée(s)':''):'');
 }
 /* Fusion avec un autre onglet / le fichier lié. « Pierres tombales » : data.deleted = {id: date de suppression}.
@@ -418,8 +418,8 @@ window.notesApi={
   remove:id=>{if(!data.notes[id])return false;(data.deleted||(data.deleted={}))[id]=now();delete data.notes[id];
     if(data.openId===id)data.openId=allNotes().sort((a,b)=>b.updated-a.updated)[0]?.id||null;save();renderAll();return true;},
   render:b=>render(b),typeset:el=>typeset(el),preview:()=>livePreview(),cmp:(a,b)=>cmpNote(a,b)};
-/* v9 : la page se ferme → ce qui est tapé (enregistrement différé de 250 ms) est écrit tout de suite ;
-   fichier lié pas encore écrit → le navigateur demande confirmation (rien si tout est à jour) */
+/* v9 : la page se ferme -> ce qui est tapé (enregistrement différé de 250 ms) est écrit tout de suite ;
+   fichier lié pas encore écrit -> le navigateur demande confirmation (rien si tout est à jour) */
 function flushSave(){if(saveT){clearTimeout(saveT);saveT=0;save();}}
 addEventListener('beforeunload',e=>{flushSave();if(FS.h&&FS.dirty){e.preventDefault();e.returnValue='';}});
 addEventListener('pagehide',flushSave);
@@ -507,7 +507,7 @@ if(typeof CTX!=='undefined')CTX.add((t,e)=>{
   if(t.id==='graph')items.splice(1,0,graphGroupItems(id));    // v5 : sur un nœud, « Groupe… » (groupes manuels)
   return{items,title:data.notes[id].title||'Sans titre'};
 },5);
-/* une note ajoutée ailleurs (clic droit → « Ajouter au carnet ») : on relit le stockage avant d'écraser */
+/* une note ajoutée ailleurs (clic droit -> « Ajouter au carnet ») : on relit le stockage avant d'écraser */
 /* v5 : accès pour tests.html (les const/let ne sont pas sur window, et la page interdit eval : CSP) */
 window.notesDebug={get data(){return data;},get acc(){return ACC.hex;},FS,G,step,tick,get settings(){return GS;},groupOf:id=>groupOf(data.notes[id]),
   styleOf:id=>styleOfGroup(groupOf(data.notes[id])),zoomAt,fit:()=>{fitGraph();redraw();},draw,setFocus:id=>setFocus(G.nodes.find(n=>n.id===id))};
@@ -520,12 +520,15 @@ function openNoteFromGraph(n){if(G.focus)setFocus(null);setView('editor');$$('.s
   const d=load();if(d){data=d;}else{seed();}
   /* pierres tombales : on les garde 90 jours (largement assez pour que tous les onglets soient à jour) */
   data.deleted=data.deleted&&typeof data.deleted==='object'?data.deleted:{};
+  /* v11 : filet de sécurité — les notes du test « graphe » (g0… titre N0…) n'ont rien à faire dans un vrai carnet */
+  if(!sessionStorage.getItem('averse-tests')){let k=0;Object.keys(data.notes).forEach(id=>{const n=data.notes[id];if(n&&/^g\d+$/.test(id)&&/^N\d+$/.test(n.title)&&/^voir \[\[N\d+\]\]/.test(n.body||'')){delete data.notes[id];data.deleted[id]=now();k++;}});
+   if(k){if(data.openId&&!data.notes[data.openId])data.openId=null;save();setTimeout(()=>toast(k+' note(s) de test supprimée(s)'),400);}}
   Object.keys(data.deleted).forEach(id=>{if(now()-data.deleted[id]>90*864e5)delete data.deleted[id];});
   if(!data.openId)data.openId=allNotes().sort((a,b)=>b.updated-a.updated)[0]?.id||null;
   G.canvas=$('graph');G.ctx=G.canvas.getContext('2d');
   const hh=location.hash.slice(1);if(hh&&data.notes[hh])data.openId=hh;
   wire();renderAll();fsRestore();
   if(/[?&]print=1/.test(location.search)){history.replaceState(null,'',location.pathname+location.hash);setTimeout(printNote,300);}   // « Exporter PDF » depuis le panneau
-  addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;if(!sessionStorage.getItem('averse-tests')&&localStorage.getItem('averse-tests-backup'))return;   // v5 : tests.html tourne dans un autre onglet → on n'avale pas ses notes de test
+  addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;if(!sessionStorage.getItem('averse-tests')&&localStorage.getItem('averse-tests-backup'))return;   // v5 : tests.html tourne dans un autre onglet -> on n'avale pas ses notes de test
   try{const d=JSON.parse(e.newValue);if(mergeNotes(d))renderAll();}catch(x){}});
 })();
