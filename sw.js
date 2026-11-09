@@ -3,7 +3,7 @@
    (averse-v14 -> averse-v18…) pour que les visiteurs reçoivent la nouvelle version.
    Tous les chemins sont RELATIFS à ce fichier : le site marche aussi dans un sous-dossier
    (ex. https://toi.github.io/averse/ sur GitHub Pages). */
-const CACHE = 'averse-v21';
+const CACHE = 'averse-v22';
 const SHARE = 'averse-share';          // contenu partagé en attente (lu puis vidé par app.js)
 /* OCR (v4) : Tesseract.js pèse ~11 Mo (moteur wasm + langues). Il n'est PAS dans ASSETS : sinon chaque visiteur
    téléchargerait 11 Mo à l'installation, même sans jamais utiliser l'OCR, et à chaque nouvelle version du site.

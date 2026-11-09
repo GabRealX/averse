@@ -17,10 +17,16 @@ const AI=(function(){
 const CFG='averse-ai',SEC='averse-ai-sec',NKEY='noxe-notes';
 const PROV={
   gemini:{name:'Google Gemini',short:'Gemini',model:'gemini-3.5-flash-lite',base:'https://generativelanguage.googleapis.com/v1beta',keyUrl:'https://aistudio.google.com/apikey'},
+  /* v11 : trois services gratuits qui parlent le même langage que OpenAI (une clé chacun, adresse fixe).
+     Gemini gratuit est souvent saturé (erreur 503) : Groq est rapide, Mistral est européen, OpenRouter a des modèles « :free ». */
+  groq:{name:'Groq',short:'Groq',model:'openai/gpt-oss-120b',base:'https://api.groq.com/openai/v1',keyUrl:'https://console.groq.com/keys'},
+  mistral:{name:'Mistral',short:'Mistral',model:'mistral-small-latest',base:'https://api.mistral.ai/v1',keyUrl:'https://console.mistral.ai/api-keys'},
+  openrouter:{name:'OpenRouter',short:'OpenRouter',model:'openai/gpt-oss-120b:free',base:'https://openrouter.ai/api/v1',keyUrl:'https://openrouter.ai/keys'},
   openai:{name:'Service OpenAI-compatible',short:'OpenAI-compatible',model:'gpt-4o-mini',base:'https://api.openai.com/v1',keyUrl:'https://platform.openai.com/api-keys'}
 };
+const FREE={gemini:'gratuit, souvent saturé',groq:'gratuit, rapide',mistral:'gratuit, européen',openrouter:'modèles :free'};
 /* v10 : modèles proposés (on peut toujours en taper un autre). Le plus rapide par défaut : la réponse commence plus tôt. */
-const MODELS={gemini:[['gemini-3.5-flash-lite','rapide (par défaut)'],['gemini-3.6-flash','équilibré'],['gemini-3.8-flash','plus fort, plus lent'],['gemini-2.5-flash-lite','ancien, rapide']],openai:[]};
+const MODELS={gemini:[['gemini-3.5-flash-lite','rapide (par défaut)'],['gemini-3.6-flash','équilibré'],['gemini-3.8-flash','plus fort, plus lent'],['gemini-2.5-flash-lite','ancien, rapide']],groq:[['openai/gpt-oss-120b','le plus fort (par défaut)'],['openai/gpt-oss-20b','plus léger, plus rapide']],mistral:[['mistral-small-latest','rapide (par défaut)'],['mistral-large-latest','plus fort']],openrouter:[['openai/gpt-oss-120b:free','gratuit (si encore proposé)']],openai:[]};
 /* v10 : « réflexion » au minimum pour les modèles qui l'acceptent (sinon Gemini réfléchit plusieurs secondes avant le 1er mot).
    Gemini 3 : thinkingLevel (minimal / low) ; Gemini 2.5 Flash : thinkingBudget 0. Modèle inconnu : on n'envoie rien (pas d'erreur 400). */
 function thinkFor(m){m=String(m||'');
@@ -31,7 +37,7 @@ function thinkFor(m){m=String(m||'');
 const okBase=u=>/^https:\/\/[a-z0-9.-]+(:\d+)?(\/[\w.~\/-]*)?$/i.test(u)||/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/[\w.~\/-]*)?$/i.test(u);
 const okKey=k=>typeof k==='string'&&/^[\x21-\x7e]{8,400}$/.test(k);
 function readCfg(){const c=getLS(CFG,{})||{};return{provider:PROV[c.provider]?c.provider:'gemini',
-  model:{gemini:String(c.model&&c.model.gemini||'').slice(0,80),openai:String(c.model&&c.model.openai||'').slice(0,80)},
+  model:Object.keys(PROV).reduce((m,k)=>{m[k]=String(c.model&&c.model[k]||'').slice(0,80);return m;},{}),
   base:typeof c.base==='string'&&okBase(c.base)?c.base:'',local:c.local===true,
   lang:['fr','en'].includes(c.lang)?c.lang:'auto',             // v8 : langue des réponses (Auto = celle de la question / de la note)
   skipFree:c.skipFree===true,                                   // v8 : « ne plus demander » pour les questions LIBRES (jamais pour les extraits de notes)
@@ -81,6 +87,7 @@ function syncReceive(r){if(!r||typeof r!=='object'||!(+r.at>KAT))return;
 /* ---------- B) appel du fournisseur (streaming) ---------- */
 let armed=false;                     // mis à true UNIQUEMENT par un clic sur « Envoyer » (voir dialogue) ; consommé par send()
 const stats={calls:0};
+const RETRY=[1000,2500];
 /* v10 : hors ligne -> erreur claire (l'IA locale, elle, marche sans réseau) */
 class OfflineError extends Error{constructor(){super('hors ligne : l\'IA par clé a besoin du réseau');this.name='OfflineError';}}
 const online=()=>navigator.onLine!==false;
@@ -101,11 +108,20 @@ async function send(system,prompt,onText,signal,onPhase){
   }
   stats.calls++;
   ph('sent');let res;
-  try{res=await window.fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal,credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',mode:'cors'});}
-  catch(e){if(e&&e.name==='AbortError')throw e;if(!online())throw new OfflineError();throw new Error('réseau indisponible ('+host()+' injoignable)');}
+  /* v11 : « service saturé » (502 / 503 / 504) = souvent passager : on réessaie 2 fois (1 s puis 2,5 s, ou le Retry-After du service,
+     4 s au plus). Même texte, même adresse : c'est le même envoi que tu as confirmé. Un quota dépassé (429) n'est PAS réessayé. */
+  for(let att=0;;att++){
+    try{res=await window.fetch(url,{method:'POST',headers,body:JSON.stringify(body),signal,credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',mode:'cors'});}
+    catch(e){if(e&&e.name==='AbortError')throw e;if(!online())throw new OfflineError();throw new Error('réseau indisponible ('+host()+' injoignable)');}
+    if(![502,503,504].includes(res.status)||att>=RETRY.length)break;
+    ph('retry');let wait=RETRY[att];const ra=parseFloat(res.headers&&res.headers.get&&res.headers.get('retry-after'));if(ra>0)wait=Math.min(4000,Math.max(wait,ra*1000));
+    try{res.body&&res.body.cancel();}catch(e){}
+    await new Promise((ok,no)=>{const t=setTimeout(ok,wait);if(signal)signal.addEventListener('abort',()=>{clearTimeout(t);no(new DOMException('arrêté','AbortError'));},{once:true});});
+    stats.calls++;
+  }
   ph('headers');
   if(!res.ok){let msg='';try{const j=await res.json();msg=(j.error&&(j.error.message||j.error.status))||'';}catch(e){}
-    throw new Error(({400:'requête refusée',401:'clé refusée',403:'clé refusée ou service non autorisé',404:'modèle introuvable',429:'quota dépassé (réessaie plus tard)'}[res.status]||'erreur '+res.status)+(msg?' — '+String(msg).slice(0,160):''));}
+    throw new Error(({400:'requête refusée',401:'clé refusée',403:'clé refusée ou service non autorisé',404:'modèle introuvable',429:'quota dépassé (réessaie plus tard, ou choisis un autre fournisseur dans les réglages)',500:'le service a un problème',502:'service saturé',503:'service saturé (forte demande) : réessaie dans un instant, ou choisis un autre fournisseur dans les réglages',504:'le service ne répond pas'}[res.status]||'erreur '+res.status)+(msg?' — '+String(msg).slice(0,160):''));}
   const rd=res.body.getReader(),td=new TextDecoder();let buf='',all='';
   const line=l=>{l=l.trim();if(!l.startsWith('data:'))return;const d=l.slice(5).trim();if(!d||d==='[DONE]')return;
     let j;try{j=JSON.parse(d);}catch(e){return;}
@@ -477,7 +493,7 @@ function run(task,o){
 function settings(){
   if(OPEN)OPEN.close();
   const ov=document.createElement('div');ov.className='ctx-ov ai-ov';
-  const P=k=>'<label class="ai-radio"><input type="radio" name="aiProv" value="'+k+'"'+(cfg.provider===k?' checked':'')+'> '+esc(PROV[k].name)+(k==='gemini'?' <small>(offre gratuite)</small>':'')+'</label>';
+  const P=k=>'<label class="ai-radio"><input type="radio" name="aiProv" value="'+k+'"'+(cfg.provider===k?' checked':'')+'> '+esc(PROV[k].name)+(FREE[k]?' <small>('+FREE[k]+')</small>':'')+'</label>';
   ov.innerHTML='<form class="ctx-dlg ai-dlg ai-set" role="dialog" aria-modal="true" aria-labelledby="aiST" novalidate>'+
     '<div class="ai-head"><span class="ai-gl"></span><div><div class="ctx-dt" id="aiST">IA — réglages</div><div class="ai-sub">Tout est désactivé par défaut. Rien ne part sans ton clic.</div></div></div>'+
     '<p class="ai-net" id="aiNet" role="status"></p>'+
@@ -486,7 +502,7 @@ function settings(){
     'Téléchargement unique ≈ 155 Mo à l\'activation — prévois du Wi-Fi (moteur 21 Mo depuis cdn.jsdelivr.net, vérifié par empreinte SHA-384 ; modèle 118 Mo + vocabulaire 17 Mo depuis huggingface.co), puis hors ligne. Tes notes ne quittent pas l\'appareil.</p>'+
     '<div class="ai-row"><span id="aiLoc"></span><span class="ai-bt" id="aiLocBt"></span></div>'+
     '<h3 class="ai-h">2 · Assistant <small>(ta clé d\'API)</small></h3>'+
-    '<div class="ai-provs">'+P('gemini')+P('openai')+'</div>'+
+    '<div class="ai-provs">'+P('gemini')+P('groq')+P('mistral')+P('openrouter')+P('openai')+'</div>'+
     '<div class="ai-grid"><label for="aiModel">Modèle</label><input id="aiModel" spellcheck="false" maxlength="80" list="aiModels" autocomplete="off"><datalist id="aiModels"></datalist>'+
     '<label for="aiBase" class="ai-ob">Adresse de l\'API</label><input id="aiBase" class="ai-ob" spellcheck="false" placeholder="https://api.openai.com/v1">'+
     '<label for="aiKey">Clé d\'API</label><input id="aiKey" type="password" autocomplete="off" spellcheck="false" maxlength="400"></div>'+
@@ -561,7 +577,7 @@ function settings(){
   OPEN={close,glyph:g,el:f};
   return OPEN;
 }
-function setPref(k,v){if(k==='lang')cfg.lang=['fr','en'].includes(v)?v:'auto';else if(k==='skipFree')cfg.skipFree=!!v;else return;saveCfg();}
+function setPref(k,v){if(k==='lang')cfg.lang=['fr','en'].includes(v)?v:'auto';else if(k==='skipFree')cfg.skipFree=!!v;else if(k==='provider'&&PROV[v])cfg.provider=v;else return;saveCfg();}
 /* v8 : la barre de l'accueil (ai-bar.js) a sa propre interface ; elle passe par CETTE porte, appelée uniquement
    depuis un clic ou un Entrée sur « Envoyer » / l'option « Demander à l'IA » (jamais au fil de la frappe). */
 function fire(task,txt,onText,signal,onPhase){if(!TASKS[task])return Promise.reject(new Error('demande inconnue'));armed=true;

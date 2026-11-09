@@ -1334,7 +1334,7 @@ T('Glyph : UNE seule boucle pour tous, arrêtée quand c\'est fini (done, error)
 /* ---- IA : un faux fournisseur (fetch) et un faux worker d'embeddings, jamais le vrai réseau ---- */
 const AIKEY='AIzaTEST_ONLY_not_a_real_key_0000000000',OAKEY='sk-TESTONLY-000000000000000000000000';
 function aiNet(){                         // remplace W.fetch : enregistre tout, répond en flux SSE
-  const log=[],real=W.fetch;let status=200,delay=0,parts=['Voici ','un **résumé** ','en trois ','morceaux.'];
+  const log=[],real=W.fetch;let status=200,delay=0,fails=0,parts=['Voici ','un **résumé** ','en trois ','morceaux.'];
   const sse=(prov)=>{const te=new W.TextEncoder();return new W.ReadableStream({async start(c){
     for(const t of parts){const j=prov==='openai'?{choices:[{delta:{content:t}}]}:{candidates:[{content:{parts:[{text:t}]}}]};c.enqueue(te.encode('data: '+JSON.stringify(j)+'\n\n'));await sleep(40);}
     if(prov==='openai')c.enqueue(te.encode('data: [DONE]\n\n'));c.close();}});};
@@ -1342,9 +1342,10 @@ function aiNet(){                         // remplace W.fetch : enregistre tout,
     if(!ai)return real.call(W,url,o);
     log.push({url,headers:Object.assign({},o&&o.headers),body:o&&o.body?JSON.parse(o.body):null,cred:o&&o.credentials});
     if(delay)await sleep(delay);                                        // v10 : latence avant les en-têtes (fournisseur « lent »)
+    if(fails>0){fails--;return new W.Response(JSON.stringify({error:{message:'overloaded'}}),{status:503});}   // v11 : « saturé » les n premières fois
     if(status!==200)return new W.Response(JSON.stringify({error:{message:'nope'}}),{status});
     return new W.Response(sse(/googleapis/.test(url)?'gemini':'openai'),{status:200,headers:{'content-type':'text/event-stream'}});};
-  return{log,set status(s){status=s;},set parts(p){parts=p;},set delay(v){delay=v;}};
+  return{log,set status(s){status=s;},set parts(p){parts=p;},set delay(v){delay=v;},set fails(n){fails=n;}};
 }
 function aiWorker(model){                 // faux worker : « sac de mots » -> vecteur normé de 64 cases (model : nom annoncé, v8)
   const log=[],texts=[];const fold=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -1403,6 +1404,25 @@ T('IA : OpenAI-compatible (Bearer, adresse perso, [DONE]) ; erreurs 401/429 lisi
     W.AI.close();W.AI.settings();const b=d.getElementById('aiBase');b.value='http://pirate.example/v1';b.dispatchEvent(new W.Event('change',{bubbles:true}));
     if(W.AI.cfg().base!=='https://ai.test/v1')throw new Error('adresse http acceptée');
     if(d.getElementById('aiKey').type!=='password'||d.getElementById('aiKey').value)throw new Error('champ clé');
+  }finally{if(F){F.contentWindow.AI&&F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
+T('IA v11 : Groq / Mistral / OpenRouter (adresse et clé propres à chacun) ; 503 « saturé » réessayé puis expliqué ; 429 jamais réessayé',async()=>{const S=snap();
+  try{setLS('averse-ai',{provider:'groq'});
+    await frame('index.html#/',()=>W.AI&&W.document.getElementById('q'));await W.AI.ready;const net=aiNet();const d=W.document;
+    for(const [k,url,mod] of [['groq','https://api.groq.com/openai/v1/chat/completions','openai/gpt-oss-120b'],['mistral','https://api.mistral.ai/v1/chat/completions','mistral-small-latest'],['openrouter','https://openrouter.ai/api/v1/chat/completions','openai/gpt-oss-120b:free']]){
+      W.AI.setPref('provider',k);await W.AI.setKey(k,OAKEY);
+      const o=W.AI.run('rewrite',{text:'je suis aller a la plage'});d.querySelector('[data-ai="send"]').click();await until(()=>d.querySelector('[data-ai="copy"]'),5000);
+      const l=net.log[net.log.length-1];if(l.url!==url||l.body.model!==mod||l.headers.authorization!=='Bearer '+OAKEY)throw new Error(k+' '+JSON.stringify(l).slice(0,160));W.AI.close();}
+    const n0=net.log.length;net.fails=1;const t0=Date.now();
+    W.AI.run('rewrite',{text:'x y z'});d.querySelector('[data-ai="send"]').click();await until(()=>d.querySelector('[data-ai="copy"]'),6000);
+    if(net.log.length-n0!==2||Date.now()-t0<900)throw new Error('1 échec 503 : 2 appels (1 s d\'attente) attendus, '+(net.log.length-n0));W.AI.close();
+    const n1=net.log.length;net.status=503;
+    W.AI.run('rewrite',{text:'x y z'});d.querySelector('[data-ai="send"]').click();await until(()=>!d.getElementById('aiErr').hidden,9000);
+    has(d.getElementById('aiErr').textContent,'saturé','autre fournisseur');if(net.log.length-n1!==3)throw new Error('3 essais attendus : '+(net.log.length-n1));W.AI.close();
+    const n2=net.log.length;net.status=429;
+    W.AI.run('rewrite',{text:'x y z'});d.querySelector('[data-ai="send"]').click();await until(()=>!d.getElementById('aiErr').hidden,4000);
+    if(net.log.length-n2!==1)throw new Error('429 ne doit pas être réessayé');has(d.getElementById('aiErr').textContent,'quota');
+    W.AI.close();W.AI.settings();const radios=[...d.querySelectorAll('input[name="aiProv"]')].map(r=>r.value).join();
+    if(radios!=='gemini,groq,mistral,openrouter,openai')throw new Error(radios);
   }finally{if(F){F.contentWindow.AI&&F.contentWindow.AI.close();F.remove();}restoreLS(S);}});
 T('IA : clé JAMAIS en clair (localStorage, Sauvegarde, carnet), chiffrée ; relue après rechargement ; effacée',async()=>{const S=snap();
   try{await frame('notes.html',()=>W.AI&&W.notesDebug);await W.AI.ready;
