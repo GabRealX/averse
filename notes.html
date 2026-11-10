@@ -9,7 +9,8 @@
 <title>AVERSE — carnet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="js/fonts.js" data-href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@300;400;500&amp;display=swap"></script>
+<noscript><link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"></noscript>
 <meta name="description" content="AVERSE · carnet — notes liées et graphe. Tout reste dans ton navigateur.">
 <meta name="theme-color" content="#06060a">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -25,7 +26,7 @@
 <script src="js/wco.js"></script>
 <script src="js/theme.js"></script>
 <script src="js/accent.js"></script>
-<script src="js/templates.js"></script>
+<script defer src="js/templates.js"></script>
 </head>
 <body>
 
@@ -51,10 +52,10 @@
       <button class="ico-btn more-btn" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="Plus d'actions : fichier, export, sauvegarde, apparence…">...</button>
       <div class="more-menu" id="moreMenu" role="menu" aria-label="Plus d'actions">
         <button class="ico-btn" id="fileBtn" role="menuitem" title="Synchro : lie le carnet à un fichier (ex. dans ton dossier OneDrive / Google Drive)">Fichier</button>
-        <button class="ico-btn" id="exportBtn" role="menuitem">Export</button>
-        <button class="ico-btn" id="importBtn" role="menuitem">Import</button>
-        <button class="ico-btn" id="bakOut" role="menuitem" title="Tout AVERSE dans un fichier : notes, favoris, réglages (sans secrets)">Sauvegarde</button>
-        <button class="ico-btn" id="bakIn" role="menuitem" title="Restaurer une sauvegarde complète (fusion)">Restaurer</button>
+        <button class="ico-btn" id="exportBtn" role="menuitem" title="Enregistre seulement tes notes dans un fichier">Export notes</button>
+        <button class="ico-btn" id="importBtn" role="menuitem" title="Ajoute les notes d'un fichier exporté (rien n'est écrasé)">Import notes</button>
+        <button class="ico-btn" id="bakOut" role="menuitem" title="Tout AVERSE dans un fichier à garder (clé USB, Drive) : notes, favoris, réglages, sans les mots de passe">Sauvegarder tout</button>
+        <button class="ico-btn" id="bakIn" role="menuitem" title="Remet une sauvegarde complète : fusion, rien n'est écrasé">Restaurer</button>
         <button class="ico-btn" id="styleBtn" role="menuitem" data-style-label >style : normal</button>
         <button class="ico-btn" role="menuitem" data-accent-btn title="Thème et couleur d'accent">apparence</button>
         <button class="ico-btn" role="menuitem" data-feedback-btn title="Signaler un bug, proposer une idée">signaler</button>
@@ -134,33 +135,33 @@
   </main>
 </div>
 
-<script src="js/backup.js"></script>
-<script src="js/math.js"></script>
-<script src="js/keys.js"></script>
-<script src="js/pwa.js"></script>
-<script src="js/ctxmenu.js"></script>
-<script src="js/data.js"></script>
-<script src="js/feedback.js"></script>
-<script src="js/eggs.js"></script>
-<script src="js/rain.js"></script>
-<script src="js/notes-graph.js"></script>
-<script src="js/circuit-core.js"></script>
-<script src="js/md.js"></script>
-<script src="js/attach.js"></script>
-<script src="js/notes.js"></script>
-<script src="js/notes-tpl.js"></script>
-<script src="js/share.js"></script>
-<script src="js/vendor/qrcode.js"></script>
-<script src="js/vault.js"></script>
-<script src="js/cloud.js"></script>
-<script src="js/notes-page.js"></script>
-<script src="js/glyph.js"></script>
-<script src="js/ai.js"></script>
-<script src="js/ai-notes.js"></script>
-<script src="js/draw.js"></script>
-<script src="js/notes-att.js"></script>
-<script src="js/conflict.js"></script>
-<script src="js/photo.js"></script>
-<script src="js/notes-share.js"></script>
+<script defer src="js/backup.js"></script>
+<script defer src="js/math.js"></script>
+<script defer src="js/keys.js"></script>
+<script defer src="js/pwa.js"></script>
+<script defer src="js/ctxmenu.js"></script>
+<script defer src="js/data.js"></script>
+<script defer src="js/feedback.js"></script>
+<script defer src="js/eggs.js"></script>
+<script defer src="js/rain.js"></script>
+<script defer src="js/notes-graph.js"></script>
+<script defer src="js/circuit-core.js"></script>
+<script defer src="js/md.js"></script>
+<script defer src="js/attach.js"></script>
+<script defer src="js/notes.js"></script>
+<script defer src="js/notes-tpl.js"></script>
+<script defer src="js/share.js"></script>
+<script defer src="js/vendor/qrcode.js"></script>
+<script defer src="js/vault.js"></script>
+<script defer src="js/cloud.js"></script>
+<script defer src="js/notes-page.js"></script>
+<script defer src="js/glyph.js"></script>
+<script defer src="js/ai.js"></script>
+<script defer src="js/ai-notes.js"></script>
+<script defer src="js/draw.js"></script>
+<script defer src="js/notes-att.js"></script>
+<script defer src="js/conflict.js"></script>
+<script defer src="js/photo.js"></script>
+<script defer src="js/notes-share.js"></script>
 </body>
 </html>

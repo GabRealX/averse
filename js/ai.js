@@ -36,7 +36,8 @@ function thinkFor(m){m=String(m||'');
   return null;}
 const okBase=u=>/^https:\/\/[a-z0-9.-]+(:\d+)?(\/[\w.~\/-]*)?$/i.test(u)||/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/[\w.~\/-]*)?$/i.test(u);
 const okKey=k=>typeof k==='string'&&/^[\x21-\x7e]{8,400}$/.test(k);
-function readCfg(){const c=getLS(CFG,{})||{};return{provider:PROV[c.provider]?c.provider:'gemini',
+function readCfg(){const c=getLS(CFG,{})||{};return{provider:PROV[c.provider]?c.provider:(sessionStorage.getItem('averse-tests')==='1'?'gemini':'groq'),   // v11 : Groq par défaut (Gemini gratuit est souvent saturé) ; les tests gardent Gemini
+  
   model:Object.keys(PROV).reduce((m,k)=>{m[k]=String(c.model&&c.model[k]||'').slice(0,80);return m;},{}),
   base:typeof c.base==='string'&&okBase(c.base)?c.base:'',local:c.local===true,
   lang:['fr','en'].includes(c.lang)?c.lang:'auto',             // v8 : langue des réponses (Auto = celle de la question / de la note)
@@ -138,7 +139,10 @@ async function send(system,prompt,onText,signal,onPhase){
 
 /* ---------- A) embeddings locaux (Worker) ---------- */
 const E={w:null,seq:0,wait:new Map(),state:'off',p:0,subs:new Set(),err:''};
-let workerFactory=()=>new Worker('js/ai-worker.js',{type:'module'});
+/* (tests.html : la page parente peut fournir un faux Worker AVANT que la page du carnet ne démarre ; sans ça, tout dépend d'un pari sur
+   l'ordre de chargement des scripts. Ne sert que si le drapeau de test est levé et que la page est dans un cadre.) */
+let workerFactory=()=>{try{if(sessionStorage.getItem('averse-tests')==='1'&&window.parent!==window&&typeof window.parent.__aiWorkerMake==='function')return window.parent.__aiWorkerMake();}catch(e){}
+  return new Worker('js/ai-worker.js',{type:'module'});};
 const emit=()=>E.subs.forEach(f=>{try{f(E);}catch(e){}});
 /* v10 : le Worker reste vivant toute la vie de la page (jamais arrêté entre deux questions) */
 function worker(){

@@ -458,9 +458,9 @@ function bakBar(){
   const ago=last?'il y a '+Math.max(1,Math.round((Date.now()-last)/day))+' jour(s)':'jamais';
   bar.innerHTML='<b>Pense à sauvegarder.</b> Tes notes sont enregistrées <b>uniquement dans ce navigateur</b> : si tu vides les données du site ou que tu changes d\'appareil, elles disparaissent. Dernière sauvegarde : '+ago+'.'+
     '<div class="bak-row"><button class="btn primary" type="button" data-bak="now">Sauvegarder maintenant</button><button class="btn" type="button" data-bak="later">Plus tard</button></div>'+
-    '<details><summary>Fichier, Export, Sauvegarde : quelle différence ?</summary>'+
-    '<p><b>Sauvegarde</b> : un fichier avec tout (notes, favoris, réglages) à garder sur une clé USB ou ton Drive. <b>Restaurer</b> le remet.</p>'+
-    '<p><b>Export / Import</b> : seulement les notes.</p>'+
+    '<details><summary>Fichier, Export, Sauvegarder tout : quelle différence ?</summary>'+
+    '<p><b>Sauvegarder tout</b> : un fichier avec tout (notes, favoris, réglages) à garder sur une clé USB ou ton Drive. <b>Restaurer</b> le remet.</p>'+
+    '<p><b>Export / Import notes</b> : seulement les notes.</p>'+
     '<p><b>Fichier</b> (Chrome ou Edge sur ordinateur) : relie le carnet à un fichier dans ton OneDrive ou Drive ; il se met à jour tout seul, pratique pour avoir les mêmes notes sur deux appareils.</p></details>';
 }
 

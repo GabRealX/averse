@@ -1356,6 +1356,7 @@ function aiWorker(model){                 // faux worker : « sac de mots » -> 
       if(m.type==='load'){w.onmessage({data:{type:'progress',p:.4}});setTimeout(()=>w.onmessage({data:{type:'ready',model}}),60);}
       if(m.type==='embed'){texts.push(...m.texts);}
       if(m.type==='embed')w.onmessage({data:{type:'vecs',id:m.id,vecs:m.texts.map(vec)}});},15);}};return w;};
+  window.__aiWorkerMake=make;          // v11 : les pages dans une iframe prennent ce faux worker dès leur démarrage (voir ai.js)
   return{log,make,texts};
 }
 const aiReq=()=>W.performance.getEntriesByType('resource').map(e=>e.name).filter(u=>/googleapis\.com\/v1|openai|openrouter|mistral|groq|huggingface|hf\.co|jsdelivr|ai-worker|transformers/.test(u));
@@ -1430,7 +1431,7 @@ T('Carnet v11 : rappel de sauvegarde (3 notes ou plus, ni fichier ni synchro) ; 
     const bar=()=>d.getElementById('bakBar');
     W.notesApi.create('A','a',[]);await sleep(60);if(bar()&&!bar().hidden)throw new Error('visible avec moins de 3 notes');
     W.notesApi.create('B','b',[]);W.notesApi.create('C','c',[]);await sleep(120);
-    if(!bar()||bar().hidden)throw new Error('pas de rappel avec 3 notes');has(bar().textContent,'uniquement dans ce navigateur','jamais','Fichier, Export, Sauvegarde');
+    if(!bar()||bar().hidden)throw new Error('pas de rappel avec 3 notes');has(bar().textContent,'uniquement dans ce navigateur','jamais','Fichier, Export, Sauvegarder tout');
     bar().querySelector('[data-bak="later"]').click();await sleep(60);if(!bar().hidden)throw new Error('« Plus tard » ne cache pas');
     localStorage.removeItem('averse-bak-snooze');W.notesApi.create('D','d',[]);await sleep(120);if(bar().hidden)throw new Error('devrait revenir');
     localStorage.setItem('averse-last-backup',String(Date.now()-2*864e5));W.notesApi.create('E','e',[]);await sleep(120);if(!bar().hidden)throw new Error('sauvegarde récente : pas de rappel');
