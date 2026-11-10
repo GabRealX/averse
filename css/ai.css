@@ -119,3 +119,8 @@ html[data-style="ascii"] .ph-img,html[data-style="ascii"] .ph-right textarea{bor
 /* v11 : les boutons radio sont alignés avec leur texte (avant : la case flottait au-dessus) */
 .ai-radio{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
 .ai-radio input{width:auto;min-width:0;margin:0;flex:none}
+
+/* v11 : mini-guide en 3 étapes */
+.ai-guide{font-size:.72rem;line-height:1.55;color:var(--fg-soft);border:1px dashed var(--line-2);padding:8px 12px;margin:0 0 14px}
+.ai-guide summary{cursor:pointer;color:var(--fg)}
+.ai-guide p{margin:8px 0 0}.ai-guide ol{margin:8px 0 0 18px;padding:0}

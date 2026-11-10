@@ -50,6 +50,7 @@ async function download(){
   const name='averse-sauvegarde-'+data.date.slice(0,10)+'.json';
   if(typeof NOXE!=='undefined'&&NOXE.download)NOXE.download(blob,name);
   else{const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+  try{localStorage.setItem('averse-last-backup',String(Date.now()));}catch(e){}   // v11 : pour le rappel de sauvegarde du carnet
   toast('Sauvegarde exportée'+(skipped?' ('+skipped+' secret'+(skipped>1?'s':'')+' exclu'+(skipped>1?'s':'')+')':''));
   return{data,skipped,name};
 }

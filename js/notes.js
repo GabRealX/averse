@@ -439,7 +439,30 @@ function setView(v){
 /* ===== GRAPHE : voir notes-graph.js (v5) ===== */
 
 /* ===== RENDU GLOBAL ===== */
-function renderAll(){renderList();renderTags();renderEditor();if(view==='graph')startGraph();}
+function renderAll(){renderList();renderTags();renderEditor();if(view==='graph')startGraph();try{bakBar();}catch(e){}}
+/* v11 : rappel de sauvegarde, en français simple. Les notes ne vivent que dans ce navigateur : vider les données du site ou
+   changer d'appareil les efface. Le bandeau apparaît (3 notes ou plus) s'il n'y a ni fichier lié, ni synchro, ni sauvegarde
+   depuis 14 jours ; « Plus tard » le cache 3 jours. */
+function bakBar(){
+  let bar=$('bakBar');
+  if(!bar){
+    bar=document.createElement('div');bar.id='bakBar';bar.className='bak-bar';bar.hidden=true;$('list').parentNode.insertBefore(bar,$('list'));
+    bar.addEventListener('click',e=>{const b=e.target.closest('[data-bak]');if(!b)return;
+      if(b.dataset.bak==='now'){save();BACKUP.download().then(()=>bakBar());}
+      else{try{localStorage.setItem('averse-bak-snooze',String(Date.now()));}catch(x){}bakBar();}});
+  }
+  const num=k=>{try{return+localStorage.getItem(k)||0;}catch(e){return 0;}},day=864e5,last=num('averse-last-backup');
+  let cloud=false;try{cloud=!!localStorage.getItem(sessionStorage.getItem('averse-tests')==='1'?'averse-tests-cloud':'averse-cloud');}catch(e){}
+  const need=Object.keys(data.notes).length>=3&&!FS.h&&!cloud&&Date.now()-last>14*day&&Date.now()-num('averse-bak-snooze')>3*day;
+  bar.hidden=!need;if(!need){bar.innerHTML='';return;}
+  const ago=last?'il y a '+Math.max(1,Math.round((Date.now()-last)/day))+' jour(s)':'jamais';
+  bar.innerHTML='<b>Pense à sauvegarder.</b> Tes notes sont enregistrées <b>uniquement dans ce navigateur</b> : si tu vides les données du site ou que tu changes d\'appareil, elles disparaissent. Dernière sauvegarde : '+ago+'.'+
+    '<div class="bak-row"><button class="btn primary" type="button" data-bak="now">Sauvegarder maintenant</button><button class="btn" type="button" data-bak="later">Plus tard</button></div>'+
+    '<details><summary>Fichier, Export, Sauvegarde : quelle différence ?</summary>'+
+    '<p><b>Sauvegarde</b> : un fichier avec tout (notes, favoris, réglages) à garder sur une clé USB ou ton Drive. <b>Restaurer</b> le remet.</p>'+
+    '<p><b>Export / Import</b> : seulement les notes.</p>'+
+    '<p><b>Fichier</b> (Chrome ou Edge sur ordinateur) : relie le carnet à un fichier dans ton OneDrive ou Drive ; il se met à jour tout seul, pratique pour avoir les mêmes notes sur deux appareils.</p></details>';
+}
 
 /* ===== ÉVÉNEMENTS ===== */
 function wire(){

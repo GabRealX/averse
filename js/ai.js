@@ -24,7 +24,7 @@ const PROV={
   openrouter:{name:'OpenRouter',short:'OpenRouter',model:'openai/gpt-oss-120b:free',base:'https://openrouter.ai/api/v1',keyUrl:'https://openrouter.ai/keys'},
   openai:{name:'Service OpenAI-compatible',short:'OpenAI-compatible',model:'gpt-4o-mini',base:'https://api.openai.com/v1',keyUrl:'https://platform.openai.com/api-keys'}
 };
-const FREE={gemini:'gratuit, souvent saturé',groq:'gratuit, rapide',mistral:'gratuit, européen',openrouter:'modèles :free'};
+const FREE={gemini:'gratuit, souvent saturé',groq:'gratuit, rapide, conseillé',mistral:'gratuit, européen',openrouter:'modèles :free'};
 /* v10 : modèles proposés (on peut toujours en taper un autre). Le plus rapide par défaut : la réponse commence plus tôt. */
 const MODELS={gemini:[['gemini-3.5-flash-lite','rapide (par défaut)'],['gemini-3.6-flash','équilibré'],['gemini-3.8-flash','plus fort, plus lent'],['gemini-2.5-flash-lite','ancien, rapide']],groq:[['openai/gpt-oss-120b','le plus fort (par défaut)'],['openai/gpt-oss-20b','plus léger, plus rapide']],mistral:[['mistral-small-latest','rapide (par défaut)'],['mistral-large-latest','plus fort']],openrouter:[['openai/gpt-oss-120b:free','gratuit (si encore proposé)']],openai:[]};
 /* v10 : « réflexion » au minimum pour les modèles qui l'acceptent (sinon Gemini réfléchit plusieurs secondes avant le 1er mot).
@@ -496,13 +496,17 @@ function settings(){
   const P=k=>'<label class="ai-radio"><input type="radio" name="aiProv" value="'+k+'"'+(cfg.provider===k?' checked':'')+'> '+esc(PROV[k].name)+(FREE[k]?' <small>('+FREE[k]+')</small>':'')+'</label>';
   ov.innerHTML='<form class="ctx-dlg ai-dlg ai-set" role="dialog" aria-modal="true" aria-labelledby="aiST" novalidate>'+
     '<div class="ai-head"><span class="ai-gl"></span><div><div class="ctx-dt" id="aiST">IA — réglages</div><div class="ai-sub">Tout est désactivé par défaut. Rien ne part sans ton clic.</div></div></div>'+
+    '<details class="ai-guide" id="aiGuide"><summary>Comment ça marche ? (3 étapes)</summary>'+
+    '<p>L\'assistant (résumer, corriger, répondre sur tes notes) a besoin d\'une <b>clé d\'API</b> : un mot de passe personnel et gratuit que le service te donne pour savoir que c\'est toi.</p>'+
+    '<ol><li>Choisis un service plus bas : <b>Groq</b> est le plus simple (gratuit, rapide).</li><li>Clique sur « Obtenir une clé », crée un compte, copie la clé.</li><li>Colle-la dans « Clé d\'API » puis clique sur « Enregistrer ».</li></ol>'+
+    '<p>Ne partage jamais ta clé. Rien n\'est envoyé tant que tu ne cliques pas sur « Envoyer » dans une fenêtre IA.</p></details>'+
     '<p class="ai-net" id="aiNet" role="status"></p>'+
     '<h3 class="ai-h">1 · Recherche par le sens <small>(100 % locale)</small></h3>'+
     '<p class="ai-p">Un modèle multilingue (multilingual-e5-small quantifié : français et anglais, une question en anglais retrouve une note en français) tourne <b>dans ton navigateur</b> : recherche par le sens, notes liées, liens dans le graphe, « demander à mes notes ». '+
     'Téléchargement unique ≈ 155 Mo à l\'activation — prévois du Wi-Fi (moteur 21 Mo depuis cdn.jsdelivr.net, vérifié par empreinte SHA-384 ; modèle 118 Mo + vocabulaire 17 Mo depuis huggingface.co), puis hors ligne. Tes notes ne quittent pas l\'appareil.</p>'+
     '<div class="ai-row"><span id="aiLoc"></span><span class="ai-bt" id="aiLocBt"></span></div>'+
     '<h3 class="ai-h">2 · Assistant <small>(ta clé d\'API)</small></h3>'+
-    '<div class="ai-provs">'+P('gemini')+P('groq')+P('mistral')+P('openrouter')+P('openai')+'</div>'+
+    '<div class="ai-provs">'+P('groq')+P('mistral')+P('openrouter')+P('gemini')+P('openai')+'</div>'+
     '<div class="ai-grid"><label for="aiModel">Modèle</label><input id="aiModel" spellcheck="false" maxlength="80" list="aiModels" autocomplete="off"><datalist id="aiModels"></datalist>'+
     '<label for="aiBase" class="ai-ob">Adresse de l\'API</label><input id="aiBase" class="ai-ob" spellcheck="false" placeholder="https://api.openai.com/v1">'+
     '<label for="aiKey">Clé d\'API</label><input id="aiKey" type="password" autocomplete="off" spellcheck="false" maxlength="400"></div>'+
