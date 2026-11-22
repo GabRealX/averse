@@ -26,7 +26,7 @@ addEventListener('pagehide',()=>{try{const r=localStorage.getItem('averse-tests-
 <script src="js/tools/dev.js"></script><script src="js/tools/texte.js"></script><script src="js/tools/memo.js"></script>
 <script src="js/tools/encodage.js"></script><script src="js/tools/pdf.js"></script><script src="js/tools/carnet.js"></script><script src="js/tools/image.js"></script><script src="js/tools/editeur.js"></script><script src="js/tools/ocr.js"></script>
 <script src="js/vault.js"></script><script src="js/attach.js"></script><script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
-<script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script><script src="js/glyph.js"></script>
+<script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script><script src="js/glyph.js"></script><script src="js/ai-mark.js"></script>
 <link rel="stylesheet" href="css/ui.css"><link rel="stylesheet" href="css/circuit.css">
 <script>
 /* Ouvre chaque outil comme le ferait un clic, remplit les champs, et compare avec des résultats vérifiés à la main.
@@ -1360,6 +1360,30 @@ function aiWorker(model){                 // faux worker : « sac de mots » -> 
   return{log,make,texts};
 }
 const aiReq=()=>W.performance.getEntriesByType('resource').map(e=>e.name).filter(u=>/googleapis\.com\/v1|openai|openrouter|mistral|groq|huggingface|hf\.co|jsdelivr|ai-worker|transformers/.test(u));
+T('Indicateur IA v12 (AIMARK) : X, « ? », coche, même nombre de points, une seule boucle, arrêt si retiré',async()=>{
+  if(typeof AIMARK==='undefined')throw new Error('AIMARK absent');
+  const a=AIMARK.create({size:24}),b=AIMARK.create({size:24,state:'think'});
+  document.body.append(a.el,b.el);
+  try{
+    if(a.el.width<20||a.el.getBoundingClientRect().width>28&&a.el.style.width!=='24px'){/* taille CSS 24 */}
+    if(parseFloat(a.el.style.width)!==24)throw new Error('taille '+a.el.style.width);
+    const n=Object.keys(AIMARK.SHAPES).reduce((m,k)=>Math.max(m,AIMARK.SHAPES[k].length),0);
+    for(const k of Object.keys(AIMARK.SHAPES))if(AIMARK.SHAPES[k].length!==n)throw new Error('forme '+k+' : '+AIMARK.SHAPES[k].length+' points ≠ '+n);
+    a.set('search');await until(()=>AIMARK.running(),500);
+    a.set('think');await sleep(80);if(a.state()!=='think')throw new Error('état '+a.state());
+    a.set('write');a.set('done');a.set('error');
+    /* retiré de la page -> la boucle s'arrête */
+    a.el.remove();b.el.remove();
+    await until(()=>!AIMARK.running()&&AIMARK.count()===0,2000).catch(()=>{throw new Error('boucle encore : '+AIMARK.running()+' '+AIMARK.count());});
+  }finally{a.destroy();b.destroy();}});
+T('Indicateur IA v12 : prefers-reduced-motion -> pas de rotation, passage par fondu ; icône toujours lisible',async()=>{
+  const ev=W=>{try{return W.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){return false;}};
+  const m=AIMARK.create({size:24});document.body.appendChild(m.el);
+  try{m.set('search');await sleep(40);const d=m.el.getContext('2d').getImageData(0,0,m.el.width,m.el.height).data;
+    if(!d.some((v,i)=>i%4===3&&v>10))throw new Error('canvas vide');
+    m.set('done');await sleep(50);if(m.state()!=='done')throw new Error(m.state());
+  }finally{m.destroy();}});
+
 T('IA : AUCUNE requête sans action (pages ouvertes, clé enregistrée, notes, recherche, fenêtre IA ouverte)',async()=>{const S=snap();
   try{sNotes([{id:'ia_a',title:'Cours réseau',body:'Le modèle OSI a sept couches.'}]);
     await frame('notes.html',()=>W.AI&&W.notesDebug&&W.document.getElementById('list').children.length);await W.AI.ready;
@@ -1844,7 +1868,7 @@ T('IA v10 hors ligne : rien ne part, message clair + indicateur ; file d\'attent
     if(net.log.length!==1)throw new Error(net.log.length+' appels');has(P.querySelector('.aip-out').textContent,'trois morceaux');
     W.AIBAR.close();
   }finally{if(F){try{offNet(F.contentWindow,false);}catch(e){}F.remove();}restoreLS(S);}});
-T('Barre IA v10 : étapes réelles (je lis, je cherche dans N notes, notes trouvées en puces cliquables, envoi, rédige, reçue + chrono), squelette, GRAND Glyph',async()=>{const S=snap();let ids=[];
+T('Barre IA v12 : étapes réelles (je lis, je cherche, j\'ai trouvé N notes en puces, envoi, j\'écris, reçue + chrono), squelette, petit indicateur, le Glyph de l\'accueil ne grandit pas',async()=>{const S=snap();let ids=[];
   try{const base=[{id:'v10_a',title:'Volcans',body:'Un volcan rejette du magma.\n\nLe Piton de la Fournaise est un volcan très actif, magma fluide.'},{id:'v10_b',title:'Liste de courses',body:'pain, lait, tomates'},
       {id:'v10_c',title:'Recette',body:'farine, oeufs, beurre, sucre'}];ids=base.map(n=>n.id);sNotes(base);
     setLS('averse-ai',{local:true});const wk=aiWorker();
@@ -1854,32 +1878,44 @@ T('Barre IA v10 : étapes réelles (je lis, je cherche dans N notes, notes trouv
     const q=qType('? Quel volcan est actif magma');d.querySelector('#results .res-ai-notes').click();
     await until(()=>P.querySelector('[data-p="send"]'),5000).catch(()=>{throw new Error('confirmation : '+P.innerHTML.slice(0,300));});
     const all=steps.join(' | ');has(all,'read:','look:','found:');
-    has(P.querySelector('.aip-steps').textContent,'Je lis ta question','Je cherche dans tes 3 notes','note trouvée');
+    has(P.querySelector('.aip-steps').textContent,'Je lis ta question','Je cherche dans tes 3 notes',"J'ai trouvé");
     const chip=P.querySelector('.aip-steps a.aip-chip[data-note="v10_a"]');if(!chip)throw new Error('puce de la note trouvée');has(chip.textContent,'Volcans');
     if(P.querySelector('.aip-chip[data-note="v10_b"]'))throw new Error('note sans rapport en puce');
     F.style.width='375px';F.style.height='667px';await sleep(150);   // iPhone SE
     W.scrollTo(0,1e6);await sleep(50);                  // petit écran : on est descendu jusqu'au bouton « Envoyer »
     if(W.scrollY<50)throw new Error('page pas défilable à 375×667 : le test ne prouverait rien');
     P.querySelector('[data-p="send"]').click();
-    /* immédiatement : squelette + grand Glyph (pas de fausse progression : une étape « J'envoie » en cours) */
+    /* immédiatement : squelette + petit indicateur (pas de fausse progression : une étape « J'envoie » en cours) */
     await until(()=>P.querySelector('.aip-skel'),800).catch(()=>{throw new Error('pas de squelette');});
-    /* pendant l'attente, le Glyph revient À L'ÉCRAN (sinon on ne le voit pas sur un iPhone SE) */
-    const inView=()=>{const r=d.querySelector('#homeView .home-glyph').getBoundingClientRect();return r.top>=-1&&r.bottom<=W.innerHeight+1;};
-    await until(inView,1500).catch(()=>{const r=d.querySelector('#homeView .home-glyph').getBoundingClientRect();throw new Error('Glyph hors écran pendant l\'attente : top='+Math.round(r.top)+' bas='+Math.round(r.bottom)+' / '+W.innerHeight);});
+    /* le haut du panneau (indicateur + statut) revient À L'ÉCRAN */
+    const inView=()=>{const el=P.querySelector('.aip-h')||P;const r=el.getBoundingClientRect();return r.top>=-1&&r.bottom<=W.innerHeight+1&&r.height>0;};
+    await until(inView,1500).catch(()=>{const r=(P.querySelector('.aip-h')||P).getBoundingClientRect();throw new Error('panneau hors écran pendant l\'attente : top='+Math.round(r.top)+' bas='+Math.round(r.bottom)+' / '+W.innerHeight);});
     if(hv.dataset.ai!=='busy')throw new Error('accueil pas en mode IA : '+hv.dataset.ai);
-    const gl=d.querySelector('#homeView .home-glyph canvas, #homeView canvas.glyph');if(!gl||gl.getBoundingClientRect().width<100)throw new Error('Glyph pas grand pendant l\'attente : '+(gl&&gl.getBoundingClientRect().width));
+    const mark=P.querySelector('.ai-mark');if(!mark)throw new Error('petit indicateur absent');
+    const mw=mark.getBoundingClientRect().width;if(mw<18||mw>32)throw new Error('indicateur trop grand ou trop petit : '+mw);
+    /* le Glyph de l'accueil NE DOIT PAS grandir (plus d\'animation gros/petit) */
+    const gl=d.querySelector('#homeView .home-glyph canvas');
+    const gw=gl?gl.getBoundingClientRect().width:0;if(gw>90)throw new Error('Glyph de l\'accueil agrandi pendant l\'IA : '+gw);
     has(W.AIBAR.steps().join(','),'send:now');if(P.querySelector('progress,[role="progressbar"]'))throw new Error('barre de progression inventée');
     await until(()=>P.querySelector('[data-p="note"]'),6000);
     const fin=W.AIBAR.steps().join(',');has(fin,'think:ok','write:ok','done:ok');if(/:now/.test(fin))throw new Error('étape restée en cours : '+fin);
     has(P.querySelector('.aip-steps').textContent,'Réponse reçue','1er mot à');
     if(P.querySelector('.aip-skel'))throw new Error('squelette resté');has(P.querySelector('.aip-out').textContent,'Le Piton de la Fournaise.');
-    if(hv.dataset.ai!=='answer')throw new Error('mode réponse');const w2=gl.getBoundingClientRect().width;if(w2<72)throw new Error('Glyph trop petit pendant la réponse : '+w2);
+    if(hv.dataset.ai!=='answer')throw new Error('mode réponse');
+    if(W.AIBAR.glyph.state()!=='done')throw new Error('indicateur pas en done : '+W.AIBAR.glyph.state());
     obs.disconnect();
     /* la puce ouvre la note */
     const ch2=P.querySelector('.aip-chip[data-note="v10_a"]');if(!ch2||!/notes\.html#v10_a/.test(ch2.getAttribute('href')))throw new Error('lien de la puce');
     wkey(q,'Escape');await sleep(50);if(hv.dataset.ai)throw new Error('mode IA pas quitté');
-    return 'Glyph '+Math.round(gl.getBoundingClientRect().width||w2)+' px en réponse';
+    return 'indicateur '+Math.round(mw)+' px, Glyph accueil '+Math.round(gw)+' px';
   }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
+T('Barre IA v12 : textes d\'attente en anglais si la langue est English',async()=>{const S=snap();
+  try{await homeAi();const d=W.document,net=aiNet();await W.AI.setKey('gemini',AIKEY);W.AI.setPref('lang','en');W.AI.setPref('skipFree',true);
+    net.delay=400;net.parts=['Hello ','world.'];
+    const q=qType('? why is the sky blue');wkey(q,'Enter');
+    await until(()=>d.querySelector('#aiPanel [data-p="note"]'),6000);
+    has(d.querySelector('#aiPanel .aip-steps').textContent,'Sending','Writing','Answer received');
+  }finally{if(F)F.remove();restoreLS(S);}});
 T('IA v10 : question préparée pendant la frappe (local, aucun réseau) ; index gardé sur le disque : seules les notes modifiées sont recalculées',async()=>{const S=snap();let ids=[];
   try{const base=[{id:'ix_a',title:'Alpha',body:'transistor silicium courant'},{id:'ix_b',title:'Beta',body:'farine levure pain'},{id:'ix_c',title:'Gamma',body:'routeur paquets réseau'}];ids=base.map(n=>n.id);sNotes(base);
     setLS('averse-ai',{local:true});const E5='Xenova/multilingual-e5-small';let wk=aiWorker(E5);await homeAi(()=>{W.AI.workerFactory=wk.make;});const net=aiNet();

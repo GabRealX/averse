@@ -6,9 +6,8 @@
    - AUCUNE requête au fil de la frappe : seul Entrée / clic sur une option, puis « Envoyer », passe par AI.fire().
      Question libre : petite confirmation (désactivable : « ne plus demander »). Extraits de notes : confirmation TOUJOURS.
    - Pas de clé : l'option mène aux réglages IA. La recherche par le sens (100 % locale) reste disponible si activée.
-   v10 : l'attente se voit.
-   - Le GRAND Glyph de l'accueil reste grand pendant la recherche et la réponse, et suit chaque étape
-     (lire -> search, envoyer / réfléchir -> think, rédiger -> write, fin -> done).
+   v12 : plus d'animation gros/petit du Glyph de l'accueil pendant une demande. Un petit indicateur
+     (AIMARK, 24 px) à côté du statut : un X qui tourne, puis un « ? », puis une forme selon l'étape.
    - Des étapes RÉELLES s'enchaînent dans le panneau : « Je lis ta question », « Je cherche dans tes 42 notes »,
      « 3 notes trouvées : X, Y, Z » (puces cliquables), « J'envoie à Gemini », « Gemini réfléchit », « Je rédige ».
      Chaque étape ne passe à la suivante que quand le travail est VRAIMENT fait (pas de fausse barre de progression) ;
@@ -18,7 +17,7 @@
    - Hors ligne : message clair (ce qui marche sans réseau, ce qui ne marche pas) et, SEULEMENT si tu cliques
      « Envoyer quand le réseau revient », la demande attend le retour du réseau (en mémoire : fermer l'onglet l'oublie). */
 (function(){
-if(typeof AI==='undefined'||typeof GLYPH==='undefined'||typeof NOXE==='undefined')return;
+if(typeof AI==='undefined'||typeof GLYPH==='undefined'||typeof AIMARK==='undefined'||typeof NOXE==='undefined')return;
 const q=$('q'),P=$('aiPanel'),btn=$('qAi'),HV=$('homeView');if(!q||!P||!btn)return;
 
 /* ---------- est-ce une question ? (simple et prudent) ---------- */
@@ -28,27 +27,18 @@ const isQuestion=v=>{v=String(v||'').trim();if(!v)return false;
 const cut=s=>s.length>60?s.slice(0,59)+'…':s;
 const reduce=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* ---------- les Glyphs : celui de la barre, celui du panneau, et le GRAND de l'accueil (home.js) ---------- */
+/* ---------- icônes : petit Glyph au repos dans la barre ; pendant une demande, le petit AIMARK du panneau ---------- */
 const small=matchMedia('(max-width:560px)').matches;
-const g=GLYPH.create({size:small?38:46,kind:'ask',dim:true});btn.appendChild(g.el);btn.hidden=false;
-const gp=GLYPH.create({size:small?48:64,kind:'ask'});gp.el.classList.add('aip-gl');
-const HG=()=>NOXE.homeGlyph||null;
-/* v10 : tant qu'une demande est en cours (data-ai sur l'accueil), le grand Glyph suit le même état (sans le petit motif du centre) */
-{const s0=g.set,t0=g.token;
-  g.set=(s,o)=>{gp.set(s,o);const h=HG();if(h&&HV&&HV.dataset.ai&&s!=='idle')h.set(s,o&&o.p!=null?{p:o.p}:undefined);return s0(s,o);};
-  g.token=n=>{gp.token(n);const h=HG();if(h&&HV&&HV.dataset.ai)h.token(n);return t0(n);};}
-function aiMode(v){if(!HV)return;const was=HV.dataset.ai;if(v)HV.dataset.ai=v;else{delete HV.dataset.ai;if(NOXE.homeMood)NOXE.homeMood();}
-  if(v==='busy'&&was!=='busy')requestAnimationFrame(glyphInView);}
-/* v10 : pendant l'attente, le grand Glyph doit SE VOIR — sur un petit téléphone (iPhone SE), le panneau a pu faire défiler la page
-   (bouton « Envoyer » en bas) : on remonte juste ce qu'il faut pour que le Glyph soit sous la barre du haut */
-function glyphInView(again){const gl=HV.querySelector('.home-glyph');if(!gl||!HV.dataset.ai)return;const r=gl.getBoundingClientRect();if(!r.height)return;
-  const nav=document.querySelector('body>nav,header.nav,nav.nav,.topnav'),top=nav?Math.max(0,nav.getBoundingClientRect().bottom):0;
-  if(r.top>=top-1&&r.bottom<=innerHeight+1)return;
-  const smooth=again!==true&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
-  scrollBy({top:r.top-top-8,behavior:smooth?'smooth':'auto'});
-  if(smooth)setTimeout(()=>glyphInView(true),450);}       // WebKit : un défilement doux peut s'arrêter en route (la page change pendant) -> on corrige
+const barG=GLYPH.create({size:small?38:46,kind:'ask',dim:true});btn.appendChild(barG.el);btn.hidden=false;
+const g=AIMARK.create({size:24,pause:true});g.el.classList.add('aip-gl');
+function aiMode(v){if(!HV)return;if(v)HV.dataset.ai=v;else{delete HV.dataset.ai;if(NOXE.homeMood)NOXE.homeMood();}}
+/* v12 : si tu as défilé jusqu'au bouton « Envoyer », on remonte le haut du panneau (là où est le petit indicateur) */
+function panelInView(){if(P.hidden)return;const el=P.querySelector('.aip-h')||P;
+  const nav=document.querySelector('body>nav'),top=nav?Math.max(0,nav.getBoundingClientRect().bottom):0;
+  const r=el.getBoundingClientRect();if(r.top>=top-1&&r.bottom<=innerHeight+1)return;
+  el.scrollIntoView({block:'start',behavior:reduce()?'auto':'smooth'});}
 let cur=null;                                     // la demande en cours : {mode, q, phase, ctl, result, extracts, t0}
-function rest(){if(cur&&cur.phase==='busy')return;g.set('idle',{dim:!(AI.hasKey()||AI.local()),kind:'ask'});}
+function rest(){if(cur&&cur.phase==='busy')return;g.set('idle');barG.set('idle',{dim:!(AI.hasKey()||AI.local()),kind:'ask'});}
 rest();
 AI.ready.then(()=>{rest();if(q.value.trim()&&NOXE.refreshHome)NOXE.refreshHome();});
 AI.onState(()=>{if(!cur)rest();});
@@ -76,7 +66,7 @@ function frame(title,sub){
   P.innerHTML='<div class="aip-h"><span class="aip-glw"></span><b>'+esc(title)+'</b><span class="aip-sub">'+esc(sub)+'</span>'+
     '<button type="button" class="aip-x" data-p="x" aria-label="Fermer (Échap)" title="Fermer (Échap)">x</button></div>'+
     '<ol class="aip-steps" aria-live="polite"></ol><div class="aip-b"></div><div class="aip-a"></div>';
-  P.querySelector('.aip-glw').appendChild(gp.el);gp.frame(0);
+  P.querySelector('.aip-glw').appendChild(g.el);
   P.hidden=false;
 }
 const body=h=>{const b=P.querySelector('.aip-b');if(b)b.innerHTML=h;return b;};
@@ -115,12 +105,12 @@ function warnHtml(kind,len){const p=AI.provider();
 async function localSteps(c,qq,fn){
   const n=nNotes();
   if(AI.local()){
-    step('read','Je lis ta question <small>(sur ton appareil)</small>');g.set('search',{kind:c.mode==='sem'?'embed':'ask'});
+    step('read',AI.t('read')+' <small>('+(AI.uiLang()==='en'?'on this device':'sur ton appareil')+')</small>');g.set('read');
     await AI.embedQ(qq);if(cur!==c)return null;
   }
-  step('look','Je cherche dans tes '+plural(n,'note','notes')+(AI.local()?'':' <small>(par mots-clés : recherche par le sens désactivée)</small>'));
-  g.set('search',{kind:c.mode==='sem'?'embed':'ask'});
-  if(AI.local())await AI.indexNotes(p=>{if(cur===c)step('look','Je cherche dans tes '+plural(n,'note','notes')+' <small>(mise à jour de l\'index : '+Math.round(p*100)+' %)</small>');});
+  step('look',AI.t(AI.local()?'look':'lookKw',{n:n}));
+  g.set('search');
+  if(AI.local())await AI.indexNotes(p=>{if(cur===c)step('look',AI.t('look',{n:n})+' <small>'+Math.round(p*100)+' %</small>');});
   if(cur!==c)return null;
   return fn();
 }
@@ -148,17 +138,17 @@ async function ask(mode,qq){
       const r=await localSteps(c,qq,()=>AI.search(qq,6));if(cur!==c||!r)return;
       const by=notesById(),list=r.filter(x=>by[x.id]&&x.ok!==false).slice(0,6);
       c.phase='answer';g.set(list.length?'done':'error',{kind:'embed'});aiMode('answer');
-      step('found',list.length?plural(list.length,'note trouvée','notes trouvées'):'Aucune note vraiment proche',list.length?'ok':'bad');
+      step('found',list.length?AI.t('found',{n:list.length,s:list.length>1?'s':''}):AI.t('foundNone'),list.length?'ok':'bad');
       body(list.length?'<ol class="ai-ex aip-sem">'+list.map(x=>'<li><a href="notes.html#'+encodeURIComponent(x.id)+'" data-note="'+esc(x.id)+'">'+esc(by[x.id].title||'Sans titre')+'</a> <small>'+esc(x.label||'')+'</small></li>').join('')+'</ol>'
         :'<p class="aip-note">Aucune note trouvée.</p>');btns(B('x','Fermer'));arrive();
       return;
     }
     const ex=await localSteps(c,qq,()=>AI.retrieve(qq));if(cur!==c||!ex)return;
-    if(!ex.length){c.phase='error';g.set('error');aiMode('answer');step('found','Aucune note ne parle de ça','bad');
-      body('<p class="ai-err">Aucune note ne semble parler de ça. Rien n\'a été envoyé.</p>');
+    if(!ex.length){c.phase='error';g.set('error');aiMode('answer');step('found',AI.t('foundNone'),'bad');
+      body('<p class="ai-err">'+esc(AI.t('foundNoneSent'))+'</p>');
       btns(B('x','Fermer')+(AI.hasKey()?B('asfree','Poser comme question libre'):''));return;}
     const nn=new Set(ex.map(x=>x.id)).size;
-    step('found',plural(nn,'note trouvée','notes trouvées')+' : '+chips(ex),'ok');
+    step('found',AI.t('found',{n:nn,s:nn>1?'s':''})+' : '+chips(ex),'ok');
     c.extracts=ex;c.phase='confirm';g.set('idle',{kind:'ask'});
     const txt=AI.askPayload(qq,ex);
     body('<div class="ai-l">Extraits retenus (seuls eux seront envoyés)</div><ol class="ai-ex">'+
@@ -167,7 +157,7 @@ async function ask(mode,qq){
     P.querySelector('.ai-pre').textContent=txt;
     P.querySelector('[data-p="send"]').focus();
   }catch(e){if(cur!==c)return;c.phase='error';g.set('error');aiMode('answer');stepsDone();
-    body('<p class="ai-err">Recherche locale impossible : '+esc(e.message)+'</p>');btns(B('x','Fermer')+B('cfg','Réglages IA…'));}
+    body('<p class="ai-err">'+esc(AI.t('errLocal',{m:e.message}))+'</p>');btns(B('x','Fermer')+B('cfg','Réglages IA…'));}
 }
 const notesById=()=>{const d=getLS('noxe-notes',null);return d&&d.notes||{};};
 /* v10 : hors ligne, dit d'avance ce qui marche et ce qui ne marche pas */
@@ -175,21 +165,7 @@ const offHtml=()=>AI.online()?'':'<p class="aip-off">Hors ligne : l\'IA par clé
   (AI.local()?' La recherche par le sens, elle, marche sans réseau.':'')+'</p>';
 
 /* ---------- texte qui s'écrit en douceur : on affiche ce qui est ARRIVÉ, un peu plus vite si du retard s'accumule ---------- */
-function streamer(out){
-  let full='',shown=0,raf=0,last=0,wait=null;
-  const stick=()=>{if(out.scrollHeight-out.scrollTop-out.clientHeight<40)out.scrollTop=out.scrollHeight;};
-  const paint=()=>{out.innerHTML=AI.md(full.slice(0,shown))+(shown<full.length?'':'');stick();};
-  const fin=()=>{if(wait&&shown>=full.length){const w=wait;wait=null;w();}};
-  const loop=t=>{raf=0;const back=full.length-shown;
-    if(back>0)shown=Math.min(full.length,shown+Math.max(2,Math.ceil(back*.18)));
-    if(t-last>33||shown>=full.length){last=t;paint();}
-    if(shown<full.length)raf=requestAnimationFrame(loop);else fin();};
-  return{
-    push(all){full=all;if(reduce()||document.hidden){shown=full.length;paint();return;}if(!raf)raf=requestAnimationFrame(loop);},
-    end(){return new Promise(r=>{wait=r;if(shown>=full.length&&!raf)fin();
-      setTimeout(()=>{if(wait){if(raf)cancelAnimationFrame(raf);raf=0;shown=full.length;paint();fin();}},1200);});},   // onglet caché : pas de rAF
-    stop(){if(raf)cancelAnimationFrame(raf);raf=0;shown=full.length;}};
-}
+function streamer(out){return AI.streamView(out);}
 const SKEL='<div class="aip-skel" aria-hidden="true"><i></i><i></i><i></i></div>';
 function arrive(){if(reduce())return;P.classList.remove('aip-arrive');void P.offsetWidth;P.classList.add('aip-arrive');setTimeout(()=>P.classList.remove('aip-arrive'),900);}
 
@@ -198,7 +174,7 @@ function arrive(){if(reduce())return;P.classList.remove('aip-arrive');void P.off
 async function send(){
   const c=cur;if(!c)return;
   const task=c.mode==='notes'?'ask':'free',txt=c.mode==='notes'?AI.askPayload(c.q,c.extracts):c.q,p=AI.provider();
-  c.phase='busy';c.result='';c.queued=false;aiMode('busy');requestAnimationFrame(glyphInView);   // le Glyph revient à l'écran pendant l'attente
+  c.phase='busy';c.result='';c.queued=false;aiMode('busy');requestAnimationFrame(panelInView);
   const keep=P.querySelector('.aip-steps')&&!P.hidden?P.querySelector('.aip-steps').innerHTML:'';
   frame(c.mode==='notes'?'IA · Demander à mes notes':'IA · Question libre',p.name+' · '+AI.host());
   if(keep)P.querySelector('.aip-steps').innerHTML=keep;
@@ -208,29 +184,29 @@ async function send(){
   const out=P.querySelector('.aip-out');
   if(!AI.online())return offline(c,out);
   c.ctl=new AbortController();
-  step('send','J\'envoie '+(c.mode==='notes'?'ta question et les extraits':'ta question')+' à '+esc(p.short)+' <small>('+esc(AI.model())+')</small>');
-  g.set('think',{kind:'ask'});
+  step('send',AI.t(c.mode==='notes'?'sendNotes':'sendQ',{name:p.short})+' <small>('+esc(AI.model())+')</small>');
+  g.set('think');
   const S=streamer(out);let first=true;
   const onPhase=k=>{if(cur!==c)return;
-    if(k==='headers')step('think',esc(p.short)+' réfléchit…');
-    if(k==='first')step('write','Je rédige');};
+    if(k==='headers'){step('think',AI.t('think',{name:p.short}));g.set('think');}
+    if(k==='first'){step('write',AI.t('write'));g.set('write');}};
   try{
     await AI.fire(task,txt,(ch,all)=>{if(cur!==c||c.ctl.signal.aborted)return;
-      if(first){first=false;out.removeAttribute('aria-busy');if(!P.querySelector('[data-k="write"]'))step('write','Je rédige');}
+      if(first){first=false;out.removeAttribute('aria-busy');if(!P.querySelector('[data-k="write"]'))step('write',AI.t('write'));g.set('write');}
       c.result=all;g.token(ch.length);S.push(all);},c.ctl.signal,onPhase);
     if(cur!==c)return;
     await S.end();if(cur!==c)return;
     out.removeAttribute('aria-busy');out.innerHTML=AI.md(c.result||'(réponse vide)');
     if(c.extracts)out.insertAdjacentHTML('beforeend','<div class="ai-src">'+c.extracts.map((x,i)=>'<a href="notes.html#'+encodeURIComponent(x.id)+'" data-note="'+esc(x.id)+'">['+(i+1)+'] '+esc(x.title)+'</a>').join(' ')+'</div>');
     const tm=AI.timing();
-    stepsDone();step('done','Réponse reçue'+(tm.done?' <small>('+fmtS(tm.done/1000)+(tm.first?', 1er mot à '+fmtS(tm.first/1000):'')+')</small>':''),'ok');
+    stepsDone();step('done',AI.t('done')+(tm.done?' <small>('+fmtS(tm.done/1000)+(tm.first?', '+AI.t('firstAt',{t:fmtS(tm.first/1000)}):'')+')</small>':''),'ok');
     c.phase='answer';c.ctl=null;g.set('done');aiMode('answer');arrive();
     btns(B('copy','Copier')+B('note','Enregistrer en note')+B('x','Fermer','primary'));
   }catch(e){S.stop();if(cur!==c)return;
     if(e&&e.name==='OfflineError'&&!c.result){c.ctl=null;return offline(c,out);}
     c.phase='error';c.ctl=null;g.set('error');aiMode('answer');
     P.querySelectorAll('.aip-steps li.now').forEach(x=>step(x.dataset.k,null,'bad'));
-    const er=P.querySelector('.aip-b .ai-err');er.hidden=false;er.textContent=e.name==='AbortError'?'Arrêté.':'Échec : '+e.message;
+    const er=P.querySelector('.aip-b .ai-err');er.hidden=false;er.textContent=e.name==='AbortError'?AI.t('errStop'):(AI.uiLang()==='en'?'Failed: ':'Échec : ')+e.message;
     out.removeAttribute('aria-busy');out.innerHTML=c.result?AI.md(c.result):'';if(!c.result)out.hidden=true;
     btns((c.result?B('copy','Copier'):'')+B('cfg','Réglages IA…')+B('x','Fermer','primary'));
   }
@@ -241,11 +217,11 @@ function offline(c,out){
   step('send','Hors ligne : '+esc(AI.provider().short)+' est injoignable','bad');
   out.hidden=true;
   const er=P.querySelector('.aip-b .ai-err');er.hidden=false;
-  er.textContent='Pas de réseau : rien n\'a été envoyé. L\'IA par clé a besoin d\'Internet'+(AI.local()?' ; la recherche par le sens (locale) marche sans réseau.':'.');
+  er.textContent=AI.t('offline');
   btns(B('x','Fermer')+(AI.local()?B('sem','Chercher par le sens (local)'):'')+B('queue','Envoyer quand le réseau revient','primary'));
 }
 function queue(){const c=cur;if(!c)return;c.queued=true;c.phase='queued';g.set('think',{kind:'ask'});
-  step('wait','En attente du réseau… <small>(envoi automatique dès son retour, comme tu l\'as demandé)</small>');
+  step('wait',AI.t('queue'));
   const er=P.querySelector('.aip-b .ai-err');if(er)er.hidden=true;
   btns(B('x','Annuler l\'envoi'));}
 addEventListener('online',()=>{if(cur&&cur.queued)send();});
@@ -295,5 +271,5 @@ btn.addEventListener('click',()=>{
   if(!q.value.trim()){q.value='? ';q.focus();q.dispatchEvent(new Event('input',{bubbles:true}));return;}
   q.focus();NOXE.forceLead();
 });
-window.AIBAR={isQuestion,close,glyph:g,panelGlyph:gp,state:()=>cur?cur.phase:'rest',open:()=>!P.hidden,ask,steps:()=>[...P.querySelectorAll('.aip-steps li')].map(x=>x.dataset.k+':'+x.className)};
+window.AIBAR={isQuestion,close,glyph:g,panelMark:g,state:()=>cur?cur.phase:'rest',open:()=>!P.hidden,ask,steps:()=>[...P.querySelectorAll('.aip-steps li')].map(x=>x.dataset.k+':'+x.className)};
 })();
