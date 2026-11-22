@@ -122,7 +122,7 @@ async function send(system,prompt,onText,signal,onPhase){
   }
   ph('headers');
   if(!res.ok){let msg='';try{const j=await res.json();msg=(j.error&&(j.error.message||j.error.status))||'';}catch(e){}
-    throw new Error(({400:'requête refusée',401:'clé refusée',403:'clé refusée ou service non autorisé',404:'modèle introuvable',429:'quota dépassé (réessaie plus tard, ou choisis un autre fournisseur dans les réglages)',500:'le service a un problème',502:'service saturé',503:'service saturé (forte demande) : réessaie dans un instant, ou choisis un autre fournisseur dans les réglages',504:'le service ne répond pas'}[res.status]||'erreur '+res.status)+(msg?' — '+String(msg).slice(0,160):''));}
+    throw new Error(errMsg(res.status,msg));}
   const rd=res.body.getReader(),td=new TextDecoder();let buf='',all='';
   const line=l=>{l=l.trim();if(!l.startsWith('data:'))return;const d=l.slice(5).trim();if(!d||d==='[DONE]')return;
     let j;try{j=JSON.parse(d);}catch(e){return;}
@@ -377,6 +377,98 @@ function md(t){
   return esc(t).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
     .split('\n').map(l=>/^\s*[-*] /.test(l)?'<li>'+l.replace(/^\s*[-*] /,'')+'</li>':/^#{1,4} /.test(l)?'<b>'+l.replace(/^#+ /,'')+'</b><br>':l+'<br>').join('');
 }
+
+/* v12 : textes d'attente / d'erreur, en français (et en anglais si la langue de l'IA est « en »). */
+const I18N={
+  fr:{
+    read:'Je lis ta question…',
+    look:'Je cherche dans tes {n} notes…',
+    lookKw:'Je cherche dans tes {n} notes (par mots-clés)…',
+    found:"J'ai trouvé {n} note{s}",
+    foundNone:'Aucune note vraiment proche',
+    foundNoneSent:"Aucune note ne semble parler de ça. Rien n'a été envoyé.",
+    sendQ:"J'envoie ta question à {name}…",
+    sendNotes:"J'envoie ta question et les extraits à {name}…",
+    think:'{name} réfléchit…',
+    write:"J'écris la réponse…",
+    done:'Réponse reçue',
+    firstAt:'1er mot à {t}',
+    offline:"Pas de réseau : rien n'a été envoyé. Branche-toi à Internet, ou cherche dans tes notes (ça marche hors ligne).",
+    queue:'En attente du réseau… (envoi automatique dès son retour, comme tu l\'as demandé)',
+    errStop:'Arrêté.',
+    errLocal:'La recherche dans tes notes a échoué : {m}',
+    nothing:'Rien à envoyer.',
+    noKey:"Aucune clé d'API enregistrée pour {name}. Ouvre les réglages IA pour en ajouter une (Groq est gratuit). Rien n'est envoyé tant que tu n'en as pas mis une."
+  },
+  en:{
+    read:'Reading your question…',
+    look:'Searching your {n} notes…',
+    lookKw:'Searching your {n} notes (by keywords)…',
+    found:'I found {n} note{s}',
+    foundNone:'No notes look close enough',
+    foundNoneSent:'No note seems to be about that. Nothing was sent.',
+    sendQ:'Sending your question to {name}…',
+    sendNotes:'Sending your question and the extracts to {name}…',
+    think:'{name} is thinking…',
+    write:'Writing the answer…',
+    done:'Answer received',
+    firstAt:'first word at {t}',
+    offline:'You are offline: nothing was sent. Connect to the internet, or search your notes (that works offline).',
+    queue:'Waiting for the network… (will send automatically when it is back, as you asked)',
+    errStop:'Stopped.',
+    errLocal:'Could not search your notes: {m}',
+    nothing:'Nothing to send.',
+    noKey:'No API key saved for {name}. Open AI settings to add one (Groq is free). Nothing is sent until you add a key.'
+  }
+};
+const uiLang=()=>cfg.lang==='en'||(cfg.lang==='auto'&&/^en(?:-|$)/i.test(document.documentElement.lang||''))?'en':'fr';
+function t(k,vars){let s=(I18N[uiLang()]||I18N.fr)[k]||I18N.fr[k]||k;if(vars)s=s.replace(/\{(\w+)\}/g,(_,x)=>vars[x]!=null?String(vars[x]):'');return s;}
+function errMsg(status,detail){
+  const fr={400:'requête refusée. Vérifie le texte, puis réessaie.',
+    401:'clé refusée. Ouvre les réglages IA, vérifie ta clé (ou demandes-en une nouvelle), puis réessaie.',
+    403:'clé refusée ou service non autorisé. Vérifie ta clé dans les réglages IA, ou choisis un autre service.',
+    404:'modèle introuvable. Choisis un autre modèle dans les réglages IA.',
+    429:'quota dépassé. Attends un moment, ou choisis un autre fournisseur dans les réglages.',
+    500:'le service a un problème. Réessaie dans un instant.',
+    502:'service saturé. Réessaie dans un instant, ou choisis un autre fournisseur dans les réglages.',
+    503:'service saturé (forte demande). Réessaie dans un instant, ou choisis un autre fournisseur dans les réglages.',
+    504:'le service ne répond pas. Réessaie dans un instant, ou choisis un autre fournisseur dans les réglages.'};
+  const en={400:'the request was rejected. Check the text, then try again.',
+    401:'the key was rejected. Open AI settings, check your key (or get a new one), then try again.',
+    403:'the key was rejected, or the service is not allowed. Check your key in AI settings, or pick another provider.',
+    404:'model not found. Pick another model in AI settings.',
+    429:'quota exceeded. Wait a moment, or pick another provider in settings.',
+    500:'the service has a problem. Try again in a moment.',
+    502:'the service is saturated. Try again in a moment, or pick another provider in settings.',
+    503:'the service is saturated (high demand). Try again in a moment, or pick another provider in settings.',
+    504:'the service is not responding. Try again in a moment, or pick another provider in settings.'};
+  const M=uiLang()==='en'?en:fr;
+  let out=M[status]||((uiLang()==='en'?'error ':'erreur ')+status);
+  if(detail)out+=' — '+String(detail).slice(0,160);
+  return out;
+}
+/* v12 : pendant le flux, on n'applique PAS le Markdown complet à chaque morceau (ça faisait ramer).
+   Texte échappé + gras/code/retours, au plus toutes les 80 ms ; le vrai Markdown une seule fois à la fin. */
+function streamView(out){
+  const reduce=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let full='',shown=0,raf=0,last=0,wait=null,pin=true;
+  const onScroll=()=>{pin=out.scrollHeight-out.scrollTop-out.clientHeight<48;};
+  out.addEventListener('scroll',onScroll,{passive:true});
+  const light=t=>esc(t).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\n/g,'<br>');
+  const paint=()=>{out.innerHTML=light(full.slice(0,shown));if(pin)out.scrollTop=out.scrollHeight;};
+  const fin=()=>{if(wait&&shown>=full.length){const w=wait;wait=null;w();}};
+  const loop=now=>{raf=0;const back=full.length-shown;
+    if(back>0)shown=Math.min(full.length,shown+Math.max(16,Math.ceil(back*.3)));
+    if(now-last>80||shown>=full.length){last=now;paint();}
+    if(shown<full.length)raf=requestAnimationFrame(loop);else fin();};
+  return{
+    push(all){full=all;if(reduce()||document.hidden){shown=full.length;paint();return;}if(!raf)raf=requestAnimationFrame(loop);},
+    end(){return new Promise(r=>{wait=r;if(shown>=full.length&&!raf)fin();
+      setTimeout(()=>{if(wait){if(raf)cancelAnimationFrame(raf);raf=0;shown=full.length;paint();fin();}},800);});},
+    stop(){if(raf)cancelAnimationFrame(raf);raf=0;shown=full.length;out.removeEventListener('scroll',onScroll);}
+  };
+}
+
 const askPayload=(q,ex)=>'Question : '+q+'\n\nExtraits de mes notes :\n'+ex.map((x,i)=>'['+(i+1)+'] '+x.title+'\n'+x.t).join('\n\n');
 const flashCount=t=>(String(t).match(/^\s*Q\s*:/gim)||[]).length;
 
@@ -398,7 +490,7 @@ function run(task,o){
     '<div class="ai-err" id="aiErr" role="alert" hidden></div>'+
     '<div class="ctx-db" id="aiBtns"></div></form>';
   document.body.appendChild(ov);
-  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=GLYPH.create({size:64,kind:T.kind});f.querySelector('.ai-gl').appendChild(g.el);
+  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=(typeof AIMARK!=='undefined'?AIMARK:GLYPH).create({size:24,kind:T.kind});f.querySelector('.ai-gl').appendChild(g.el);
   let ctl=null,result='',extracts=null,closed=false;
   const prev=document.activeElement;
   const close=()=>{if(closed)return;closed=true;if(ctl)ctl.abort();g.destroy();ov.remove();OPEN=null;document.removeEventListener('keydown',onKey,true);if(prev&&prev.focus)try{prev.focus();}catch(e){}};
@@ -417,7 +509,7 @@ function run(task,o){
   }
   function warn(){
     const w=$i('aiWarn'),p=PROV[cfg.provider],txt=payload();
-    if(!hasKey()){w.className='ai-warn none';w.innerHTML='Aucune clé d\'API enregistrée pour <b>'+esc(p.name)+'</b>. Rien n\'est envoyé tant que tu n\'en as pas mis une.';
+    if(!hasKey()){w.className='ai-warn none';w.innerHTML=esc(t('noKey',{name:p.name})).replace(esc(p.name),'<b>'+esc(p.name)+'</b>');
       btns(B('x','Fermer')+B('cfg','Réglages IA…','primary'));return;}
     w.className='ai-warn';
     w.innerHTML='[!] En cliquant sur « Envoyer », <b>ce texte ('+txt.length+' caractères) part chez '+esc(p.name)+'</b> ('+esc(host())+', modèle '+esc(model())+') avec ta clé, '+
@@ -433,28 +525,27 @@ function run(task,o){
     const q=($i('aiIn').value||'').trim();if(!q){$i('aiIn').focus();return;}
     g.set('search');$i('aiErr').hidden=true;
     try{extracts=await retrieve(q);
-      if(!extracts.length){g.set('error');$i('aiErr').hidden=false;$i('aiErr').textContent='Aucune note ne semble parler de ça.';extracts=null;return;}
+      if(!extracts.length){g.set('error');$i('aiErr').hidden=false;$i('aiErr').textContent=t('foundNoneSent');extracts=null;return;}
       $i('aiCtx').innerHTML='<div class="ai-l">Extraits retenus (seuls eux seront envoyés)</div><ol class="ai-ex">'+extracts.map(x=>'<li><b>'+esc(x.title)+'</b> — '+esc(x.t.slice(0,140))+(x.t.length>140?'…':'')+'</li>').join('')+'</ol>';
       g.set('idle');warn();
-    }catch(e){g.set('error');$i('aiErr').hidden=false;$i('aiErr').textContent='Recherche locale impossible : '+e.message;}
+    }catch(e){g.set('error');$i('aiErr').hidden=false;$i('aiErr').textContent=t('errLocal',{m:e.message});}
   }
   async function go(){
-    const txt=payload();if(!txt.trim()){$i('aiErr').hidden=false;$i('aiErr').textContent='Rien à envoyer.';return;}
+    const txt=payload();if(!txt.trim()){$i('aiErr').hidden=false;$i('aiErr').textContent=t('nothing');return;}
     $i('aiErr').hidden=true;const out=$i('aiOut');out.hidden=false;out.innerHTML='';result='';
     f.querySelectorAll('#aiWarn details').forEach(d=>d.open=false);     // place à la réponse
     g.set('think');btns(B('stop','Arrêter'));
-    ctl=new AbortController();let tm=0;
+    ctl=new AbortController();const S=streamView(out);
     armed=true;                                            // <- la SEULE porte d'entrée vers le réseau
     try{
-      await send(sysFor(task),txt,(chunk,all)=>{result=all;g.token(chunk.length);
-        if(!tm)tm=setTimeout(()=>{tm=0;out.innerHTML=md(result);out.scrollTop=out.scrollHeight;},70);},ctl.signal);
-      clearTimeout(tm);out.innerHTML=md(result||'(réponse vide)');
+      await send(sysFor(task),txt,(chunk,all)=>{result=all;g.set('write');S.push(all);},ctl.signal);
+      await S.end();out.innerHTML=md(result||'(réponse vide)');
       if(task==='ask')out.innerHTML+='<div class="ai-src">'+extracts.map((x,i)=>'<a href="notes.html#'+encodeURIComponent(x.id)+'" data-open="'+esc(x.id)+'">['+(i+1)+'] '+esc(x.title)+'</a>').join(' ')+'</div>';
       if(task==='flashcards')out.insertAdjacentHTML('afterbegin','<div class="ai-l">'+flashCount(result)+' carte(s)</div>');
       g.set('done');after();
-    }catch(e){clearTimeout(tm);armed=false;
+    }catch(e){S.stop();armed=false;
       if(closed)return;
-      g.set('error');$i('aiErr').hidden=false;$i('aiErr').textContent=e.name==='AbortError'?'Arrêté.':'Échec : '+e.message;
+      g.set('error');$i('aiErr').hidden=false;$i('aiErr').textContent=e.name==='AbortError'?t('errStop'):(uiLang()==='en'?'Failed: ':'Échec : ')+e.message;
       btns(B('x','Fermer')+B('cfg','Réglages IA…')+(result?B('copy','Copier'):''));
     }finally{ctl=null;}
   }
@@ -501,13 +592,13 @@ function settings(){
   ov.innerHTML='<form class="ctx-dlg ai-dlg ai-set" role="dialog" aria-modal="true" aria-labelledby="aiST" novalidate>'+
     '<div class="ai-head"><span class="ai-gl"></span><div><div class="ctx-dt" id="aiST">IA — réglages</div><div class="ai-sub">Tout est désactivé par défaut. Rien ne part sans ton clic.</div></div></div>'+
     '<details class="ai-guide" id="aiGuide"><summary>Comment ça marche ? (3 étapes)</summary>'+
-    '<p>L\'assistant (résumer, corriger, répondre sur tes notes) a besoin d\'une <b>clé d\'API</b> : un mot de passe personnel et gratuit que le service te donne pour savoir que c\'est toi.</p>'+
-    '<ol><li>Choisis un service plus bas : <b>Groq</b> est le plus simple (gratuit, rapide).</li><li>Clique sur « Obtenir une clé », crée un compte, copie la clé.</li><li>Colle-la dans « Clé d\'API » puis clique sur « Enregistrer ».</li></ol>'+
-    '<p>Ne partage jamais ta clé. Rien n\'est envoyé tant que tu ne cliques pas sur « Envoyer » dans une fenêtre IA.</p></details>'+
+    '<p>Pour résumer, corriger ou poser une question, AVERSE s\'adresse à un service d\'IA. Ce service te demande une <b>clé d\'API</b> : un mot de passe personnel, en général gratuit, qui prouve que c\'est toi.</p>'+
+    '<ol><li>Plus bas, choisis un service. <b>Groq</b> est le plus simple pour commencer (gratuit et rapide).</li><li>Clique sur « Obtenir une clé », crée un compte chez ce service, copie la clé.</li><li>Colle-la dans le champ « Clé d\'API », puis clique sur « Enregistrer ».</li></ol>'+
+    '<p>Ne montre ta clé à personne. AVERSE n\'envoie rien tant que tu n\'as pas cliqué sur « Envoyer ».</p></details>'+
     '<p class="ai-net" id="aiNet" role="status"></p>'+
     '<h3 class="ai-h">1 · Recherche par le sens <small>(100 % locale)</small></h3>'+
-    '<p class="ai-p">Un modèle multilingue (multilingual-e5-small quantifié : français et anglais, une question en anglais retrouve une note en français) tourne <b>dans ton navigateur</b> : recherche par le sens, notes liées, liens dans le graphe, « demander à mes notes ». '+
-    'Téléchargement unique ≈ 155 Mo à l\'activation — prévois du Wi-Fi (moteur 21 Mo depuis cdn.jsdelivr.net, vérifié par empreinte SHA-384 ; modèle 118 Mo + vocabulaire 17 Mo depuis huggingface.co), puis hors ligne. Tes notes ne quittent pas l\'appareil.</p>'+
+    '<p class="ai-p">Optionnel, et <b>sans compte</b> : un petit modèle se télécharge une fois (environ 155 Mo, à faire en Wi-Fi) et tourne <b>dans ton navigateur</b>. Il sert à retrouver tes notes par le sens (même dans une autre langue), à proposer des notes liées, et à préparer « demander à mes notes ». '+
+    'Ensuite ça marche hors ligne. Tes notes ne quittent pas l\'appareil. (Détail technique : moteur 21 Mo, modèle 118 Mo, vocabulaire 17 Mo.)</p>'+
     '<div class="ai-row"><span id="aiLoc"></span><span class="ai-bt" id="aiLocBt"></span></div>'+
     '<h3 class="ai-h">2 · Assistant <small>(ta clé d\'API)</small></h3>'+
     '<div class="ai-provs">'+P('groq')+P('mistral')+P('openrouter')+P('gemini')+P('openai')+'</div>'+
@@ -613,7 +704,7 @@ if(typeof NOXE!=='undefined'&&NOXE.cmds)NOXE.cmds.push(
   {id:'ai-settings',title:'IA : réglages (clé d\'API, recherche par le sens)',words:'ia ai reglages cle api gemini openai modele sens embeddings intelligence artificielle',run:settings});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-ai-settings]');if(b){e.preventDefault();settings();}});
 
-return{PROV,MODELS,thinkFor,online,OfflineError,prepare,prewarm,warmed:()=>warmed,related,semPairs,plain,passages,timing:()=>Object.assign({},TIME),qCache:()=>QC.size,_vecs:()=>VEC,_nn:()=>nnStats(),_qvec:q=>qvec(q),embedQ:q=>qvec(q),
+return{PROV,MODELS,thinkFor,online,OfflineError,prepare,prewarm,t,uiLang,errMsg,streamView,warmed:()=>warmed,related,semPairs,plain,passages,timing:()=>Object.assign({},TIME),qCache:()=>QC.size,_vecs:()=>VEC,_nn:()=>nnStats(),_qvec:q=>qvec(q),embedQ:q=>qvec(q),
   TASKS,run,settings,ready,hasKey,fire,sysFor,setPref,askPayload,md,host,model,provider:()=>PROV[cfg.provider],IDX,rel:relOf,setKey,syncPart,syncReceive,embed,enableLocal,disableLocal,indexNotes,similarTo,search,retrieve,ctxItems,
   cfg:()=>JSON.parse(JSON.stringify(cfg)),local:()=>cfg.local,state:()=>E.state,stats,
   set workerFactory(f){workerFactory=f;},onState(f){E.subs.add(f);return()=>E.subs.delete(f);},isOpen:()=>!!OPEN,close:()=>OPEN&&OPEN.close(),

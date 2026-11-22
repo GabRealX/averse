@@ -4,7 +4,7 @@
    - Échap, ou barre vide quand on la quitte -> retour au Glyph seul ;
    - un fichier qui survole la page -> le Glyph « aspire » ; au dépôt, app.js choisit l'outil (PDF, image, JSON…) ;
    - pendant la frappe, le motif du Glyph suit l'intention détectée (PDF, image, code, note, synchro, IA…).
-   v10 : pendant une demande à l'IA (data-ai), le Glyph REGRANDIT au-dessus du panneau et suit les étapes (ai-bar.js).
+   v12 : pendant une demande à l'IA (data-ai), le Glyph de l'accueil s'efface calmement (pas de changement de taille) ; le petit indicateur est dans le panneau (ai-mark.js).
    Une seule boucle d'animation (glyph.js), arrêtée quand l'onglet est caché ou quand l'accueil n'est pas affiché. */
 (function(){
 const hv=document.getElementById('homeView'),btn=document.getElementById('homeGlyph'),q=document.getElementById('q');
