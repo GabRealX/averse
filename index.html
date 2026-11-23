@@ -45,7 +45,7 @@
 
 <main class="wrap">
   <!-- accueil = recherche -->
-  <section id="homeView" class="view" data-home="rest">
+  <section id="homeView" class="view">
     <header class="home-head">
       <pre class="ascii-logo" aria-hidden="true">    ___     _______ ____  ____  _____
    / \ \   / / ____|  _ \/ ___|| ____|
@@ -56,11 +56,7 @@
       <h1>AVERSE</h1>
       <p class="hero-subtitle">Ta boîte à outils du quotidien : tout tourne dans ton navigateur, même hors ligne. Rien n'est envoyé nulle part.</p>
     </header>
-    <!-- v9 : au centre, le grand Glyph (l'assistant). Clic / tap, « / », Ctrl+K ou taper au clavier -> la barre de recherche -->
-    <div class="home-stage">
-      <button type="button" id="homeGlyph" class="home-glyph" aria-label="Assistant AVERSE : chercher un outil, une note ou poser une question" aria-controls="q" aria-expanded="false"></button>
-      <p class="home-hint" id="homeHint">Touche le Glyph ou tape au clavier · glisse un fichier ici · <button type="button" class="linklike" id="homeAll">tous les outils</button></p>
-    </div>
+    <!-- v13 : plus de Glyph sur l'accueil. Titre, barre de recherche / IA toujours visible, puis Récents et Favoris. -->
     <div class="search-hero">
       <label class="sr-only" for="q">Que veux-tu faire ?</label>
       <div class="qbar">
@@ -131,6 +127,5 @@
 <script defer src="js/ai.js"></script>
 <script defer src="js/ai-bar.js"></script>
 <script defer src="js/photo.js"></script>
-<script defer src="js/home.js"></script>
 </body>
 </html>

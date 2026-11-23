@@ -1,4 +1,4 @@
-/* app.js — l'accueil v2 : une grande barre de recherche, les favoris / récents, le collage malin,
+/* app.js — l'accueil : une grande barre de recherche toujours visible, les favoris / récents, le collage malin,
    le glisser-déposer n'importe où, et le routage par adresse :
      #/          -> recherche (accueil)
      #/autres    -> les outils moins utilisés (réseau, électronique, texte & dates, mémo)
@@ -73,17 +73,14 @@ const card=t=>{
 };
 const group=(title,list,extra)=>list.length||extra?'<div class="tool-group"><div class="tool-category">'+esc(title)+'</div><div class="tools">'+list.map(card).join('')+(extra||'')+'</div></div>':'';
 function renderHome(){
-  const favs=NOXE.favs().map(toolOf).filter(Boolean),rec=NOXE.recents().map(toolOf).filter(t=>t&&!NOXE.isFav(t.key)).slice(0,4);
-  let html=group('* Favoris',favs)+group('Récents',rec);
-  if(!favs.length)html+='<p class="hint-line">Astuce : clique + sur un outil pour l\'épingler ici.</p>';
-  NOXE.main.forEach(c=>{
-    const extra=c==='notes'?'<div class="card"><a class="tool" href="notes.html"><h3>Carnet complet</h3><p>Toutes tes notes, liens [[entre notes]], graphe, export.</p></a></div>'+
-      '<div class="card"><button class="tool" type="button" data-panel><h3>Panneau Ctrl+J</h3><p>Les notes à portée de main, depuis n\'importe quel outil.</p></button></div>':'';
-    html+=group(catName(c),NOXE.tools.filter(t=>t.cat===c),extra);
-  });
-  const n=NOXE.tools.filter(t=>!NOXE.main.includes(t.cat)).length;
-  html+='<a class="more-link" href="#/autres">Autres outils ('+n+') : réseau, électronique, texte &amp; dates, mémo -></a>';
-  blocks.innerHTML=html;
+  /* v13 : seulement Récents (jusqu'à 6, hors favoris déjà listés) et Favoris. Section vide = cachée ; un court conseil si aucun favori. */
+  const favs=NOXE.favs().map(toolOf).filter(Boolean),rec=NOXE.recents().map(toolOf).filter(t=>t&&!NOXE.isFav(t.key)).slice(0,6);
+  let html='';
+  if(rec.length)html+=group('Récents',rec);
+  if(favs.length)html+=group('Favoris',favs);
+  else html+='<p class="hint-line home-fav-hint">Aucun favori pour l\'instant. Sur un outil, touche l\'étoile (ou appuie longtemps) pour l\'épingler ici.</p>';
+  html+='<a class="more-link" href="#/autres">Autres outils -></a>';
+  blocks.innerHTML=html;blocks.hidden=false;
 }
 function renderOthers(){
   $('othersGroups').innerHTML=NOXE.cats.filter(c=>!NOXE.main.includes(c[0])).map(([k,name])=>group(name,NOXE.tools.filter(t=>t.cat===k))).join('');
@@ -280,7 +277,8 @@ let routing=false;
 function show(v){
   homeV.hidden=v!=='home';othersV.hidden=v!=='autres';
   document.title=v==='autres'?'Autres outils — AVERSE':'AVERSE';
-  if(v==='home'){if(q.value)drawResults();else renderHome();setTimeout(()=>{if(NOXE.current())return;if(q.value||!NOXE.homeIdle)q.focus({preventScroll:true});else NOXE.homeIdle();},0);}   // v9 : au repos, le Glyph seul (home.js)
+  if(v==='home'){if(q.value)drawResults();else renderHome();
+    setTimeout(()=>{if(NOXE.current())return;if(q.value)q.focus({preventScroll:true});},0);}   // v13 : pas de focus auto (évite le clavier sur téléphone)
   if(v==='autres')renderOthers();
 }
 function route(){
@@ -309,7 +307,7 @@ addEventListener('keydown',e=>{
   if(e.key==='Escape'&&!othersV.hidden){e.preventDefault();location.hash='#/';return;}
   /* sur l'accueil, taper n'importe où écrit dans la recherche */
   const a=document.activeElement;
-  if(!homeV.hidden&&e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&(!a||a===document.body||a.id==='homeGlyph'||a.classList.contains('tool')))q.focus();
+  if(!homeV.hidden&&e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&(!a||a===document.body||a.classList.contains('tool')))q.focus();
 });
 
 /* liens du pied de page (data.js) — uniquement des adresses http(s) */

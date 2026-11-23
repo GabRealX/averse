@@ -9,8 +9,8 @@ Il faut un petit serveur local (service worker, Worker et crypto ne marchent pas
     python3 -m http.server 8000     # puis http://localhost:8000
 
 ## Utiliser
-- **L'accueil est une recherche** (v9 : derrière le Glyph, voir plus bas) : tape quelques lettres (« jsn », « fusion pdf », « qr »…), **Entrée** ouvre le meilleur résultat, ↑ ↓ pour choisir. Les notes du carnet sortent aussi dans les résultats. **Ctrl+K** remet le curseur dans la recherche (depuis les autres pages : revient à l'accueil).
-- **Favoris** : l'étoile ☆ sur une carte ou en haut d'un outil. Favoris et **récents** s'affichent sous la recherche.
+- **L'accueil est une recherche** : le titre AVERSE, la barre (recherche et IA) toujours visible, puis tes **récents** (jusqu'à 6) et tes **favoris**. Une section vide est cachée ; s'il n'y a pas encore de favori, un court conseil l'explique. Tape quelques lettres (« jsn », « fusion pdf », « qr »…), **Entrée** ouvre le meilleur résultat, ↑ ↓ pour choisir. Les notes du carnet sortent aussi dans les résultats. **Ctrl+K** remet le curseur dans la recherche (depuis les autres pages : revient à l'accueil).
+- **Favoris** : l'étoile sur une carte, en haut d'un outil, ou par un appui long / clic droit. Favoris et **récents** s'affichent sous la recherche (mémorisés dans le navigateur, `averse-fav` / `averse-recent`).
 - **Collage malin** : colle (Ctrl+V) directement sur l'accueil un JSON, un JWT, une URL, une couleur (#ff8800), un timestamp, un UUID, du Base64, une IP, un hash… ou une image : l'outil qui va bien est proposé (Entrée pour l'ouvrir).
 - **Glisser-déposer** un fichier n'importe où : un PDF ouvre l'outil PDF, une image propose optimiser / convertir / éditer / mettre en PDF, un autre fichier propose hash ou Base64.
 - **Une page par outil** : adresse `index.html#/json`, `#/regex`, `#/pdfoutils`… (on peut la mettre en marque-page, le bouton Retour marche). **Échap** revient à la recherche.
@@ -18,6 +18,12 @@ Il faut un petit serveur local (service worker, Worker et crypto ne marchent pas
 - **Carnet** : **Ctrl+J** (⌘+J sur Mac) ouvre le panneau des notes partout. **→ Carnet** en haut de chaque outil envoie entrées + résultats dans une note. Le carnet complet reste `notes.html`.
 - **Autres outils** (`#/autres`) : réseau, électronique, texte & dates, aide-mémoire. Moins utilisés, mais toujours trouvables par la recherche.
 - **Pluie** : désactivée par défaut, lien « pluie : off/on » en bas de page. **Style ASCII** : lien « style » en bas (ou `?style=ascii`).
+
+## Nouveautés v13
+- **Plus de Glyph sur l'accueil.** Le grand disque au centre (et son animation gros/petit) disparaît. Tu arrives directement sur le titre AVERSE, la barre de recherche / IA, tes outils récents, tes favoris, et les liens en bas de page.
+- **Récents et favoris.** Les derniers outils ouverts (jusqu'à 6) apparaissent sous la barre ; tes favoris aussi. Une section vide n'est pas affichée. Pour épingler un outil : l'étoile sur sa carte ou en haut de sa page, ou un appui long / clic droit.
+- **Glisser-déposer inchangé.** Un fichier déposé sur l'accueil ouvre toujours l'outil qui convient (PDF, JSON, image, etc.).
+- **L'attente de l'IA** reste le petit indicateur de v12 (X qui tourne, « ? », etc.), dans le panneau de réponse — plus rien ne se redimensionne au milieu de la page.
 
 ## Nouveautés v12
 - **Plus d'animation gros/petit du Glyph pendant l'IA.** Le grand Glyph de l'accueil reste l'identité de la page au repos. Quand tu poses une question, il s'efface calmement (sans changer de taille) et laisse la place à un **petit indicateur** (24 px) à côté du statut, comme sur les autres assistants.
@@ -261,7 +267,7 @@ Pas de fichier .reg fourni, volontairement :
            ui.css (partagé : bouton Installer, menus Envoyer vers / clic droit, aide des raccourcis, fenêtres v6) · share.css (share.html) · ai.css (IA, Glyph)
     js/
       core.js       petites fonctions communes ($, esc, getLS/setLS, envoi vers le carnet…)
-      app.js        l'accueil : recherche, favoris/récents, collage malin, glisser-déposer, routage #/outil
+      app.js        l'accueil : recherche toujours visible, favoris/récents, collage malin, glisser-déposer, routage #/outil
       detect.js     le collage malin : devine ce qui a été collé (testé dans tests.html)
       panel.js      le panneau de notes Ctrl+J
       keys.js       raccourcis clavier + aide « ? »
@@ -343,7 +349,7 @@ Tous les chemins sont relatifs (manifeste, service worker, partage, « Ouvrir av
 - Le dossier pèse ~17 Mo, dont 15,6 Mo pour l'OCR. C'est bien sous les limites de GitHub (1 Go par site, 100 Mo par fichier). Le plus gros fichier fait 3,9 Mo.
 
 ## Tests
-- `tests.html` (via le serveur, ou en ligne sur ton site) : **227 tests**. Vert = réussi, rouge = vrai problème, gris = « ignoré : non disponible sur ce navigateur » (API absente, jamais pour cacher un résultat faux). `tests.html?only=Graphe` ne lance que les tests dont le nom contient ce mot.
+- `tests.html` (via le serveur, ou en ligne sur ton site) : **226 tests**. Vert = réussi, rouge = vrai problème, gris = « ignoré : non disponible sur ce navigateur » (API absente, jamais pour cacher un résultat faux). `tests.html?only=Graphe` ne lance que les tests dont le nom contient ce mot.
   - v7 : thèmes (data-theme, sauvegarde, contraste de chaque thème × accents, vraies pages, orage), surprises (déclenchement, aucune boucle qui traîne), Glyph (états, arrêt), IA (fournisseur et Worker simulés : aucune requête sans clic, Gemini / OpenAI-compatible / erreurs 401-429, clé jamais en clair ni dans la synchro, RAG qui n'envoie que les extraits utiles).
   - v8 : barre IA (option présente seulement pour une question / `?` / Tab / bouton, aucune requête sans action, confirmation, états du Glyph, Échap, réponse piégée en HTML/script/javascript: rendue inerte, 401, tenue à 360 px), langue des réponses, migration du modèle et préfixes e5.
   - v6 : couleur d'accent (contraste, variables, theme-color, sauvegarde) ; recherche (texte plié de même longueur, accents, extraits échappés, 600 notes, mémo, groupes et clavier) ; modèles (variables, fusion, pierres tombales, sauvegarde, synchro Gist) ; partage (aller-retour, clé à part, mauvaise clé, lien abîmé, bombe de décompression, charges XSS, CSP, import) ; signaler (adresse exacte, échappement `& # ? + %` / emoji / `<script>`, limite 6 000, aucune note ni jeton, e-mail caché par défaut — `window.open` est remplacé : aucun vrai ticket n'est ouvert).

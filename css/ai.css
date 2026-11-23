@@ -59,7 +59,7 @@
 .res-ai-hint span,.res-ai-keys span{color:var(--fg-soft)}
 html[data-style="ascii"] .ai-panel{border:1px dashed var(--line-2)}
 @media(max-width:560px){
-  .qbar .big-search{padding-right:100px}
+  .qbar .big-search{padding-right:116px}
   .qbar-ai{right:4px;width:48px;height:48px}
   .ai-panel{padding:12px;margin-left:0;margin-right:0}
   .aip-a{justify-content:stretch}.aip-a .btn{flex:1 1 auto}
@@ -68,7 +68,7 @@ html[data-style="ascii"] .ai-panel{border:1px dashed var(--line-2)}
 
 /* ===== v9 : Photo -> note (photo.js) ===== */
 .qbar-ph{position:absolute;right:72px;top:50%;transform:translateY(-50%);width:44px;height:44px;display:flex;align-items:center;justify-content:center;
-  background:transparent;border:1px solid transparent;cursor:pointer;padding:0;opacity:.7;font-size:1.15rem;filter:grayscale(1)}
+  background:transparent;border:1px solid transparent;cursor:pointer;padding:0;opacity:.7;font-size:1.15rem;filter:grayscale(1);overflow:hidden}
 .qbar-ph:hover,.qbar-ph:focus-visible{border-color:var(--line-2);opacity:1}
 .qbar-ph[hidden]{display:none}
 .ph-dlg{width:min(760px,100%);max-height:calc(100vh - 40px);overflow-y:auto}
@@ -87,7 +87,8 @@ html[data-style="ascii"] .ai-panel{border:1px dashed var(--line-2)}
 .ph-dlg .ctx-db{flex-wrap:wrap}
 @media(max-width:560px){.ph-work{flex-direction:column}.ph-img{width:100%;max-height:200px}.ph-dlg .ctx-db .tpl-b{flex:1 1 auto}.ph-pick .tpl-b{flex:1 1 100%;padding:12px}}
 html[data-style="ascii"] .ph-img,html[data-style="ascii"] .ph-right textarea{border:1px dashed var(--line-2)}
-@media(max-width:560px){.qbar-ph{right:54px;width:40px;height:40px;font-size:1.05rem}}
+@media(max-width:560px){.qbar-ph{right:54px;width:44px;height:44px;font-size:1.05rem}}
+@media(max-width:400px){.qbar-ph{font-size:0}.qbar-ph::before{content:"img";font-size:.62rem;letter-spacing:0;color:var(--fg-soft)}}
 /* ---------- v10 : étapes réelles, squelette, arrivée de la réponse ---------- */
 .aip-steps{list-style:none;margin:2px 0 8px;padding:0;display:flex;flex-direction:column;gap:4px;font-size:.74rem;color:var(--fg-soft)}
 .aip-steps:empty{display:none}
