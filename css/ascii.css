@@ -101,3 +101,8 @@ html[data-style="ascii"] .modal-note::before{content:"[ -> carnet ]";font-size:.
 html[data-style="ascii"] .modal-note::after{content:""}
 html[data-style="ascii"] .back::before{content:"<- accueil";font-size:.72rem}
 html[data-style="ascii"] .modal-close:hover::before{content:"[x]"}
+
+@media(max-width:360px){
+  html[data-style="ascii"] .nav-links{gap:6px;font-size:.68rem}
+  html[data-style="ascii"] .nav-links a::before,html[data-style="ascii"] .nav-links a::after{content:none}
+}

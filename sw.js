@@ -3,7 +3,7 @@
    (averse-v14 -> averse-v18…) pour que les visiteurs reçoivent la nouvelle version.
    Tous les chemins sont RELATIFS à ce fichier : le site marche aussi dans un sous-dossier
    (ex. https://toi.github.io/averse/ sur GitHub Pages). */
-const CACHE = 'averse-v24';
+const CACHE = 'averse-v25';
 const SHARE = 'averse-share';          // contenu partagé en attente (lu puis vidé par app.js)
 /* OCR (v4) : Tesseract.js pèse ~11 Mo (moteur wasm + langues). Il n'est PAS dans ASSETS : sinon chaque visiteur
    téléchargerait 11 Mo à l'installation, même sans jamais utiliser l'OCR, et à chaque nouvelle version du site.
@@ -42,7 +42,7 @@ const ASSETS = [
   './', './index.html', './notes.html', './about.html', './share.html', './manifest.json', './icon.svg',
   './icons/icon.svg', './icons/maskable.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png',
   './css/base.css', './css/home.css', './css/tools.css', './css/app.css', './css/ui.css', './css/notes.css', './css/ascii.css', './css/share.css',
-  './js/core.js', './js/wco.js', './js/attach.js', './js/notes-att.js', './js/conflict.js', './js/photo.js', './js/home.js', './js/data.js', './js/rain.js', './js/app.js', './js/about.js', './js/detect.js', './js/panel.js', './js/notes.js',
+  './js/core.js', './js/wco.js', './js/attach.js', './js/notes-att.js', './js/conflict.js', './js/photo.js', './js/data.js', './js/rain.js', './js/app.js', './js/about.js', './js/detect.js', './js/panel.js', './js/notes.js',
   './js/keys.js', './js/pwa.js', './js/ctxmenu.js', './js/backup.js', './js/math.js',
   './js/notes-graph.js', './js/notes-page.js', './js/vault.js', './js/cloud.js',   // v5 : graphe, barre mobile, synchro chiffrée
   './js/theme.js', './js/eggs.js', './js/glyph.js', './js/ai-mark.js', './js/ai.js', './js/ai-bar.js', './js/ai-notes.js', './js/ai-worker.js', './css/ai.css',   // v7

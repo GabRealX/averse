@@ -1175,6 +1175,9 @@ T('Signaler : fenêtre depuis le pied de page, la recherche (« signaler ») et 
   d.querySelector('#results .res-cmd').click();await until(()=>d.getElementById('fbDlg'));W.FEEDBACK.close();
   const S2=W.eval('NOXE').search('bug idée');if(!S2.some(r=>r.cmd==='feedback'))throw new Error('« bug idée »');
   q.value='';q.dispatchEvent(new W.Event('input',{bubbles:true}));
+  /* v13 : les cartes d'outils ne sont plus toutes sur l'accueil — on épingle JSON pour le clic droit */
+  if(!d.querySelector('a.tool[href="#/json"]')){W.eval('NOXE').toggleFav('json');W.eval('NOXE').refreshHome();}
+  await until(()=>d.querySelector('a.tool[href="#/json"]'));
   /* le clic droit (dernière entrée de chaque menu) */
   const card=d.querySelector('a.tool[href="#/json"]');wctx(card);await until(()=>d.getElementById('ctxMenu'));
   const bs=[...d.querySelectorAll('#ctxMenu button')],last=bs[bs.length-1];if(!/Signaler \/ Suggérer/.test(last.textContent))throw new Error('menu : '+last.textContent);
@@ -1756,75 +1759,66 @@ T('Carnet (v9) : menu « ... » (actions secondaires) au clavier ; pièces joint
 T('Markdown (v9) : options gardées sur toutes les lignes d\'un paragraphe ([[lien]] existant, image jointe en 2e ligne)',async()=>{
   const h=MD.render('ligne 1\n[[Cible]] et ![x](att:abc123def)',{exists:()=>true,att:true});
   if(/missing/.test(h))throw new Error('lien marqué absent en 2e ligne');if(!/<img class="att-img" data-att="abc123def"/.test(h))throw new Error('image en 2e ligne : '+h);});
-/* ---- v9 : l'accueil = le grand Glyph ---- */
-const homeV9=async()=>{await frame('index.html#/',()=>{try{return W.eval('NOXE').homeState&&W.document.querySelectorAll('#footerLinks a').length;}catch(e){return false;}});N=W.eval('NOXE');return W.document;};
+/* ---- v13 : accueil sans Glyph, barre visible, Récents et Favoris ---- */
+const homeV13=async()=>{await frame('index.html#/',()=>{try{return W.eval('NOXE').search&&W.document.getElementById('q')&&W.document.querySelectorAll('#footerLinks a').length;}catch(e){return false;}});N=W.eval('NOXE');return W.document;};
 const visible=el=>!!el&&el.getClientRects().length>0&&W.getComputedStyle(el).visibility!=='hidden'&&+W.getComputedStyle(el).opacity>0;
-const gW=d=>d.querySelector('#homeGlyph canvas').getBoundingClientRect().width;
-T('Accueil (v9) : au repos, AUCUN outil affiché — titre AVERSE, grand Glyph (bouton avec label), liens réseaux',async()=>{const S=snap();
-  try{const d=await homeV9();const hv=d.getElementById('homeView');
-    if(hv.dataset.home!=='rest')throw new Error('état '+hv.dataset.home);
-    const shown=[...d.querySelectorAll('.tool,.res-item,.card')].filter(visible);if(shown.length)throw new Error(shown.length+' outil(s) visible(s) au repos');
-    if(d.querySelectorAll('#homeBlocks .tool').length<5)throw new Error('la liste des outils doit rester dans la page (repliée)');
+T('Accueil (v13) : titre AVERSE, barre visible sans clic, pas de Glyph, liens réseaux, conseil favoris si la liste est vide',async()=>{const S=snap();
+  try{setLS('averse-fav',[]);setLS('averse-recent',[]);const d=await homeV13();
     if(d.querySelector('.home-head h1').textContent!=='AVERSE'||!visible(d.querySelector('.home-head')))throw new Error('titre');
+    const q=d.getElementById('q');if(!q||!visible(q))throw new Error('barre pas visible');
+    if(d.getElementById('homeGlyph')||d.querySelector('.home-glyph,.home-stage'))throw new Error('Glyph de l\'accueil encore là');
     if(![...d.querySelectorAll('#footerLinks a')].every(visible))throw new Error('liens réseaux');
-    const b=d.getElementById('homeGlyph');if(b.tagName!=='BUTTON'||!/Assistant/.test(b.getAttribute('aria-label')||'')||b.getAttribute('aria-expanded')!=='false')throw new Error('bouton / label');
-    if(gW(d)<200)throw new Error('Glyph pas assez grand : '+gW(d));
-    await sleep(400);if(!W.GLYPH.running()||N.homeState().motif!=='alive')throw new Error('Glyph immobile au repos ('+N.homeState().motif+')');
-    const c=d.querySelector('#homeGlyph canvas');const a=c.toDataURL();await sleep(500);if(c.toDataURL()===a)throw new Error('aucune image ne bouge (idle vivant)');
+    if(d.querySelector('#homeBlocks .tool-category'))throw new Error('une section alors que récents et favoris sont vides');
+    const hint=d.querySelector('.home-fav-hint');if(!hint||!visible(hint)||!/favori/i.test(hint.textContent))throw new Error('conseil favoris manquant');
+    if([...d.querySelectorAll('#homeBlocks .tool')].some(visible))throw new Error('outils affichés sans récents/favoris');
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Accueil (v9) : clic sur le Glyph, « / », Ctrl+K, taper au clavier ou Tab -> la barre ; Échap / barre vide quittée -> le Glyph seul',async()=>{const S=snap();
-  try{const d=await homeV9();const hv=d.getElementById('homeView'),q=d.getElementById('q'),b=d.getElementById('homeGlyph');
-    const isOpen=()=>hv.dataset.home==='open'&&visible(q);
-    b.focus();b.click();await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('clic');});if(b.getAttribute('aria-expanded')!=='true')throw new Error('aria-expanded');
-    await until(()=>gW(d)<100,4000).catch(()=>{throw new Error('le Glyph ne se réduit pas : '+gW(d)+' '+hv.dataset.home+' '+W.getComputedStyle(d.querySelector('#homeGlyph canvas')).width+' '+W.getComputedStyle(d.getElementById('homeGlyph')).getPropertyValue('--gz')+' vw='+W.innerWidth);});
-    if(![...d.querySelectorAll('#homeBlocks .tool')].some(visible)||!visible(d.querySelector('#homeBlocks .more-link')))throw new Error('barre vide : la liste complète des outils doit apparaître');
-    wkey(q,'Escape');await until(()=>hv.dataset.home==='rest'&&d.activeElement===b).catch(()=>{throw new Error('Échap -> repos + focus sur le Glyph');});
-    await until(()=>gW(d)>200,4000);
-    wkey(d.body,'/');await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('« / »');});
-    q.blur();await until(()=>hv.dataset.home==='rest').catch(()=>{throw new Error('barre vide quittée -> repos');});
-    wkey(d.body,'k',{ctrlKey:true});await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('Ctrl+K');});wkey(q,'Escape');await until(()=>hv.dataset.home==='rest');
-    b.focus();wkey(b,'j');await until(()=>isOpen()&&d.activeElement===q).catch(()=>{throw new Error('taper au clavier');});wkey(q,'Escape');await until(()=>hv.dataset.home==='rest');
-    q.focus();await until(()=>isOpen()).catch(()=>{throw new Error('Tab jusqu\'à la barre');});
-    /* avec du texte : résultats sous la barre ; Échap vide ET referme */
-    qType('json');await until(()=>visible(d.querySelector('#results .res-item')));if([...d.querySelectorAll('#homeBlocks .tool')].some(visible))throw new Error('liste + résultats');
-    wkey(q,'Escape');await until(()=>hv.dataset.home==='rest'&&!q.value);
+T('Accueil (v13) : Récents (jusqu\'à 6) et Favoris depuis le stockage ; étoile pour retirer / ajouter ; section vide cachée',async()=>{const S=snap();
+  try{setLS('averse-fav',['json','qr']);setLS('averse-recent',['url','json','uuid','base64','jwt','pdfoutils','ocr']);
+    const d=await homeV13();
+    const cats=[...d.querySelectorAll('#homeBlocks .tool-category')].map(x=>x.textContent.trim());
+    if(cats[0]!=='Récents'||cats[1]!=='Favoris')throw new Error('sections : '+cats.join(' | '));
+    const rec=[...d.querySelectorAll('#homeBlocks .tool-group')[0].querySelectorAll('.tool h3')].map(x=>x.textContent);
+    const fav=[...d.querySelectorAll('#homeBlocks .tool-group')[1].querySelectorAll('.tool h3')].map(x=>x.textContent);
+    if(rec.length>6)throw new Error('plus de 6 récents : '+rec.length);
+    if(rec.some(t=>/JSON|QR/i.test(t)))throw new Error('un favori encore dans les récents : '+rec.join());
+    if(fav.length!==2)throw new Error('favoris : '+fav.join());
+    const st=d.querySelector('#homeBlocks [data-star="json"]');
+    const r=st.getBoundingClientRect();if(r.width<44||r.height<44)throw new Error('étoile trop petite : '+r.width+'×'+r.height);
+    st.click();await sleep(30);
+    if(N.isFav('json'))throw new Error('favori pas retiré');
+    if(!d.querySelector('#homeBlocks [data-star="json"]')||[...d.querySelectorAll('#homeBlocks .tool-category')].map(x=>x.textContent.trim()).indexOf('Favoris')<0)throw new Error('favoris disparus après un retrait');
+    /* plus aucun favori -> la section disparaît, le conseil revient */
+    const st2=d.querySelector('#homeBlocks [data-star="qr"]');st2.click();await sleep(30);
+    if(N.favs().length)throw new Error('favoris pas vides');
+    if([...d.querySelectorAll('#homeBlocks .tool-category')].some(x=>x.textContent.trim()==='Favoris'))throw new Error('section Favoris encore là');
+    if(!d.querySelector('.home-fav-hint')||!visible(d.querySelector('.home-fav-hint')))throw new Error('conseil pas revenu');
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Accueil (v9) : le motif du Glyph suit l\'intention pendant la frappe (PDF, image, code, note, synchro, IA…)',async()=>{const S=snap();
-  try{const d=await homeV9();d.getElementById('homeGlyph').click();
-    const want={'fusionner pdf':'pdf','convertir image':'image','json':'code','regex':'code','photo':'ocr','note':'note','synchro':'sync','conflit':'conflict','? pourquoi le ciel est bleu':'think','zzqx':'search','':'alive'};
-    const got=[];for(const [v,m] of Object.entries(want)){qType(v);await sleep(30);const st=N.homeState().motif;got.push(v+'->'+st);if(st!==m)throw new Error('« '+v+' » -> '+st+' (attendu '+m+')');}
-    if(!W.GLYPH.MOTIFS.includes('absorb'))throw new Error('motifs');
-    /* chaque motif dessine autre chose */
-    const g=N.homeGlyph,img={};for(const m of ['pdf','image','code','note','sync','conflict','ocr','search']){g.set(m);for(let i=0;i<40;i++)g.frame(.05);img[m]=g.cells.map(c=>c.b.toFixed(1)).join('');}
-    const u=new Set(Object.values(img));if(u.size!==8)throw new Error('motifs identiques');
+T('Accueil (v13) : la barre reste visible ; une recherche cache Récents / Favoris',async()=>{const S=snap();
+  try{setLS('averse-fav',['json']);setLS('averse-recent',['url']);const d=await homeV13();const q=d.getElementById('q');
+    if(!visible(q))throw new Error('barre');
+    qType('json');await until(()=>visible(d.querySelector('#results .res-item')));
+    if([...d.querySelectorAll('#homeBlocks .tool')].some(visible))throw new Error('listes + résultats');
+    if(!visible(q))throw new Error('barre disparue pendant la recherche');
+    wkey(q,'Escape');await until(()=>!q.value);
+    if(!visible(q))throw new Error('barre disparue après Échap');
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Accueil (v9) : glisser un fichier -> le Glyph aspire ; déposer -> le bon outil (JSON -> JSON, PDF -> outils PDF, image -> OCR / Photo -> note)',async()=>{const S=snap();
-  try{const d=await homeV9();const hv=d.getElementById('homeView');
+T('Accueil (v13) : déposer un fichier ouvre le bon outil (JSON, PDF, image → choix OCR / Photo → note)',async()=>{const S=snap();
+  try{const d=await homeV13();
     const drag=async f=>{const dt=new W.DataTransfer();dt.items.add(f);
-      d.body.dispatchEvent(new W.DragEvent('dragenter',{bubbles:true,cancelable:true,dataTransfer:dt}));d.body.dispatchEvent(new W.DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));
-      if(N.homeState().motif!=='absorb'||!hv.classList.contains('h-drag'))throw new Error('survol : '+N.homeState().motif);
+      d.body.dispatchEvent(new W.DragEvent('dragenter',{bubbles:true,cancelable:true,dataTransfer:dt}));
+      d.body.dispatchEvent(new W.DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));
+      if(!d.body.classList.contains('dropping'))throw new Error('pas de voile au survol');
       d.body.dispatchEvent(new W.DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));return dt;};
     await drag(new W.File(['{"depose":42}'],'d.json',{type:'application/json'}));
     await until(()=>W.location.hash==='#/json'&&d.getElementById('j_in')&&/depose/.test(d.getElementById('j_in').value)).catch(()=>{throw new Error('JSON -> '+W.location.hash);});
-    if(hv.classList.contains('h-drag'))throw new Error('état survol resté');
+    if(d.body.classList.contains('dropping'))throw new Error('état survol resté');
     key('Escape');await until(()=>!N.current());
     await drag(new W.File(['%PDF-1.4\n%%EOF'],'doc.pdf',{type:'application/pdf'}));await until(()=>W.location.hash==='#/pdfoutils').catch(()=>{throw new Error('PDF -> '+W.location.hash);});
     key('Escape');await until(()=>!N.current());
     await drag(await wpng(30,30));const sg=d.getElementById('suggest');await until(()=>!sg.hidden);
-    if(hv.dataset.home!=='open')throw new Error('la barre doit s\'ouvrir avec les propositions');if(N.homeState().motif!=='image')throw new Error('motif '+N.homeState().motif);
+    if(!visible(d.getElementById('q')))throw new Error('barre cachée avec les propositions');
     has(sg.textContent,'Lire le texte (OCR)','Photo -> note','Optimiser');
     [...sg.querySelectorAll('[data-sug]')].find(x=>/Photo -> note/.test(x.textContent)).click();await until(()=>d.getElementById('photoDlg'));W.PHOTO.close();
-  }finally{if(F)F.remove();restoreLS(S);}});
-T('Accueil (v9) : une seule boucle d\'animation, arrêtée quand l\'onglet est caché ou qu\'un outil couvre l\'accueil',async()=>{const S=snap();
-  try{const d=await homeV9();await sleep(300);if(!W.GLYPH.running())throw new Error('pas animé au repos');
-    let n=0;const raf0=W.requestAnimationFrame;W.requestAnimationFrame=f=>{n++;return raf0.call(W,f);};
-    await sleep(300);const perFrame=n;if(!perFrame)throw new Error('aucune image');
-    Object.defineProperty(d,'hidden',{configurable:true,get:()=>true});d.dispatchEvent(new W.Event('visibilitychange'));n=0;await sleep(400);
-    if(n||W.GLYPH.running())throw new Error('onglet caché : '+n+' rAF');
-    delete d.hidden;d.dispatchEvent(new W.Event('visibilitychange'));await until(()=>W.GLYPH.running()).catch(()=>{throw new Error('ne repart pas');});
-    N.open('uuid');await sleep(400);n=0;await sleep(400);if(n)throw new Error('outil ouvert : l\'accueil anime encore ('+n+' rAF)');
-    key('Escape');await until(()=>!N.current());await until(()=>W.GLYPH.running(),3000).catch(()=>{throw new Error('retour accueil : ne repart pas');});
-    W.requestAnimationFrame=raf0;
   }finally{if(F)F.remove();restoreLS(S);}});
 T('Glyph (v9) : plus grand (barre 46 px, réponse 64, fenêtres 64) avec une grille plus fine ; progression de l\'indexation visible',async()=>{const S=snap();
   try{sNotes([{id:'gx_a',title:'Un',body:'transistor courant'},{id:'gx_b',title:'Deux',body:'farine lait'},{id:'gx_c',title:'Trois',body:'réseau couches'}]);
@@ -1868,7 +1862,7 @@ T('IA v10 hors ligne : rien ne part, message clair + indicateur ; file d\'attent
     if(net.log.length!==1)throw new Error(net.log.length+' appels');has(P.querySelector('.aip-out').textContent,'trois morceaux');
     W.AIBAR.close();
   }finally{if(F){try{offNet(F.contentWindow,false);}catch(e){}F.remove();}restoreLS(S);}});
-T('Barre IA v12 : étapes réelles (je lis, je cherche, j\'ai trouvé N notes en puces, envoi, j\'écris, reçue + chrono), squelette, petit indicateur, le Glyph de l\'accueil ne grandit pas',async()=>{const S=snap();let ids=[];
+T('Barre IA v12 : étapes réelles (je lis, je cherche, j\'ai trouvé N notes en puces, envoi, j\'écris, reçue + chrono), squelette, petit indicateur (pas de Glyph sur l\'accueil)',async()=>{const S=snap();let ids=[];
   try{const base=[{id:'v10_a',title:'Volcans',body:'Un volcan rejette du magma.\n\nLe Piton de la Fournaise est un volcan très actif, magma fluide.'},{id:'v10_b',title:'Liste de courses',body:'pain, lait, tomates'},
       {id:'v10_c',title:'Recette',body:'farine, oeufs, beurre, sucre'}];ids=base.map(n=>n.id);sNotes(base);
     setLS('averse-ai',{local:true});const wk=aiWorker();
@@ -1893,9 +1887,7 @@ T('Barre IA v12 : étapes réelles (je lis, je cherche, j\'ai trouvé N notes en
     if(hv.dataset.ai!=='busy')throw new Error('accueil pas en mode IA : '+hv.dataset.ai);
     const mark=P.querySelector('.ai-mark');if(!mark)throw new Error('petit indicateur absent');
     const mw=mark.getBoundingClientRect().width;if(mw<18||mw>32)throw new Error('indicateur trop grand ou trop petit : '+mw);
-    /* le Glyph de l'accueil NE DOIT PAS grandir (plus d\'animation gros/petit) */
-    const gl=d.querySelector('#homeView .home-glyph canvas');
-    const gw=gl?gl.getBoundingClientRect().width:0;if(gw>90)throw new Error('Glyph de l\'accueil agrandi pendant l\'IA : '+gw);
+    if(d.querySelector('#homeGlyph,.home-glyph'))throw new Error('Glyph de l\'accueil encore présent');
     has(W.AIBAR.steps().join(','),'send:now');if(P.querySelector('progress,[role="progressbar"]'))throw new Error('barre de progression inventée');
     await until(()=>P.querySelector('[data-p="note"]'),6000);
     const fin=W.AIBAR.steps().join(',');has(fin,'think:ok','write:ok','done:ok');if(/:now/.test(fin))throw new Error('étape restée en cours : '+fin);
@@ -1907,7 +1899,7 @@ T('Barre IA v12 : étapes réelles (je lis, je cherche, j\'ai trouvé N notes en
     /* la puce ouvre la note */
     const ch2=P.querySelector('.aip-chip[data-note="v10_a"]');if(!ch2||!/notes\.html#v10_a/.test(ch2.getAttribute('href')))throw new Error('lien de la puce');
     wkey(q,'Escape');await sleep(50);if(hv.dataset.ai)throw new Error('mode IA pas quitté');
-    return 'indicateur '+Math.round(mw)+' px, Glyph accueil '+Math.round(gw)+' px';
+    return 'indicateur '+Math.round(mw)+' px';
   }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
 T('Barre IA v12 : textes d\'attente en anglais si la langue est English',async()=>{const S=snap();
   try{await homeAi();const d=W.document,net=aiNet();await W.AI.setKey('gemini',AIKEY);W.AI.setPref('lang','en');W.AI.setPref('skipFree',true);

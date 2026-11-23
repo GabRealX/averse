@@ -11,7 +11,7 @@
 .modal-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
 .modal-actions{display:flex;gap:8px;margin-left:auto}
 .modal-top .modal-close,.modal-top .modal-note{position:static}
-.modal-star{height:34px;min-width:34px;border:1px solid var(--line-2);background:transparent;color:var(--fg-soft);cursor:pointer;font-size:1rem;transition:all .2s}
+.modal-star{height:44px;min-width:44px;border:1px solid var(--line-2);background:transparent;color:var(--fg-soft);cursor:pointer;font-size:1rem;transition:all .2s}
 .modal-star:hover,.modal-star.on{color:var(--fg);border-color:var(--fg-soft)}
 .modal-eyebrow a{color:inherit}
 .modal-eyebrow{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--fg-faint)}
