@@ -28,7 +28,7 @@ function confetti(){
   document.body.appendChild(c);
   const x=c.getContext('2d'),dpr=Math.min(2,devicePixelRatio||1),W=innerWidth,H=innerHeight;
   c.width=W*dpr;c.height=H*dpr;x.scale(dpr,dpr);
-  const r=reduce(),n=r?30:150,acc=getComputedStyle(document.documentElement).getPropertyValue('--fg').trim()||'#c7bce4';
+  const r=reduce(),n=r?30:150,acc=getComputedStyle(document.documentElement).getPropertyValue('--fg').trim()||'#ffffff';
   const cols=[acc,'#ff9494','#8fb4ff','#8fdca6','#f5b26b','#f5a0cf','#73d9e6','#ebd96b'];
   const P=[];for(let i=0;i<n;i++)P.push({x:W/2+(Math.random()-.5)*W*.3,y:H*.35,vx:(Math.random()-.5)*(r?160:900),vy:-(r?80:300)-Math.random()*(r?120:520),
     w:5+Math.random()*6,h:3+Math.random()*5,a:Math.random()*6,va:r?0:(Math.random()-.5)*12,c:cols[i%cols.length]});

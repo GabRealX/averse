@@ -25,7 +25,7 @@ function tech(){
     ['Langue',navigator.language||'?'],
     ['Écran',screen.width+'×'+screen.height+' (fenêtre '+innerWidth+'×'+innerHeight+', ×'+(devicePixelRatio||1)+')'],
     ['Page',page+(tool?' · outil : '+tool:'')],
-    ['Style',(r.dataset.style||'normal')+' · couleur '+(r.dataset.accent||'#c7bce4')],
+    ['Style',(r.dataset.style||'normal')+' · couleur '+(r.dataset.accent||'#ffffff')],
     ['Mode',(mm('(display-mode: standalone)')?'appli installée':'navigateur')+(navigator.onLine===false?' · hors ligne':'')+(mm('(pointer: coarse)')?' · tactile':'')]
   ];
 }

@@ -6,18 +6,18 @@
   --panel:#0b0b11;
   --soft-a:.68;--faint-a:.36;--line-a:.10;--line2-a:.20;
   /* v6 : la teinte vient de --acc-rgb (mêmes valeurs que --fg) : accent.js change ces deux-là, tout le reste suit */
-  --fg:#c7bce4;
-  --acc-rgb:199,188,228;
+  --fg:#ffffff;
+  --acc-rgb:255,255,255;
   --fg-soft:rgba(var(--acc-rgb),var(--soft-a));
   --fg-faint:rgba(var(--acc-rgb),var(--faint-a));
   --line:rgba(var(--acc-rgb),var(--line-a));
   --line-2:rgba(var(--acc-rgb),var(--line2-a));
-  --code:'JetBrains Mono',ui-monospace,monospace;
+  --code:'JetBrains Mono','JetBrains Mono Fallback',ui-monospace,monospace;
   --tint:rgba(var(--acc-rgb),.05);
   --ok:#9fd8b4;
   --bad:#e79898;
-  --display:'Big Shoulders Display',sans-serif;
-  --mono:'JetBrains Mono',monospace;
+  --display:'Big Shoulders Display','Big Shoulders Fallback',sans-serif;
+  --mono:'JetBrains Mono','JetBrains Mono Fallback',ui-monospace,monospace;
 }
 /* ===== v7 : THÈMES (js/theme.js) — uniquement des variables ; la couleur d'accent (--fg, --acc-rgb) est posée par accent.js ===== */
 html[data-theme="neon"]{--bg:#020108;--bg-rgb:2,1,8;--panel:#0a0614;--soft-a:.80;--faint-a:.50;--line-a:.18;--line2-a:.36;--glow:0 0 7px rgba(var(--acc-rgb),.55)}

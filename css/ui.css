@@ -62,11 +62,11 @@ html[data-style="ascii"] .keys-box kbd{border-style:dashed}
 .acc-th button{display:flex;flex-direction:column;align-items:center;gap:4px;background:transparent;border:1px solid var(--line);color:var(--fg-soft);font:inherit;font-size:.6rem;padding:6px 2px;cursor:pointer}
 .acc-th button b{display:block;width:34px;height:24px;line-height:24px;text-align:center;font-weight:600;border:1px solid var(--line-2)}
 .acc-th button[aria-checked="true"]{border-color:var(--fg);color:var(--fg)}
-.th-defaut b{background:#06060a;color:#c7bce4;font-family:'JetBrains Mono',monospace}
+.th-defaut b{background:#06060a;color:#ffffff;font-family:'JetBrains Mono',monospace}
 .th-neon b{background:#020108;color:#e670ff;text-shadow:0 0 6px #e670ff;font-family:'JetBrains Mono',monospace}
 .th-papier b{background:#f4eedf;color:#55467e;font-family:Georgia,serif}
 .th-terminal b{background:#000;color:#4dff88;font-family:ui-monospace,monospace}
-.th-orage b{background:linear-gradient(160deg,#0a1020,#04060c);color:#c7bce4;font-family:'JetBrains Mono',monospace}
+.th-orage b{background:linear-gradient(160deg,#0a1020,#04060c);color:#ffffff;font-family:'JetBrains Mono',monospace}
 @media(max-width:520px){.acc-th{grid-template-columns:repeat(3,1fr)}}
 .acc-own{display:flex;align-items:center;gap:10px;margin:14px 0 10px;font-size:.74rem;color:var(--fg-soft)}
 .acc-dlg .acc-own input{width:52px;height:30px;padding:0 2px;cursor:pointer}

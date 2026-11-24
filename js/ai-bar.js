@@ -1,6 +1,6 @@
 /* ai-bar.js — v8 : l'IA directement dans la barre de recherche de l'accueil.
    - Quand le texte ressemble à une question (« comment… », « … ? », 5 mots ou plus), ou si tu le demandes
-     (préfixe « ? », touche Tab, bouton Glyph à droite de la barre), des options « IA » s'affichent EN TÊTE des résultats :
+     (préfixe « ? », touche Tab, bouton IA à droite de la barre), des options « IA » s'affichent EN TÊTE des résultats :
        Demander à l'IA (question libre) · Demander à mes notes (RAG) · Chercher par le sens (local, si activé).
      Elles ne prennent la sélection que si tu les forces : Entrée ouvre toujours le premier outil / la première note sinon.
    - AUCUNE requête au fil de la frappe : seul Entrée / clic sur une option, puis « Envoyer », passe par AI.fire().
@@ -17,7 +17,7 @@
    - Hors ligne : message clair (ce qui marche sans réseau, ce qui ne marche pas) et, SEULEMENT si tu cliques
      « Envoyer quand le réseau revient », la demande attend le retour du réseau (en mémoire : fermer l'onglet l'oublie). */
 (function(){
-if(typeof AI==='undefined'||typeof GLYPH==='undefined'||typeof AIMARK==='undefined'||typeof NOXE==='undefined')return;
+if(typeof AI==='undefined'||typeof AIMARK==='undefined'||typeof NOXE==='undefined')return;
 const q=$('q'),P=$('aiPanel'),btn=$('qAi'),HV=$('homeView');if(!q||!P||!btn)return;
 
 /* ---------- est-ce une question ? (simple et prudent) ---------- */
@@ -27,9 +27,8 @@ const isQuestion=v=>{v=String(v||'').trim();if(!v)return false;
 const cut=s=>s.length>60?s.slice(0,59)+'…':s;
 const reduce=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* ---------- icônes : petit Glyph au repos dans la barre ; pendant une demande, le petit AIMARK du panneau ---------- */
-const small=matchMedia('(max-width:560px)').matches;
-const barG=GLYPH.create({size:small?38:46,kind:'ask',dim:true});btn.appendChild(barG.el);btn.hidden=false;
+/* ---------- icônes : bouton texte « IA » dans la barre ; pendant une demande, le petit AIMARK du panneau ---------- */
+btn.textContent='IA';btn.hidden=false;
 const g=AIMARK.create({size:24,pause:true});g.el.classList.add('aip-gl');
 function aiMode(v){if(!HV)return;if(v)HV.dataset.ai=v;else{delete HV.dataset.ai;if(NOXE.homeMood)NOXE.homeMood();}}
 /* v12 : si tu as défilé jusqu'au bouton « Envoyer », on remonte le haut du panneau (là où est le petit indicateur) */
@@ -38,7 +37,7 @@ function panelInView(){if(P.hidden)return;const el=P.querySelector('.aip-h')||P;
   const r=el.getBoundingClientRect();if(r.top>=top-1&&r.bottom<=innerHeight+1)return;
   el.scrollIntoView({block:'start',behavior:reduce()?'auto':'smooth'});}
 let cur=null;                                     // la demande en cours : {mode, q, phase, ctl, result, extracts, t0}
-function rest(){if(cur&&cur.phase==='busy')return;g.set('idle');barG.set('idle',{dim:!(AI.hasKey()||AI.local()),kind:'ask'});}
+function rest(){if(cur&&cur.phase==='busy')return;g.set('idle');btn.classList.toggle('dim',!(AI.hasKey()||AI.local()));}
 rest();
 AI.ready.then(()=>{rest();if(q.value.trim()&&NOXE.refreshHome)NOXE.refreshHome();});
 AI.onState(()=>{if(!cur)rest();});
@@ -259,7 +258,7 @@ document.addEventListener('keydown',e=>{
   e.preventDefault();e.stopPropagation();close();q.focus();
 },true);
 /* taper autre chose annule une confirmation en attente (jamais une réponse déjà reçue) */
-/* clé ajoutée / retirée entre-temps (réglages) : le Glyph au repos s'allume ou se tamise — seulement si ça change */
+/* clé ajoutée / retirée entre-temps (réglages) : le bouton IA s'allume ou se tamise — seulement si ça change */
 const resync=()=>{if(cur)return;const d=!(AI.hasKey()||AI.local());if(g.state()!=='idle'||(g.el.dataset.dim==='1')!==d)rest();};
 /* v10 : vecteur de la question préparé pendant la frappe (local, sans réseau), 350 ms après la dernière touche */
 let prepT=0;
