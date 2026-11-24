@@ -1,15 +1,15 @@
-/* accent.js — v6 : la COULEUR D'ACCENT du site (le violet par défaut) : rouge, bleu, vert… ou une couleur au choix.
+/* accent.js — v6 : la COULEUR D'ACCENT du site (le blanc par défaut, v14) : rouge, bleu, vert… ou une couleur au choix.
    Même principe qu'au temps de NOXE : le site n'a qu'une teinte (--fg) et tout le reste en dérive (opacités de --acc-rgb).
    Il suffit donc de changer DEUX variables CSS sur <html> pour recolorer tout : boutons, liens, bordures, sélection,
    style ASCII, graphe (notes.js relit la teinte), pluie (rainSetColor), et la couleur de la barre du navigateur (theme-color).
-   - Chargé dans <head> juste après core.js : la couleur est posée AVANT l'affichage (pas de flash violet).
+   - Chargé dans <head> juste après core.js : la couleur est posée AVANT l'affichage (pas de flash de couleur).
    - Mémorisée dans localStorage « averse-accent » (et dans la Sauvegarde : backup.js, réglage « accent »).
    - Lisibilité : le fond est presque noir ; une couleur trop sombre est éclaircie automatiquement jusqu'à ce que
      le texte secondaire (--fg-soft, 68 % d'opacité) garde un contraste d'au moins 4,5:1 (norme WCAG AA).
    - v7 : thèmes (theme.js) : fond, opacités et sens de correction (foncer sur Papier) viennent du thème ;
      la couleur choisie reste mémorisée telle quelle, seule la couleur AFFICHÉE est adaptée (effective()). */
 const ACCENT=(function(){
-const KEY='averse-accent',DEF='#c7bce4',MIN=4.5;
+const KEY='averse-accent',DEF='#ffffff',MIN=4.5;
 /* v7 : le fond et l'opacité du texte secondaire dépendent du thème (theme.js) */
 const TH=()=>window.THEME?THEME.def():{bg:[6,6,10],soft:.68,light:false,base:null};
 const PRESETS=[['violet','#c7bce4'],['rouge','#ff9494'],['bleu','#8fb4ff'],['vert','#8fdca6'],['orange','#f5b26b'],['rose','#f5a0cf'],['cyan','#73d9e6'],['jaune','#ebd96b']];
@@ -36,12 +36,12 @@ function readable(h){
   while(contrast(mix(T.bg,rgb(hex(c)),T.soft),T.bg)<MIN&&i++<60)c=mix(c,to,.06);   // v7 : mesuré APRÈS arrondi en #rrggbb (sinon 4,49)
   return hex(c);
 }
-/* v7 : la couleur réellement affichée = choix de l'utilisateur adapté au thème
-   (violet par défaut -> teinte du thème ; Néon -> saturée et lumineuse) */
+/* v14 : jamais choisi -> blanc (DEF), même sur Néon / Papier / Terminal.
+   Néon ne sature pas le blanc (sinon il virerait au gris). Papier : readable() fonce pour le contraste. */
 function effective(h){
   const T=TH();if(!ok(h))h=DEF;
-  if(h===DEF&&T.base)h=T.base;
-  if(T.sat){const[hh,ss,ll]=hsl(rgb(h));h=hex(fromHsl(hh,ss<.08?0:Math.max(ss,.9),Math.min(.72,Math.max(.62,ll))));}   // Néon : vif
+  const nearWhite=h===DEF||lum(rgb(h))>=.9;
+  if(T.sat&&!nearWhite){const[hh,ss,ll]=hsl(rgb(h));h=hex(fromHsl(hh,ss<.08?0:Math.max(ss,.9),Math.min(.72,Math.max(.62,ll))));}   // Néon : vif
   return readable(h);
 }
 function get(){try{const v=localStorage.getItem(KEY);return ok(v)?v.toLowerCase():DEF;}catch(e){return DEF;}}
@@ -83,7 +83,7 @@ function picker(){
     '<label class="acc-own">Autre couleur <input type="color" id="accPick" value="'+before+'"></label>'+
     '<div class="acc-prev"><span class="acc-demo-btn">bouton</span> <a href="#" tabindex="-1">un lien</a> <span class="acc-soft">texte secondaire</span></div>'+
     '<p class="acc-info" id="accInfo" aria-live="polite"></p>'+
-    '<div class="ctx-db"><button class="btn ghost" type="button" data-x>Annuler</button><button class="btn ghost" type="button" data-def>Violet d\'origine</button><button class="btn primary" type="submit">OK</button></div></form>';
+    '<div class="ctx-db"><button class="btn ghost" type="button" data-x>Annuler</button><button class="btn ghost" type="button" data-def>Blanc d\'origine</button><button class="btn primary" type="submit">OK</button></div></form>';
   document.body.appendChild(ov);
   const f=ov.firstChild,info=f.querySelector('#accInfo'),pick=f.querySelector('#accPick');
   const show=(asked)=>{

@@ -31,7 +31,7 @@ function confirmBox(message,okLabel){
 }
 
 /* ===== TEINTE du graphe ===== v6 : suit la couleur d'accent du site (accent.js), relue à chaque changement */
-const ACC={hex:'#c7bce4',rgb:[199,188,228]};
+const ACC={hex:'#ffffff',rgb:[255,255,255]};
 function accRead(){if(typeof ACCENT==='undefined')return;const h=ACCENT.readable(ACCENT.get());ACC.hex=h;ACC.rgb=ACCENT.rgb(h);}
 accRead();
 document.addEventListener('averse-accent',e=>{ACC.hex=e.detail.hex;ACC.rgb=e.detail.rgb;if(typeof redraw==='function'&&G.canvas){redraw();renderLegend();}});

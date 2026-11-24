@@ -29,7 +29,7 @@ const all=new Set();let raf=0,last=0;
 
 function color(){
   const cs=getComputedStyle(document.documentElement),th=document.documentElement.dataset.theme;
-  const acc=cs.getPropertyValue('--fg').trim()||'#c7bce4';
+  const acc=cs.getPropertyValue('--fg').trim()||'#ffffff';
   const glow=cs.getPropertyValue('--accent').trim()||cs.getPropertyValue('--acc').trim()||'';
   return{fill:th==='neon'?'#ffffff':acc,glow:th==='neon'?(glow||acc):''};
 }

@@ -22,7 +22,7 @@
 const TEST=sessionStorage.getItem('averse-tests')==='1';      // tests.html : clés à part et réseau coupé (faux GitHub injecté)
 const CKEY=TEST?'averse-tests-cloud':'averse-cloud',FILE='averse-carnet.json',DESC='AVERSE — carnet chiffré (ne pas modifier à la main)';
 const TOKEN_URL='https://github.com/settings/tokens/new?scopes=gist&description=AVERSE';
-let POLL=300000,PUSH_DELAY=6000,MAX_WAIT=60000,FOCUS_MIN=20000,ITER=VAULT.ITER;   // v8 : 30 s et 2,5 s
+let POLL=300000,PUSH_DELAY=6000,MAX_WAIT=60000,FOCUS_MIN=20000,ITER=VAULT.ITER,AUTH_RETRY=2000;
 let API='https://api.github.com';
 try{const o=localStorage.getItem('averse-cloud-api');if(o&&o.startsWith(location.origin+'/'))API=o.replace(/\/+$/,'');}catch(e){}   // faux GitHub local (tests) : même origine seulement
 let fetchFn=TEST?null:(u,o)=>fetch(u,o);
@@ -39,11 +39,30 @@ class CloudError extends Error{constructor(code,msg){super(msg);this.code=code;}
 const E=(code,msg)=>new CloudError(code,msg);
 const hash=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}return (h>>>0).toString(36)+'.'+s.length;};
 const hm=t=>new Date(t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+const AUTH_MSG="GitHub a refusé le jeton : il est faux, a été révoqué, ou a peut-être expiré. Crée-en un nouveau avec seulement le droit « gist » (de préférence sans date d'expiration, ou une date lointaine), puis colle-le dans Synchro → « Changer de jeton ».";
+const WEEK=7*864e5;
+function parseExp(raw){if(!raw)return null;let at=Date.parse(raw);if(isFinite(at))return at;at=Date.parse(String(raw).trim().replace(' UTC','Z').replace(' ','T'));return isFinite(at)?at:null;}
+function noteExp(r){if(!CS||!r||!r.headers||!r.headers.get)return;const raw=r.headers.get('github-authentication-token-expiration');if(!raw)return;CS.tokenExp=parseExp(raw);CS.tokenExpRaw=raw;store();banner();}
+function expSoon(){if(!CS||!CS.tokenExp)return null;const left=CS.tokenExp-Date.now();return{at:CS.tokenExp,left,soon:left<=WEEK,expired:left<=0};}
+function expDate(at){return new Date(at).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}
+function banner(){
+  const el=$('cloudTok');const x=expSoon();
+  if(!el)return;
+  const show=!!(x&&(x.soon||x.expired));
+  el.hidden=!show;document.documentElement.classList.toggle('tok-warn',show);
+  if(!show){el.innerHTML='';return;}
+  const d=expDate(x.at);
+  const msg=x.expired?'Le jeton GitHub a expiré le '+d+'.':'Le jeton GitHub expire le '+d+' (dans moins de 7 jours).';
+  el.innerHTML=esc(msg)+' Crée-en un nouveau avec seulement le droit « gist » (de préférence sans date d\'expiration). <a href="'+TOKEN_URL+'" target="_blank" rel="noopener noreferrer">Créer un jeton</a> '+
+    '<button type="button" class="btn primary" data-cloud-token>Changer de jeton</button>';
+}
+const AUTH_HTML='GitHub a refusé le jeton : il est faux, a été révoqué, ou a peut-être expiré. <a href="'+TOKEN_URL+'" target="_blank" rel="noopener noreferrer">Crée-en un nouveau</a> avec seulement le droit « gist » (de préférence sans date d\'expiration, ou une date lointaine), puis colle-le via « Changer de jeton ».';
 
 /* ---------- indicateur ---------- */
 const LABEL={busy:'synchro…',ok:'synchronisé',ext:'reçu d\'un autre appareil — fusionné',err:'erreur',lock:'verrouillée',removed:'appareil retiré',off:''};
 function ui(state,detail){
   M.state=state;M.detail=detail||'';
+  if(state!=='err')M.authFail=false;
   const b=$('cloudBtn'),st=$('cloudState');
   if(b){b.textContent=!CS?'Synchro':state==='lock'?'Synchro — déverrouiller':state==='err'?'Synchro [!]':'Synchro [ok]';b.classList.toggle('on',!!CS&&(state==='ok'||state==='ext'||state==='busy'));}
   if(!st)return;
@@ -53,6 +72,8 @@ function ui(state,detail){
   st.textContent=state==='off'?'':' '+(wait?'modifs à envoyer':LABEL[state])+(detail?' : '+detail:'')+((state==='ok'||state==='ext')&&CS&&CS.at?' · '+hm(CS.at):'');
   st.title='Synchro chiffrée (Gist GitHub secret)'+(CS&&CS.name?' — cet appareil : '+CS.name:'')+(M.conflicts?' — '+M.conflicts+' copie(s) de conflit':'')+
     (CS&&CS.at?'\nDernière synchro : '+new Date(CS.at).toLocaleString('fr-FR'):'')+(wait?'\nModifs pas encore envoyées (envoi quelques secondes après ta dernière frappe)':'');
+  if(st){st.classList.toggle('cloud-err',state==='err'&&!!M.authFail);st.style.cursor=(state==='err'&&M.authFail)?'pointer':'';if(M.authFail){st.setAttribute('role','button');st.tabIndex=0;}else{st.removeAttribute('role');st.removeAttribute('tabindex');}}
+  banner();
   if(window.barScroll)barScroll.update();
 }
 
@@ -66,10 +87,17 @@ async function gh(method,path,body,o){
   if(body)h['Content-Type']='application/json';
   let r;
   const b=body?JSON.stringify(body):undefined,ka=!!(o.keepalive&&(!b||b.length<60000));   // v9 : keepalive (page qui se ferme) : 64 Ko max
-  try{r=await fetchFn(API+path,Object.assign({method,headers:h,body:b,cache:'no-store'},ka?{keepalive:true}:{}));}
+  const once=()=>fetchFn(API+path,Object.assign({method,headers:h,body:b,cache:'no-store'},ka?{keepalive:true}:{}));
+  try{r=await once();}
   catch(e){throw E('net','pas de réseau (ou GitHub injoignable)');}
+  noteExp(r);
+  if(r.status===401&&!o.noRetry&&!ka){
+    await new Promise(res=>setTimeout(res,AUTH_RETRY));
+    try{r=await once();}catch(e){throw E('net','pas de réseau (ou GitHub injoignable)');}
+    noteExp(r);
+  }
   if(r.status===304)return{status:304};
-  if(r.status===401)throw E('auth','jeton GitHub refusé (faux, expiré ou révoqué ?)');
+  if(r.status===401)throw E('auth',AUTH_MSG);
   if(r.status===403||r.status===429){
     if(r.headers.get('x-ratelimit-remaining')==='0'||r.status===429)throw E('rate','limite de GitHub atteinte, nouvel essai plus tard');
     throw E('perm','accès refusé : le jeton a-t-il bien le droit « gist » ?');}
@@ -187,8 +215,8 @@ function sync(why){
       ui(attErr?'err':res.n?'ext':(M.state==='ext'&&why==='poll'?'ext':'ok'),attErr||(res.c?res.c+' conflit(s) gardé(s) en double':''));
     }catch(e){
       if(M.first)M.first=Date.now();                         // v9 : hors ligne -> pas de rafale d'essais à chaque frappe
-      ui('err',(e instanceof CloudError?e.message:'erreur inattendue').slice(0,140));
-      if(e&&e.code==='auth')ui('err','jeton GitHub refusé : Synchro -> « Changer de jeton »');
+      if(e&&e.code==='auth')M.authFail=true;
+      ui('err',(e instanceof CloudError?e.message:'erreur inattendue').slice(0,200));
     }finally{
       M.busy=null;
       if(M.again){M.again=false;setTimeout(()=>sync('again'),60);}
@@ -370,7 +398,7 @@ const VIEWS={
     pwIn('cwToken','Jeton GitHub')+txtIn('cwRec','Code de secours','','XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX')+pwIn('cwPw','Nouveau mot de passe','new-password')+pwIn('cwPw2','Encore une fois','new-password')+
     '<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('intro','<- Retour'),B('recOk','Continuer','primary')),
   settings:()=>{const v=M.vault,dev=v?v.slots.filter(s=>s.type==='device'):[],rec=v&&v.slots.some(s=>s.type==='recovery');
-    return '<h2>Synchro</h2><p class="cw-state">'+esc(($('cloudState')||{}).textContent||'')+'</p>'+
+    return '<h2>Synchro</h2>'+expBlock()+'<p class="cw-state"'+(M.authFail?' data-cw="newToken" style="cursor:pointer"':'')+'>'+esc(($('cloudState')||{}).textContent||'')+'</p>'+(M.authFail?'<p class="cw-warn">'+AUTH_HTML+' '+B('newToken','Changer de jeton','primary')+'</p>':'')+
     btns(B('syncNow','Synchroniser maintenant','primary'),B('pair','Ajouter un appareil'))+
     '<h3>Appareils</h3><ul class="cw-dev">'+dev.map(s=>'<li><span>'+esc(s.name)+(s.id===CS.slotId?' <i>(celui-ci)</i>':'')+'<small>ajouté le '+esc(new Date(s.created).toLocaleDateString('fr-FR'))+'</small></span>'+
       B('rm:'+esc(s.id),'Retirer')+'</li>').join('')+'</ul>'+
@@ -387,7 +415,7 @@ const VIEWS={
     '<p class="cw-small">Ou, dans Synchro -> « J\'ai déjà la synchro… » sur l\'autre appareil, colle ce code :</p><div class="cw-code small" id="cwPairCode">'+esc(WS.pairText)+'</div>'+
     '<p class="cw-small" id="cwExp">Valable 15 minutes, une seule fois. Ce code seul ne suffit pas : il faut aussi le mot de passe.</p>'+
     btns(B('pairCancel','Annuler l\'appairage'),B('settings','OK','primary')),
-  newToken:()=>'<h2>Changer de jeton</h2><p>Crée un nouveau jeton (<a href="'+TOKEN_URL+'" target="_blank" rel="noopener noreferrer">ici</a>, case « gist »), colle-le, puis révoque l\'ancien sur GitHub.</p>'+
+  newToken:()=>'<h2>Changer de jeton</h2><p>Crée un nouveau jeton (<a href="'+TOKEN_URL+'" target="_blank" rel="noopener noreferrer">ici</a>, seulement le droit « gist »). Expiration : « No expiration », ou une date lointaine (il faudra sinon en refaire un). Colle-le ici, puis révoque l\'ancien sur GitHub.</p>'+
     pwIn('cwToken','Nouveau jeton GitHub')+'<div class="cw-err" id="cwErr" role="alert"></div>'+btns(B('settings','Annuler'),B('tokenSet','Enregistrer','primary')),
   noprf:()=>'<h2>Synchro impossible sur cet appareil</h2><p class="cw-warn">'+esc(NOPRF)+'</p><p>Tes notes restent utilisables ici ; pour les passer d\'un appareil à l\'autre en attendant : « Sauvegarde » puis « Restaurer » (fusion, rien n\'est écrasé).</p>'+btns(B('x','Fermer','primary')),
 };
@@ -463,7 +491,7 @@ async function onClick(e){
     case 'pairCancel':await busy(b,async()=>{await cancelPair();show('settings');toast('Appairage annulé');});return;
     case 'newToken':show('newToken');return;
     case 'tokenSet':{const t=val('cwToken').trim();if(!/^[\w-]{20,255}$/.test(t)){errBox('jeton mal copié');return;}
-      await busy(b,async()=>{await gh('GET','/gists/'+CS.gistId,null,{token:t});CS.token=t;CS.etag=null;store();await sync('token');show('settings');});return;}
+      await busy(b,async()=>{await gh('GET','/gists/'+CS.gistId,null,{token:t});CS.token=t;CS.etag=null;CS.tokenExp=null;CS.tokenExpRaw=null;store();await sync('token');show('settings');});return;}
     case 'off':if(!(await CTX.confirm('Désactiver la synchro sur cet appareil ? Tes notes restent ici ; le coffre sur GitHub n\'est pas effacé.','Désactiver')))return;
       await disableHere();close();toast('Synchro désactivée sur cet appareil');return;
   }
@@ -472,14 +500,27 @@ document.addEventListener('change',async e=>{if(e.target&&e.target.id==='cwLock'
   if(CS.lock){try{await idbSet(DKEY,null);}catch(x){}toast('Mot de passe + passkey demandés à chaque ouverture');}
   else if(M.key){try{await idbSet(DKEY,M.key);}catch(x){}}}});
 
+function openToken(){if(!CS){show('intro');return;}show('newToken');}
 function openPanel(){
   if(!CS){show('intro');return;}
+  if(M.authFail){openToken();return;}
   if(!M.key){WS.then='unlock';WS.title='Déverrouiller la synchro';WS.why='Entre ton mot de passe de synchro, puis valide avec la passkey de cet appareil.';show('askPw');return;}
   show('settings');
 }
+function expBlock(){
+  const x=expSoon();if(!x)return '';
+  const d=esc(expDate(x.at));
+  if(x.soon||x.expired)return '<div class="cw-warn cw-tok" role="status">'+(x.expired?'Le jeton GitHub a expiré le '+d+'.':'Le jeton GitHub expire le '+d+' (dans moins de 7 jours).')+
+    ' Crée-en un nouveau avec seulement le droit « gist » (de préférence sans date d\'expiration). '+B('newToken','Changer de jeton','primary')+'</div>';
+  return '<p class="cw-small" id="cwTokExp">Jeton GitHub : expire le '+d+'.</p>';
+}
 
 /* ---------- démarrage ---------- */
-{const b=$('cloudBtn');if(b)b.addEventListener('click',openPanel);}
+{const b=$('cloudBtn');if(b)b.addEventListener('click',openPanel);
+  const st=$('cloudState');if(st){st.addEventListener('click',()=>{if(M.authFail)openToken();});
+    st.addEventListener('keydown',e=>{if(M.authFail&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openToken();}});}
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-cloud-token]');if(!b)return;e.preventDefault();openToken();});
+}
 async function init(){
   const h=location.hash.match(/^#pair=(.+)$/);
   if(h){history.replaceState(null,'',location.pathname+location.search);          // le code ne reste pas dans l'adresse
@@ -491,10 +532,10 @@ async function init(){
 }
 window.cloudLater=later;
 const ready0=init();
-window.cloudSync={state:()=>M.state,status:()=>{const s=$('cloudState');return s?s.textContent:'';},sync,open:openPanel,ready:()=>ready0,
+window.cloudSync={state:()=>M.state,status:()=>{const s=$('cloudState');return s?s.textContent:'';},sync,open:openPanel,openToken,ready:()=>ready0,
   configured:()=>!!CS,unlocked:()=>!!M.key,parsePair,pending,lastSync:()=>CS&&CS.at||0};
 if(TEST)window.cloudDebug={                                // tests.html seulement : faux GitHub, fausses passkeys, réglages rapides
-  setFetch:f=>{fetchFn=f;},setCreds:c=>{creds=()=>c;},setIter:n=>{ITER=n;},setTimes:(poll,push,max,focus)=>{POLL=poll;PUSH_DELAY=push;if(max)MAX_WAIT=max;if(focus!=null)FOCUS_MIN=focus;if(CS&&M.key)watch();},prepare,lastChance,
+  setFetch:f=>{fetchFn=f;},setCreds:c=>{creds=()=>c;},setIter:n=>{ITER=n;},setAuthRetry:n=>{AUTH_RETRY=+n||0;},setTimes:(poll,push,max,focus)=>{POLL=poll;PUSH_DELAY=push;if(max)MAX_WAIT=max;if(focus!=null)FOCUS_MIN=focus;if(CS&&M.key)watch();},prepare,lastChance,
   M,get CS(){return CS;},show,close,view:()=>WS.view,reset:async()=>{await disableHere();close();},reload:async()=>{CS=load();M.key=null;M.vault=null;await init();},
   forgetLocalKey:async()=>{M.key=null;try{await idbSet(DKEY,null);}catch(e){}},setup:setupFirst,startPair,joinPair,recover,removeDevice,addRecoveryNow,fullUnlock};
 })();

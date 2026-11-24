@@ -26,7 +26,7 @@ addEventListener('pagehide',()=>{try{const r=localStorage.getItem('averse-tests-
 <script src="js/tools/dev.js"></script><script src="js/tools/texte.js"></script><script src="js/tools/memo.js"></script>
 <script src="js/tools/encodage.js"></script><script src="js/tools/pdf.js"></script><script src="js/tools/carnet.js"></script><script src="js/tools/image.js"></script><script src="js/tools/editeur.js"></script><script src="js/tools/ocr.js"></script>
 <script src="js/vault.js"></script><script src="js/attach.js"></script><script src="js/backup.js"></script><script src="js/tools/sauvegarde.js"></script><script src="js/detect.js"></script>
-<script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script><script src="js/glyph.js"></script><script src="js/ai-mark.js"></script>
+<script src="js/math.js"></script><script src="js/ctxmenu.js"></script><script src="js/search.js"></script><script src="js/md.js"></script><script src="js/share.js"></script><script src="js/ai-mark.js"></script>
 <link rel="stylesheet" href="css/ui.css"><link rel="stylesheet" href="css/circuit.css">
 <script>
 /* Ouvre chaque outil comme le ferait un clic, remplit les champs, et compare avec des résultats vérifiés à la main.
@@ -601,11 +601,12 @@ T('Graphe : réglages gardés après rechargement',async()=>{const n0=gD().setti
    dans la page. En mode test, cloud.js refuse d'ailleurs tout réseau tant qu'on ne lui a pas donné ce faux GitHub. */
 const GTOK='ghp_TESTONLY0000000000000000000000000000',GPW='phrase de test 2026';
 function fakeGitHub(){
-  const G={},log=[];let before=null;const sha=()=>[...crypto.getRandomValues(new Uint8Array(20))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  const G={},log=[];let before=null,failAuth=0,expHdr=null;const sha=()=>[...crypto.getRandomValues(new Uint8Array(20))].map(x=>x.toString(16).padStart(2,'0')).join('');
   const view=(g,rev)=>{const r=rev?g.hist.find(h=>h.version===rev):g.hist[0];if(!r)return null;const files={};
     for(const n in r.files)files[n]={filename:n,raw_url:'mock://raw/'+g.id+'/'+r.version+'/'+n,truncated:false,content:r.files[n]};
     return{id:g.id,public:g.public,description:g.desc,files,updated_at:r.at,history:g.hist.map(h=>({version:h.version,committed_at:h.at}))};};
-  const R=(st,o,h)=>new Response(st===304?null:JSON.stringify(o),{status:st,headers:Object.assign({'Content-Type':'application/json'},h||{})});
+  const expH=()=>expHdr?{'github-authentication-token-expiration':expHdr}:{};
+  const R=(st,o,h)=>new Response(st===304?null:JSON.stringify(o),{status:st,headers:Object.assign({'Content-Type':'application/json'},expH(),h||{})});
   /* v9 : plusieurs fichiers par PATCH, et null = fichier supprimé (comme l'API GitHub) */
   const commit=(g,files)=>{const nf=Object.assign({},g.hist[0]?g.hist[0].files:{});for(const n in files){if(files[n]==null)delete nf[n];else nf[n]=files[n];}
     g.hist.unshift({version:sha(),at:new Date().toISOString(),files:nf});};
@@ -613,6 +614,7 @@ function fakeGitHub(){
   async function f(url,o){
     const u=new URL(url),p=u.pathname.split('/').filter(Boolean),a=(o.headers||{}).Authorization||'',ok=a==='Bearer '+GTOK;
     log.push({m:o.method,p:u.pathname,inm:(o.headers||{})['If-None-Match']||null,auth:!!a,ka:!!o.keepalive});
+    if(failAuth>0){failAuth--;return R(401,{message:'Bad credentials'});}
     if(u.host!=='api.github.com')return R(404,{});
     if(a&&!ok)return R(401,{message:'Bad credentials'});
     if(p[0]!=='gists')return R(404,{});
@@ -627,7 +629,8 @@ function fakeGitHub(){
     return R(405,{});
   }
   return{fetch:f,G,log,one:()=>Object.values(G)[0],vault:()=>JSON.parse(Object.values(Object.values(G)[0].hist[0].files)[0]),
-    write:v=>{const g=Object.values(G)[0];commit(g,{'averse-carnet.json':JSON.stringify(v)});},beforePatch:fn=>{before=fn;}};
+    write:v=>{const g=Object.values(G)[0];commit(g,{'averse-carnet.json':JSON.stringify(v)});},beforePatch:fn=>{before=fn;},
+    failAuth:n=>{failAuth=n;},expire:s=>{expHdr=s;}};
 }
 function fakePasskeys(opt){const keys={};opt=opt||{};const b=u=>VAULT.b64(new Uint8Array(u));
   return{keys,create:async({publicKey:o})=>{const id=crypto.getRandomValues(new Uint8Array(16));if(opt.noprf)return{rawId:id.buffer,getClientExtensionResults:()=>({})};
@@ -883,7 +886,7 @@ T('Accent : 8 couleurs prêtes, toutes lisibles (contraste ≥ 4,5:1 même en te
 T('Accent : couleur trop sombre -> éclaircie automatiquement jusqu\'au contraste minimal',async()=>{
   for(const c of ['#1a1a6e','#400000','#000000','#0a3d0a']){const r=ACCENT.readable(c);if(ACCENT.check(r).soft<4.5)throw new Error(c+' -> '+r);if(r===c)throw new Error(c+' pas éclaircie');}
   if(ACCENT.readable('rouge')!==ACCENT.DEF||ACCENT.readable('#12345')!==ACCENT.DEF)throw new Error('valeur invalide acceptée');});
-T('Accent : appliquée via les variables CSS (--fg, --acc-rgb), theme-color, mémorisée ; violet = rien de stocké',async()=>{const S=snap();
+T('Accent : appliquée via les variables CSS (--fg, --acc-rgb), theme-color, mémorisée ; blanc = rien de stocké',async()=>{const S=snap();
   try{
     const h=ACCENT.set('#8fb4ff'),r=document.documentElement,cs=getComputedStyle(r);
     if(h!=='#8fb4ff'||cs.getPropertyValue('--fg').trim()!=='#8fb4ff'||cs.getPropertyValue('--acc-rgb').replace(/\s/g,'')!=='143,180,255')throw new Error('variables');
@@ -892,7 +895,7 @@ T('Accent : appliquée via les variables CSS (--fg, --acc-rgb), theme-color, mé
     const tc=document.querySelector('meta[name=theme-color]');if(tc&&tc.content==='#06060a')throw new Error('theme-color inchangé');
     let ev=null;const f=e=>ev=e.detail;document.addEventListener('averse-accent',f);ACCENT.set('#FF9494');document.removeEventListener('averse-accent',f);
     if(!ev||ev.hex!=='#ff9494'||ev.rgb.join()!=='255,148,148')throw new Error('événement');
-    ACCENT.set(ACCENT.DEF);if(localStorage.getItem('averse-accent')!==null||r.style.getPropertyValue('--fg'))throw new Error('violet : clé ou style restant');
+    ACCENT.set(ACCENT.DEF);if(localStorage.getItem('averse-accent')!==null||r.style.getPropertyValue('--fg'))throw new Error('blanc : clé ou style restant');
   }finally{restoreLS(S);ACCENT.apply(ACCENT.get());}});
 T('Accent : dans la Sauvegarde (export, import, valeur piégée refusée)',async()=>{const S=snap();
   try{
@@ -1127,7 +1130,7 @@ T('Carnet : Ctrl+K -> recherche globale de l\'accueil ; le graphe suit la couleu
   try{
     await frame('notes.html',()=>W.notesDebug&&W.ACCENT);
     W.ACCENT.set('#f5b26b');if(W.notesDebug.acc!=='#f5b26b')throw new Error('graphe : '+W.notesDebug.acc);
-    W.ACCENT.set(W.ACCENT.DEF);if(W.notesDebug.acc!==W.ACCENT.DEF)throw new Error('retour violet');
+    W.ACCENT.set(W.ACCENT.DEF);if(W.notesDebug.acc!==W.ACCENT.DEF)throw new Error('retour blanc');
     wkey(W.document.body,'k',{ctrlKey:true});await until(()=>{try{return/index\.html#\/$/.test(F.contentWindow.location.href)&&F.contentWindow.document.getElementById('q');}catch(e){return false;}},5000);
   }finally{if(F)F.remove();restoreLS(S);ACCENT.apply(ACCENT.get());}});
 
@@ -1306,33 +1309,7 @@ T('Easter egg : 5 clics sur le titre AVERSE (grand titre ou logo ASCII) -> les l
   if(!red&&t.querySelectorAll('span.egg-drip').length<6)throw new Error('lettres');if(W.EGGS.drips()!==1)throw new Error('compteur');
   if(!red&&t.textContent!==txt)throw new Error('texte changé pendant l\'effet');
   await until(()=>!t.querySelector('span')&&t.textContent===txt,4000);F.remove();return t.tagName;});
-T('Glyph : disque de carrés, états (think, search, download %, write, error, done), motif par type',async()=>{
-  const g=GLYPH.create({size:48,kind:'summary'});document.body.appendChild(g.el);
-  try{if(g.el.tagName!=='CANVAS'||g.el.getAttribute('role')!=='img')throw new Error('élément');
-    if(g.cells.length<180||g.cells.length>289)throw new Error(g.cells.length+' cases');      // disque, pas carré
-    for(const s of ['think','search','write','error','done','idle']){g.set(s);if(g.el.dataset.state!==s||g.state()!==s)throw new Error(s);if(!g.el.getAttribute('aria-label'))throw new Error('aria '+s);}
-    const lit=()=>g.cells.filter(k=>k.b>.8).length/g.cells.length;
-    g.progress(.25);const a=lit();g.progress(.75);const b=lit();if(g.state()!=='download'||!(b>a+.3))throw new Error('remplissage '+a.toFixed(2)+' -> '+b.toFixed(2));
-    g.progress(1);if(lit()<.6)throw new Error('100 % pas plein');
-    const k1=GLYPH.create({kind:'regex'}),k2=GLYPH.create({kind:'json'});k1.set('idle');k2.set('idle');
-    if(k1.cells.map(c=>c.b>.3?1:0).join('')===k2.cells.map(c=>c.b>.3?1:0).join('')&&k1.cells.length)throw new Error('motifs identiques');
-    g.set('error');g.frame(1);const bar=g.cells.filter(k=>k.i===k.j);if(bar.some(k=>k.b<.2*k.crater&&k.crater===1))throw new Error('barre');
-    g.token(30);if(g.state()!=='write')throw new Error('token -> write');
-  }finally{g.destroy();}});
-T('Glyph : UNE seule boucle pour tous, arrêtée quand c\'est fini (done, error), retiré de la page ou idle',async()=>{
-  const red=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const a=GLYPH.create({state:'think'}),b=GLYPH.create({state:'search'});document.body.append(a.el,b.el);
-  try{await sleep(80);if(!GLYPH.running()||GLYPH.count()!==2)throw new Error('boucle : '+GLYPH.running()+' '+GLYPH.count());
-    /* une seule boucle : on compte les requestAnimationFrame demandés pendant 200 ms */
-    let n=0;const R=window.requestAnimationFrame;window.requestAnimationFrame=f=>{n++;return R.call(window,f);};
-    await sleep(200);window.requestAnimationFrame=R;const fr=n;
-    a.el.remove();await until(()=>GLYPH.count()===1,1500);
-    b.set('done');await until(()=>!GLYPH.running()&&GLYPH.count()===0,3000);
-    const c=GLYPH.create({state:'think'});document.body.appendChild(c.el);await until(()=>GLYPH.running());c.set('error');await until(()=>!GLYPH.running(),2000);
-    c.set('think');await until(()=>GLYPH.running());c.set('idle');await until(()=>!GLYPH.running(),1500);c.destroy();
-    if(fr>30)throw new Error(fr+' rAF en 200 ms : plusieurs boucles ?');
-    return fr+' images en 200 ms'+(red?' (mouvement réduit)':'');
-  }finally{a.destroy();b.destroy();}});
+/* v14 : le Glyph a été retiré du site (il reste AIMARK, testé plus bas). */
 
 /* ---- IA : un faux fournisseur (fetch) et un faux worker d'embeddings, jamais le vrai réseau ---- */
 const AIKEY='AIzaTEST_ONLY_not_a_real_key_0000000000',OAKEY='sk-TESTONLY-000000000000000000000000';
@@ -1509,10 +1486,10 @@ T('IA locale (worker simulé) : rien avant « Activer », progression, notes li�
     W.openNote('e_a');await sleep(200);if(wk.log.length||W.document.getElementById('aiRelated'))throw new Error('worker lancé sans activation');
     if(!W.document.getElementById('graphSem').hidden)throw new Error('bouton ≈ sens visible');
     W.AI.settings();const d=W.document;has(d.querySelector('.ai-set').textContent,'Désactivée','155 Mo');
-    const states=[];const g=W.AI.isOpen()&&d.querySelector('.ai-set .glyph');
+    const states=[];const g=W.AI.isOpen()&&d.querySelector('.ai-set .ai-mark');
     W.AI.onState(E=>states.push(E.state+':'+E.p));
     d.querySelector('[data-s="on"]').click();await until(()=>W.AI.state()==='ready',4000);
-    if(!states.some(s=>s==='download:0.4'))throw new Error('progression : '+states);if(g.dataset.state!=='download'&&g.dataset.state!=='done')throw new Error('glyph '+g.dataset.state);
+    if(!states.some(s=>s==='download:0.4'))throw new Error('progression : '+states);if(!g||(g.dataset.state!=='read'&&g.dataset.state!=='done'))throw new Error('indicateur '+(g&&g.dataset.state));
     await until(()=>/Prête/.test(d.getElementById('aiLoc').textContent),3000);W.AI.close();
     if(wk.log.filter(x=>x==='load').length!==1)throw new Error('chargé '+wk.log.filter(x=>x==='load').length+' fois');
     W.renderAll();W.openNote('e_a');await until(()=>{const b=d.getElementById('aiRelated');return b&&b.querySelector('a[data-id]');},4000);
@@ -1598,14 +1575,14 @@ T('Barre IA : option en tête pour une question, « ? », Tab ou bouton ; Entré
     /* aucune requête, quoi qu'on tape */
     for(const v of ['pourquoi le ciel est bleu ?','how does a transistor work?','explique les masques réseau','résume ma semaine de stage']){qType(v);await sleep(30);}
     await sleep(200);if(net.log.length||W.AI.stats.calls)throw new Error('requête partie');if(!W.AIBAR.state()==='rest'||W.AIBAR.open())throw new Error('panneau ouvert sans action');
-    if(W.AIBAR.glyph.state()!=='idle')throw new Error('glyph au repos : '+W.AIBAR.glyph.state());
+    if(W.AIBAR.glyph.state()!=='idle')throw new Error('indicateur au repos : '+W.AIBAR.glyph.state());
     /* détection de question */
     const iq=W.AIBAR.isQuestion;for(const [v,e] of [['comment ça marche',true],['what is DNS',true],['json',false],['qr code',false],['convertir des images en png',true],['quiche',false],['ip ?',true]])if(iq(v)!==e)throw new Error('isQuestion('+v+')');
   }finally{if(F)F.remove();restoreLS(S);}});
 T('Barre IA : question libre -> confirmation (texte exact) -> UN appel, flux Markdown, Glyph think/write/done dans la barre ; enregistrer, Échap ; « ne plus demander »',async()=>{const S=snap();
   try{await homeAi();const d=W.document,net=aiNet();await W.AI.setKey('gemini',AIKEY);
     const g=W.AIBAR.glyph,sts=[],st0=g.set.bind(g);g.set=(s,x)=>{sts.push(s);return st0(s,x);};
-    if(!d.querySelector('.qbar #qAi canvas.glyph'))throw new Error('glyph pas dans la barre');
+    const qa=d.querySelector('.qbar #qAi');if(!qa||!/IA/i.test(qa.textContent)||qa.querySelector('canvas.glyph'))throw new Error('bouton IA de la barre');
     const q=qType('? Pourquoi la pluie tombe ?');wkey(q,'Enter');await until(()=>W.AIBAR.open());
     const P=d.getElementById('aiPanel');has(P.textContent,'part chez Google Gemini','Ne plus demander');
     if(P.querySelector('.ai-pre').textContent!=='Pourquoi la pluie tombe ?')throw new Error('aperçu');if(net.log.length)throw new Error('envoyé avant le clic');
@@ -1820,11 +1797,10 @@ T('Accueil (v13) : déposer un fichier ouvre le bon outil (JSON, PDF, image → 
     has(sg.textContent,'Lire le texte (OCR)','Photo -> note','Optimiser');
     [...sg.querySelectorAll('[data-sug]')].find(x=>/Photo -> note/.test(x.textContent)).click();await until(()=>d.getElementById('photoDlg'));W.PHOTO.close();
   }finally{if(F)F.remove();restoreLS(S);}});
-T('Glyph (v9) : plus grand (barre 46 px, réponse 64, fenêtres 64) avec une grille plus fine ; progression de l\'indexation visible',async()=>{const S=snap();
+T('IA (v9) : progression de l\'indexation visible (sans « 0 note indexée »)',async()=>{const S=snap();
   try{sNotes([{id:'gx_a',title:'Un',body:'transistor courant'},{id:'gx_b',title:'Deux',body:'farine lait'},{id:'gx_c',title:'Trois',body:'réseau couches'}]);
-    const g=GLYPH.create({size:64});if(g.el.style.width!=='64px')throw new Error('taille');g.destroy();
     setLS('averse-ai',{local:true});const wk=aiWorker('Xenova/multilingual-e5-small');await homeAi(()=>{W.AI.workerFactory=wk.make;});
-    const b=W.document.querySelector('#qAi canvas');if(!b||parseInt(b.style.width)<46)throw new Error('Glyph de la barre : '+(b&&b.style.width));
+    const b=W.document.querySelector('#qAi');if(!b||!/IA/i.test(b.textContent)||b.querySelector('canvas.glyph'))throw new Error('bouton IA');
     const seen=[];W.AI.settings();await until(()=>W.document.querySelector('[data-s="on"]'));W.document.querySelector('[data-s="on"]').click();const st=()=>W.document.getElementById('aiLoc').textContent;
     await until(()=>{seen.push(st());return /indexée/.test(st());},8000).catch(()=>{throw new Error('états : '+[...new Set(seen)].join(' | '));});
     if(seen.some(s=>/\b0 note/.test(s)))throw new Error('« 0 note indexée » affiché : '+seen.join(' | '));
@@ -1876,12 +1852,12 @@ T('Barre IA v12 : étapes réelles (je lis, je cherche, j\'ai trouvé N notes en
     const chip=P.querySelector('.aip-steps a.aip-chip[data-note="v10_a"]');if(!chip)throw new Error('puce de la note trouvée');has(chip.textContent,'Volcans');
     if(P.querySelector('.aip-chip[data-note="v10_b"]'))throw new Error('note sans rapport en puce');
     F.style.width='375px';F.style.height='667px';await sleep(150);   // iPhone SE
-    W.scrollTo(0,1e6);await sleep(50);                  // petit écran : on est descendu jusqu'au bouton « Envoyer »
-    if(W.scrollY<50)throw new Error('page pas défilable à 375×667 : le test ne prouverait rien');
+    W.scrollTo(0,1e6);await sleep(50);                  // petit écran : on descend jusqu'au bouton « Envoyer » si la page dépasse
+    const scrolled=W.scrollY>=50;
     P.querySelector('[data-p="send"]').click();
     /* immédiatement : squelette + petit indicateur (pas de fausse progression : une étape « J'envoie » en cours) */
     await until(()=>P.querySelector('.aip-skel'),800).catch(()=>{throw new Error('pas de squelette');});
-    /* le haut du panneau (indicateur + statut) revient À L'ÉCRAN */
+    /* le haut du panneau (indicateur + statut) revient À L'ÉCRAN (si on avait défilé) */
     const inView=()=>{const el=P.querySelector('.aip-h')||P;const r=el.getBoundingClientRect();return r.top>=-1&&r.bottom<=W.innerHeight+1&&r.height>0;};
     await until(inView,1500).catch(()=>{const r=(P.querySelector('.aip-h')||P).getBoundingClientRect();throw new Error('panneau hors écran pendant l\'attente : top='+Math.round(r.top)+' bas='+Math.round(r.bottom)+' / '+W.innerHeight);});
     if(hv.dataset.ai!=='busy')throw new Error('accueil pas en mode IA : '+hv.dataset.ai);
@@ -1899,7 +1875,7 @@ T('Barre IA v12 : étapes réelles (je lis, je cherche, j\'ai trouvé N notes en
     /* la puce ouvre la note */
     const ch2=P.querySelector('.aip-chip[data-note="v10_a"]');if(!ch2||!/notes\.html#v10_a/.test(ch2.getAttribute('href')))throw new Error('lien de la puce');
     wkey(q,'Escape');await sleep(50);if(hv.dataset.ai)throw new Error('mode IA pas quitté');
-    return 'indicateur '+Math.round(mw)+' px';
+    return 'indicateur '+Math.round(mw)+' px'+(scrolled?'':' (page tenait à l\'écran)');
   }finally{if(F){const w=F.contentWindow;try{if(w.AI){w.AI.close();await w.AI.forget(ids);}}catch(e){}F.remove();}restoreLS(S);}});
 T('Barre IA v12 : textes d\'attente en anglais si la langue est English',async()=>{const S=snap();
   try{await homeAi();const d=W.document,net=aiNet();await W.AI.setKey('gemini',AIKEY);W.AI.setPref('lang','en');W.AI.setPref('skipFree',true);
@@ -2014,6 +1990,117 @@ T('Dessin (v10) : plein écran, stylo + pression, gomme, couleurs, annuler/réta
     /* Échap sans changement : ferme */
     W.DRAW.open({});wkey(d.body,'Escape');await until(()=>!d.getElementById('drawDlg'),1500).catch(()=>{throw new Error('Échap');});
   }finally{if(F){const w=F.contentWindow;try{w.DRAW.close();await w.ATT.removeNote('dw_a');}catch(e){}F.remove();}restoreLS(S);}});
+
+/* ==================== v14 ==================== */
+T('Synchro Gist (v14) : 401 une fois puis 200 -> pas d\'erreur ; 401 persistant -> message clair + clic ouvre « Changer de jeton » ; en-tête d\'expiration affichée / avertissement',async()=>{const S=snap();
+  try{
+    const t0=Date.now()-60000;setLS('noxe-notes',{notes:{k_a:{id:'k_a',title:'Kilo',body:'k1',tags:[],created:t0,updated:t0}},openId:'k_a',deleted:{}});
+    await frame('notes.html',()=>W.cloudDebug&&W.document.getElementById('cloudBtn'));
+    const GH=fakeGitHub(),PK=fakePasskeys();
+    cd().setFetch(GH.fetch);cd().setCreds(PK);cd().setIter(100000);cd().setTimes(600000,150);cd().setAuthRetry(40);
+    await cd().setup(GTOK,GPW,'PC test');await W.cloudSync.sync('t');
+    if(cst()==='err')throw new Error('erreur dès le départ : '+W.cloudSync.status());
+    GH.failAuth(1);await W.cloudSync.sync('t');
+    if(cst()==='err')throw new Error('401 transitoire affichée : '+W.cloudSync.status());
+    GH.failAuth(5);await W.cloudSync.sync('t');
+    if(cst()!=='err')throw new Error('401 persistante ignorée : '+cst());
+    const st=W.cloudSync.status();
+    has(st,'refusé','expir');has(st,'gist');
+    const cs=W.document.getElementById('cloudState');cs.click();
+    await until(()=>cd().view()==='newToken');
+    const href=W.document.querySelector('.cw a[href*="tokens/new"]');
+    if(!href||href.getAttribute('href')!=='https://github.com/settings/tokens/new?scopes=gist&description=AVERSE')throw new Error('lien jeton');
+    has(W.document.querySelector('.cw').textContent,'expiration');
+    cd().close();
+    GH.failAuth(0);
+    const soon=new Date(Date.now()+3*864e5);const soonStr=soon.getUTCFullYear()+'-'+String(soon.getUTCMonth()+1).padStart(2,'0')+'-'+String(soon.getUTCDate()).padStart(2,'0')+' 23:59:59 UTC';
+    GH.expire(soonStr);await W.cloudSync.sync('t');
+    W.cloudSync.open();await until(()=>cd().view()==='settings');
+    const box=W.document.querySelector('.cw');has(box.textContent,'expire');has(box.textContent,'Changer de jeton');
+    const ban=W.document.getElementById('cloudTok');if(!ban||ban.hidden)throw new Error('bandeau absent');
+    if(!W.document.querySelector('#cloudTok [data-cloud-token]'))throw new Error('bouton bandeau');
+    cd().close();
+    const far=new Date(Date.now()+120*864e5);
+    const farStr=far.getUTCFullYear()+'-'+String(far.getUTCMonth()+1).padStart(2,'0')+'-'+String(far.getUTCDate()).padStart(2,'0')+' 23:59:59 UTC';
+    GH.expire(farStr);await W.cloudSync.sync('t');
+    W.cloudSync.open();await until(()=>cd().view()==='settings');
+    has(W.document.querySelector('.cw').textContent,'expire le');
+    if(W.document.querySelector('.cw-tok'))throw new Error('avertissement 7 jours alors que le jeton est lointain');
+    const ban2=W.document.getElementById('cloudTok');if(ban2&&!ban2.hidden)throw new Error('bandeau encore visible');
+    cd().close();
+  }finally{if(F){try{await cd().reset();}catch(e){}F.remove();}restoreLS(S);}});
+
+T('Polices (v14) : fichiers locaux, aucun appel à Google Fonts, CSP sans fonts.gstatic',async()=>{
+  await frame('index.html#/',()=>W.document.querySelector('h1'));
+  const d=W.document;
+  if(!d.querySelector('link[rel="stylesheet"][href="css/fonts.css"]'))throw new Error('css/fonts.css manquant');
+  if(!d.querySelector('link[rel="preload"][href="fonts/jbm-latin.woff2"]'))throw new Error('preload manquant');
+  if(d.querySelector('link[href*="fonts.googleapis"],link[href*="fonts.gstatic"],script[src="js/fonts.js"]'))throw new Error('requête / script Google Fonts encore présent');
+  const csp=(d.querySelector('meta[http-equiv="Content-Security-Policy"]')||{}).content||'';
+  F.remove();
+  await frame('notes.html',()=>W.document.querySelector('meta[http-equiv="Content-Security-Policy"]'));
+  const c=W.document.querySelector('meta[http-equiv="Content-Security-Policy"]').content;
+  if(/fonts\.googleapis|fonts\.gstatic/.test(c))throw new Error('CSP encore ouverte aux polices Google');
+  has(c,"font-src 'self'");
+  F.remove();
+});
+
+T('Barre du carnet (v14) : à 320 / 360 / 375 / 390 px, menu + accueil + ⋯ seulement, sans chevauchement ni flèches, cibles ≥ 44 px',async()=>{const S=snap();
+  try{
+    sNotes([{id:'br_a',title:'Barre',body:'texte de la note\n\nplus'}]);
+    await frame('notes.html#br_a',()=>W.notesApi&&W.document.querySelector('.bar'));
+    const bad=[],widths=[320,360,375,390];
+    const vis=el=>{if(!el||el.hidden)return false;const cs=W.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||cs.opacity==='0')return false;const r=el.getBoundingClientRect();return r.width>1&&r.height>1;};
+    const overlap=(a,b)=>{const A=a.getBoundingClientRect(),B=b.getBoundingClientRect();const ox=Math.min(A.right,B.right)-Math.max(A.left,B.left),oy=Math.min(A.bottom,B.bottom)-Math.max(A.top,B.top);return ox>1&&oy>1;};
+    for(const w of widths){
+      F.style.width=w+'px';F.style.height='640px';
+      if(W.barScroll)W.barScroll.update();
+      await sleep(80);
+      const d=W.document,bar=d.querySelector('.bar');
+      if(d.getElementById('barL')||d.getElementById('barR')||d.getElementById('barNav'))bad.push(w+' : flèches encore dans le HTML');
+      const menu=d.getElementById('menuBtn'),back=d.querySelector('a.back'),more=d.getElementById('moreBtn');
+      if(!vis(menu)||!vis(back)||!vis(more))bad.push(w+' : menu / accueil / ⋯ invisibles');
+      const inBar=[...bar.querySelectorAll('a,button,input,select,.sync-state,.seg')].filter(el=>{
+        if(!vis(el))return false;
+        /* dans le menu fermé : exclus */
+        if(el.closest('.more-menu')||el.closest('.ed-more-menu'))return false;
+        /* descendants d'un contrôle déjà listé : le bouton du seg ouvert dans la barre seulement */
+        return true;
+      });
+      /* à ces largeurs, en barre : menu, accueil, ⋯ (éventuellement installer caché) */
+      const ids=inBar.map(e=>e.id||e.className||e.tagName).join(', ');
+      if(!inBar.includes(menu)||!inBar.includes(back)||!inBar.includes(more))bad.push(w+' : trio manquant ('+ids+')');
+      const extra=inBar.filter(e=>e!==menu&&e!==back&&e!==more&&!e.closest('#barMore')&&e.id!=='moreBtn');
+      /* le bouton ⋯ est dans #barMore ; rien d'autre (Éditeur, IA, Synchro…) ne doit être visible dans la barre */
+      const leak=inBar.filter(e=>{
+        if(e===menu||e===back||e===more)return false;
+        if(e===more||e.id==='moreBtn')return false;
+        if(e.closest('#moreMenu')||e.closest('#edMoreMenu'))return false;
+        /* logo caché, install hidden */
+        if(e.classList.contains('logo')||e.hasAttribute('hidden')||e.id==='styleBtn')return false;
+        return true;
+      });
+      if(leak.length)bad.push(w+' : encore visible dans la barre : '+leak.map(e=>e.id||e.className).join(', '));
+      const boxes=[menu,back,more].filter(vis);
+      for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++)if(overlap(boxes[i],boxes[j]))bad.push(w+' : chevauchement '+(boxes[i].id||boxes[i].className)+' / '+(boxes[j].id||boxes[j].className));
+      for(const el of boxes){const r=el.getBoundingClientRect();if(Math.min(r.width,r.height)<44&&!(r.height>=44&&r.width>=24)&&!(r.width>=44&&r.height>=40))bad.push(w+' : cible '+(el.id||el.className)+' '+Math.round(r.width)+'×'+Math.round(r.height));}
+      /* menu ⋯ ouvert : Éditeur, Graphe, IA, Synchro y sont, cibles 44 px */
+      more.click();await sleep(40);
+      const mm=d.getElementById('moreMenu');
+      if(!mm||!mm.classList.contains('open'))bad.push(w+' : menu ⋯ pas ouvert');
+      else{
+        const need=['Éditeur','Graphe','IA','Synchro'];
+        const txt=mm.textContent;
+        for(const n of need)if(!txt.includes(n.replace('IA','IA')))bad.push(w+' : manque « '+n+' » dans le ⋯');
+        if(!/IA/.test(txt))bad.push(w+' : IA absente du menu');
+        if(!/Synchro/.test(txt))bad.push(w+' : Synchro absente du menu');
+        mm.querySelectorAll('button').forEach(b=>{const r=b.getBoundingClientRect();if(r.width&&r.height&&Math.min(r.width,r.height)<44&&!(r.height>=44&&r.width>=24))bad.push(w+' : item ⋯ '+(b.id||b.textContent.trim())+' '+Math.round(r.width)+'×'+Math.round(r.height));});
+      }
+      more.click();await sleep(20);
+    }
+    if(bad.length)throw new Error(bad.slice(0,10).join(' ; ')+(bad.length>10?' … (+'+(bad.length-10)+')':''));
+  }finally{if(F)F.remove();restoreLS(S);}});
+
 T('Petit écran (v10) : carnet, accueil, IA, dessin à 320 px — cibles ≥ 44 px (boutons principaux), champs ≥ 16 px, pas de défilement horizontal',async()=>{const S=snap();
   const bad=[];
   const audit=(w,where)=>{const d=w.document;const vw=d.documentElement.clientWidth;

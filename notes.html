@@ -5,12 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- v5 : politique de sécurité (CSP). Cette page garde le jeton GitHub de la synchro : aucun script en ligne, aucun eval,
      et elle ne peut parler qu'à elle-même et à l'API GitHub. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://gist.githubusercontent.com https://generativelanguage.googleapis.com https://api.openai.com https://openrouter.ai https://api.mistral.ai https://api.groq.com http://localhost:* http://127.0.0.1:* https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://gist.githubusercontent.com https://generativelanguage.googleapis.com https://api.openai.com https://openrouter.ai https://api.mistral.ai https://api.groq.com http://localhost:* http://127.0.0.1:* https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>AVERSE — carnet</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<script src="js/fonts.js" data-href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@300;400;500&amp;display=swap"></script>
-<noscript><link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"></noscript>
+<link rel="preload" href="fonts/jbm-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/bsd-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
 <meta name="description" content="AVERSE · carnet — notes liées et graphe. Tout reste dans ton navigateur.">
 <meta name="theme-color" content="#06060a">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -49,8 +48,9 @@
     <!-- v9 : actions secondaires regroupées dans « ... » sur ordinateur (la barre tient à toutes les largeurs, même en appli
          installée sous les boutons de fenêtre). Sur mobile, le menu s'efface et ses boutons défilent avec les autres. -->
     <div class="more" id="barMore">
-      <button class="ico-btn more-btn" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="Plus d'actions : fichier, export, sauvegarde, apparence…">...</button>
+      <button class="ico-btn more-btn" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="Plus d'actions : fichier, export, sauvegarde, apparence, synchro…">...</button>
       <div class="more-menu" id="moreMenu" role="menu" aria-label="Plus d'actions">
+        <div class="more-primary" id="morePrimary" hidden></div>
         <button class="ico-btn" id="fileBtn" role="menuitem" title="Synchro : lie le carnet à un fichier (ex. dans ton dossier OneDrive / Google Drive)">Fichier</button>
         <button class="ico-btn" id="exportBtn" role="menuitem" title="Enregistre seulement tes notes dans un fichier">Export notes</button>
         <button class="ico-btn" id="importBtn" role="menuitem" title="Ajoute les notes d'un fichier exporté (rien n'est écrasé)">Import notes</button>
@@ -64,13 +64,10 @@
     <input type="file" id="importFile" accept="application/json" style="display:none">
     <input type="file" id="bakFile" accept=".json,application/json" style="display:none">
   </div>
-  <!-- v5 : sur mobile, la barre de boutons défile au doigt : flèches + fondus aux bords + petite barre de position -->
-  <button class="bar-arrow l" id="barL" aria-label="Boutons précédents" hidden><</button>
-  <button class="bar-arrow r" id="barR" aria-label="Boutons suivants" hidden>></button>
-  <div class="bar-nav" id="barNav" hidden><span id="barThumb"></span></div>
+  <div class="cloud-tok" id="cloudTok" hidden role="status"></div>
 </div>
 
-<div class="app">
+<div class="app" id="noteApp">
   <!-- BARRE LATÉRALE -->
   <aside class="side" id="side">
     <div class="side-top">
@@ -81,6 +78,7 @@
     </div>
     <div class="list" id="list"></div>
   </aside>
+  <div class="split split-v" id="splitSide" aria-label="Largeur de la liste de notes"></div>
 
   <!-- ZONE PRINCIPALE -->
   <main class="main" id="main">
@@ -96,11 +94,16 @@
         <div class="ed-row">
           <span>Tags</span>
           <input class="tags-in" id="tagsIn" placeholder="séparés par des virgules">
-          <button class="del" id="mdBtn" style="margin-left:auto">Exporter .md</button>
-          <button class="del" id="pdfBtn" style="margin-left:0" title="Vue d'impression propre -> « Enregistrer au format PDF »">PDF</button>
-          <button class="del" id="shareBtn" style="margin-left:0" title="Partager cette note : lien chiffré, fichier, ou partage du téléphone">Partager</button>
-          <button class="del" id="tplSaveBtn" style="margin-left:0" title="Enregistrer comme modèle (réutilisable pour tes prochaines notes)">Modèle</button>
-          <button class="del" id="delBtn" style="margin-left:0">Supprimer</button>
+          <div class="ed-acts" id="edActs">
+            <button type="button" class="del ed-more" id="edMoreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="edMoreMenu" title="Actions de la note" aria-label="Actions de la note">...</button>
+            <div class="ed-more-menu" id="edMoreMenu" role="menu" aria-label="Actions de la note">
+              <button class="del" id="mdBtn" role="menuitem">Exporter .md</button>
+              <button class="del" id="pdfBtn" role="menuitem" title="Vue d'impression propre -> « Enregistrer au format PDF »">PDF</button>
+              <button class="del" id="shareBtn" role="menuitem" title="Partager cette note : lien chiffré, fichier, ou partage du téléphone">Partager</button>
+              <button class="del" id="tplSaveBtn" role="menuitem" title="Enregistrer comme modèle (réutilisable pour tes prochaines notes)">Modèle</button>
+              <button class="del" id="delBtn" role="menuitem">Supprimer</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="cf-bar" id="cfBar" hidden role="status"></div>
@@ -108,14 +111,20 @@
         <button class="active" data-p="write">Écrire</button>
         <button data-p="prev">Aperçu</button>
       </div>
-      <div class="panes">
+      <div class="ed-body" id="edBody">
+      <div class="panes" id="panes">
         <div class="pane write shown" id="paneWrite">
           <textarea id="bodyIn" placeholder="Écris ici…&#10;&#10;# Titre   **gras**   *italique*   `code`&#10;- liste   1. numérotée   - [ ] tâche&#10;```bloc de code```   | tableau |   > citation&#10;[[Lien vers une note]]   [texte](https://lien.fr)"></textarea>
         </div>
+        <div class="split split-v" id="splitPanes" aria-label="Largeur de l'aperçu"></div>
         <div class="pane" id="panePrev"><div id="preview"></div></div>
       </div>
+      <div class="split split-h" id="splitSouth" aria-label="Hauteur du bas de page"></div>
+      <div class="ed-south" id="edSouth">
       <div class="att-box" id="attBox" aria-label="Pièces jointes"></div>
       <div class="backlinks" id="backlinks"></div>
+      </div>
+      </div>
     </div>
 
     <div class="graph-wrap" id="graphWrap">
@@ -154,8 +163,8 @@
 <script defer src="js/vendor/qrcode.js"></script>
 <script defer src="js/vault.js"></script>
 <script defer src="js/cloud.js"></script>
+<script defer src="js/split.js"></script>
 <script defer src="js/notes-page.js"></script>
-<script defer src="js/glyph.js"></script>
 <script defer src="js/ai-mark.js"></script>
 <script defer src="js/ai.js"></script>
 <script defer src="js/ai-notes.js"></script>

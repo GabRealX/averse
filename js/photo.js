@@ -54,7 +54,7 @@ function open(file){
   close();prevFocus=document.activeElement;
   ov=document.createElement('div');ov.className='ctx-ov';ov.id='photoDlg';
   ov.innerHTML='<div class="ctx-dlg ph-dlg" role="dialog" aria-modal="true" aria-labelledby="phT">'+
-    '<div class="ph-head"><span class="ph-gl"></span><div><div class="ctx-dt" id="phT">Photo -> note</div>'+
+    '<div class="ph-head"><div><div class="ctx-dt" id="phT">Photo -> note</div>'+
     '<div class="ph-sub">Lecture du texte sur ton appareil (français + anglais). Rien n\'est envoyé.</div></div></div>'+
     '<div class="ph-pick" id="phPick">'+
       '<button type="button" class="tpl-b primary" data-ph="cam">photo Prendre une photo</button>'+
@@ -67,7 +67,7 @@ function open(file){
     '<input type="file" id="phCam" accept="image/*" capture="environment" hidden><input type="file" id="phFile" accept="image/*" hidden>'+
     '<div class="ctx-db" id="phBtns"><button type="button" class="tpl-b" data-ph="x">Annuler</button></div></div>';
   document.body.appendChild(ov);addEventListener('keydown',onKey,true);
-  const q=s=>ov.querySelector(s),g=GLYPH.create({size:64,kind:'photo'});q('.ph-gl').appendChild(g.el);ov._g=g;
+  const q=s=>ov.querySelector(s),g=(typeof AIMARK!=='undefined'?AIMARK.create({size:24,state:'idle',pause:true}):{set:()=>{},destroy:()=>{},el:null});ov._g=g;
   let cur=null,busy=false;
   const btns=h=>{q('#phBtns').innerHTML='<button type="button" class="tpl-b" data-ph="x">Annuler</button>'+h;};
   async function take(f){
@@ -77,10 +77,10 @@ function open(file){
     q('#phPick').hidden=true;q('#phWork').hidden=false;
     if(ov._u)URL.revokeObjectURL(ov._u);ov._u=URL.createObjectURL(f);q('#phImg').src=ov._u;
     const st=q('#phSt'),ta=q('#phTxt');ta.value='';ta.disabled=true;btns('');
-    g.set('download',{p:0});st.textContent='Préparation…';
+    g.set('read');st.textContent='Préparation…';if(g.el)st.prepend(g.el);
     try{
       const t=await OCR(f,(label,p,pp)=>{if(!ov)return;st.textContent=label+(pp!=null&&isFinite(pp)?' — '+Math.round(pp*100)+' %':'');
-        if(p!=null)g.progress(p);else if(pp!=null)g.set('download',{p:pp});});
+        if(g.set)g.set('read');});
       if(!ov)return;
       const txt=tidy(t);ta.value=txt;ta.disabled=false;g.set(txt?'done':'error');
       st.textContent=txt?txt.length+' caractères lus. Vérifie, puis crée la note.':'Aucun texte trouvé sur cette image. Tu peux l\'écrire toi-même.';

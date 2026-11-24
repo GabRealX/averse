@@ -490,7 +490,7 @@ function run(task,o){
     '<div class="ai-err" id="aiErr" role="alert" hidden></div>'+
     '<div class="ctx-db" id="aiBtns"></div></form>';
   document.body.appendChild(ov);
-  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=(typeof AIMARK!=='undefined'?AIMARK:GLYPH).create({size:24,kind:T.kind});f.querySelector('.ai-gl').appendChild(g.el);
+  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=AIMARK.create({size:24,kind:T.kind});f.querySelector('.ai-gl').appendChild(g.el);
   let ctl=null,result='',extracts=null,closed=false;
   const prev=document.activeElement;
   const close=()=>{if(closed)return;closed=true;if(ctl)ctl.abort();g.destroy();ov.remove();OPEN=null;document.removeEventListener('keydown',onKey,true);if(prev&&prev.focus)try{prev.focus();}catch(e){}};
@@ -615,9 +615,9 @@ function settings(){
     '<a id="aiGet" target="_blank" rel="noopener noreferrer">Obtenir une clé</a>. Sur le carnet, la page n\'autorise que Gemini, OpenAI, OpenRouter, Mistral, Groq et localhost (CSP).</p>'+
     '<div class="ctx-db"><button type="button" class="btn primary" data-s="x">Fermer</button></div></form>';
   document.body.appendChild(ov);
-  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=GLYPH.create({size:64,kind:'model'});f.querySelector('.ai-gl').appendChild(g.el);
+  const f=ov.firstChild,$i=id=>f.querySelector('#'+id),g=AIMARK.create({size:24,state:'idle',pause:true});const _gl=f.querySelector('.ai-gl');if(_gl)_gl.appendChild(g.el);g.progress=p=>g.set(p>=1?'done':'read');
   let closed=false;
-  const close=()=>{closed=true;E.subs.delete(loc);E.subs.delete(net);removeEventListener('online',net);removeEventListener('offline',net);g.destroy();ov.remove();OPEN=null;document.removeEventListener('keydown',onKey,true);};
+  const close=()=>{closed=true;E.subs.delete(loc);E.subs.delete(net);removeEventListener('online',net);removeEventListener('offline',net);if(g)g.destroy();ov.remove();OPEN=null;document.removeEventListener('keydown',onKey,true);};
   const onKey=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}};
   document.addEventListener('keydown',onKey,true);
   ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
