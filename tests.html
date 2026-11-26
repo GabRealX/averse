@@ -2101,6 +2101,21 @@ T('Barre du carnet (v14) : à 320 / 360 / 375 / 390 px, menu + accueil + ⋯ seu
     if(bad.length)throw new Error(bad.slice(0,10).join(' ; ')+(bad.length>10?' … (+'+(bad.length-10)+')':''));
   }finally{if(F)F.remove();restoreLS(S);}});
 
+
+T('Carnet (v14) : un seul défilement dans le panneau d\'écriture — le textarea, pas aussi le conteneur (plus de double barre)',async()=>{const S=snap();
+  try{
+    const body=Array.from({length:60},(_,i)=>'## '+i+'\n\n'+'paragraphe '.repeat(20)).join('\n');
+    sNotes([{id:'dbl_a',title:'Longue note',body:body}]);
+    await frame('notes.html#dbl_a',()=>W.notesApi&&W.document.getElementById('bodyIn'));
+    F.style.width='1280px';F.style.height='800px';await sleep(200);
+    const d=W.document,pane=d.querySelector('.pane.write'),ta=d.getElementById('bodyIn'),split=d.getElementById('splitPanes');
+    if(!pane||!ta)throw new Error('panneaux');
+    if(pane.scrollHeight-pane.clientHeight>1)throw new Error('le conteneur défile encore ('+pane.scrollHeight+' > '+pane.clientHeight+')');
+    if(ta.scrollHeight-ta.clientHeight<80)throw new Error('le textarea devrait défiler (contenu trop court ? '+ta.scrollHeight+' / '+ta.clientHeight+')');
+    const ov=W.getComputedStyle(pane).overflowY;if(ov!=='hidden'&&ov!=='clip')throw new Error('overflow du panneau : '+ov);
+    if(split){const cs=W.getComputedStyle(split);if(cs.cursor!=='col-resize'&&cs.display!=='none')throw new Error('curseur poignée : '+cs.cursor);}
+  }finally{if(F)F.remove();restoreLS(S);}});
+
 T('Petit écran (v10) : carnet, accueil, IA, dessin à 320 px — cibles ≥ 44 px (boutons principaux), champs ≥ 16 px, pas de défilement horizontal',async()=>{const S=snap();
   const bad=[];
   const audit=(w,where)=>{const d=w.document;const vw=d.documentElement.clientWidth;

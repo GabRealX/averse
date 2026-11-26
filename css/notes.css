@@ -24,7 +24,7 @@ body{overflow:hidden}
 .ico-btn:hover{border-color:var(--fg-soft);color:var(--fg)}
 
 /* ===== STRUCTURE ===== */
-.app{position:relative;z-index:1;height:100%;padding-top:var(--bar);display:grid;grid-template-columns:var(--side-w,288px) 10px 1fr}
+.app{position:relative;z-index:1;height:100%;padding-top:var(--bar);display:grid;grid-template-columns:var(--side-w,288px) 12px 1fr}
 .side{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 .side-top{padding:16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
 .search{width:100%;background:transparent;border:1px solid var(--line-2);color:var(--fg);font-family:var(--mono);
@@ -78,11 +78,12 @@ body{overflow:hidden}
   letter-spacing:.12em;text-transform:uppercase;padding:7px 14px;cursor:pointer}
 .panes-tabs button+button{border-left:1px solid var(--line-2)}
 .panes-tabs button.active{background:var(--fg);color:var(--bg)}
-.panes{flex:1;display:grid;grid-template-columns:minmax(140px,var(--write-fr,40%)) 10px minmax(180px,var(--prev-fr,60%));min-height:0;margin-top:14px;border-top:1px solid var(--line)}
+.panes{flex:1;display:grid;grid-template-columns:minmax(140px,var(--write-fr,40%)) 12px minmax(180px,var(--prev-fr,60%));min-height:0;margin-top:14px;border-top:1px solid var(--line)}
 .pane{min-height:0;overflow-y:auto;padding:22px 28px}
-.pane.write{border-right:1px solid var(--line)}
-.write textarea{width:100%;height:100%;min-height:300px;background:transparent;border:0;resize:none;outline:none;
-  color:var(--fg-soft);font-family:var(--mono);font-size:.84rem;line-height:1.85}
+/* v14 : un seul défilement à gauche — le textarea, pas aussi le panneau (padding + height:100% faisait une 2e barre, presque pleine, juste à côté de la poignée) */
+.pane.write{overflow:hidden;display:flex;flex-direction:column;padding:0;border-right:0}
+.write textarea{flex:1;min-height:0;width:100%;height:auto;padding:22px 28px;background:transparent;border:0;resize:none;outline:none;
+  color:var(--fg-soft);font-family:var(--mono);font-size:.84rem;line-height:1.85;box-sizing:border-box}
 
 /* rendu */
 .rendered h1,.rendered h2,.rendered h3{color:var(--fg);font-family:var(--mono);font-weight:500;letter-spacing:.01em;margin:1.3em 0 .5em}
@@ -325,12 +326,16 @@ html[data-style="ascii"] .more-menu{border-style:dashed;box-shadow:none}
 
 /* ===== v14 : séparateurs, sections repliables, barre compacte sur téléphone ===== */
 .split{flex:none;position:relative;z-index:2;background:transparent;touch-action:none;-webkit-user-select:none;user-select:none}
-.split-v{width:10px;cursor:col-resize}
-.split-h{height:10px;cursor:row-resize;flex:none}
+.split-v{width:12px;cursor:col-resize}
+.split-h{height:12px;cursor:row-resize;flex:none}
 .split::after{content:'';position:absolute;background:var(--line-2)}
-.split-v::after{top:0;bottom:0;left:4px;width:2px}
-.split-h::after{left:0;right:0;top:4px;height:2px}
-.split:hover::after,.split.on::after,.split:focus-visible::after{background:var(--fg)}
+.split-v::after{top:0;bottom:0;left:50%;width:1px;transform:translateX(-50%)}   /* fine ligne, pas une fausse scrollbar */
+.split-h::after{left:0;right:0;top:50%;height:1px;transform:translateY(-50%)}
+.split-v::before,.split-h::before{content:'';position:absolute;background:var(--fg-faint);border-radius:2px;pointer-events:none;z-index:1}
+.split-v::before{left:50%;top:50%;width:4px;height:28px;transform:translate(-50%,-50%)}   /* poignée centrale */
+.split-h::before{left:50%;top:50%;width:28px;height:4px;transform:translate(-50%,-50%)}
+.split:hover::after,.split.on::after,.split:focus-visible::after,
+.split:hover::before,.split.on::before,.split:focus-visible::before{background:var(--fg)}
 .split:focus-visible{outline:2px solid var(--fg);outline-offset:-2px}
 body.splitting{cursor:col-resize}
 body.splitting .split-h,body.splitting.split-h{cursor:row-resize}
@@ -481,7 +486,8 @@ html.dw-lock,html.dw-lock body{overflow:hidden;overscroll-behavior:none}
   .ed-body{flex:none}
   .panes{flex:none}
   .pane{min-height:60vh;padding:16px 16px}
-  .pane.write textarea{min-height:58vh}
+  .pane.write{padding:0}
+  .pane.write textarea{min-height:58vh;padding:16px}
   .ed-south{height:auto}
   .ed-row{gap:6px;flex-wrap:wrap}
   .ed-row .del{margin-left:0!important;padding:0 10px}
